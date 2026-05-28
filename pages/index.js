@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
-import '../styles/globals.css'
 
 const fmt = (n) => isNaN(n) ? '0' : Number(n).toLocaleString('pt-BR')
 const fmtR = (n) => `R$ ${fmt(Math.round(n))}`
