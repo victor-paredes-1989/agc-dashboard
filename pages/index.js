@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 
 const fmt = (n) => { const num = Number(n); return isNaN(num) ? '0' : num.toLocaleString('pt-BR') }
-const fmtR = (n) => `R$ ${fmt(Math.round(Number(n) || 0))}`
+const fmtDec = (n) => { const num = Number(n); return isNaN(num) ? '0,0' : num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) }
+const fmtR = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
 const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`
 
 // Colors by CONCEPT — same concept = same color everywhere
@@ -267,7 +268,7 @@ function MetricCards({ metricas }) {
           { label: 'Contratos Pagos', value: fmt(metricas.contratosPagos), sub: `Vendidos: ${fmt(metricas.contratosVendidos)}`, color: 'green' },
           { label: 'NMRR', value: fmtR(metricas.nmrr), sub: `TKM: ${fmtR(metricas.tkm)}`, color: 'amber' },
           { label: 'Investimento', value: fmtR(metricas.investimento), sub: `CPL: ${fmtR(metricas.cpl)}`, color: 'purple' },
-          { label: 'CAC', value: fmtR(metricas.cac), sub: 'por contrato pago', color: 'teal' },
+          { label: 'CAC', value: fmtR(metricas.cac), sub: `por contrato | TKM: ${fmtR(metricas.tkm)}`, color: 'teal' },
           { label: 'Gap da Meta', value: gap, sub: gapPositive ? '✓ Meta atingida' : '⚠ Abaixo da meta', color: gapPositive ? 'green' : 'red' },
         ].map((c, i) => (
           <div key={i} className={`card ${c.color}`}>
@@ -334,6 +335,111 @@ function ReuniaoGraficos({ graficos }) {
   )
 }
 
+
+function ForecastView({ forecast }) {
+  const [mesSel, setMesSel] = useState(null)
+
+  if (!forecast || forecast.length === 0) return (
+    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de forecast</div>
+  )
+
+  const dados = mesSel ? forecast.filter(f => f.mes === mesSel) : forecast
+
+  const isPositive = (v) => Number(String(v).replace(/[^0-9.-]/g,'')) >= 0
+  const fmtGap = (v) => {
+    const s = String(v)
+    return s.startsWith('-') ? { val: s, color: '#ef4444' } : { val: s.startsWith('R') ? s : `+${s}`, color: '#10b981' }
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Filtrar:</span>
+        <button onClick={() => setMesSel(null)}
+          style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer',
+            background: mesSel === null ? 'rgba(255,255,255,0.12)' : 'transparent',
+            borderColor: mesSel === null ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+            color: mesSel === null ? '#e2e8f0' : '#94a3b8' }}>
+          Todos os meses
+        </button>
+        {forecast.map(f => (
+          <button key={f.mes} onClick={() => setMesSel(f.mes)}
+            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer',
+              background: mesSel === f.mes ? 'rgba(255,255,255,0.12)' : 'transparent',
+              borderColor: mesSel === f.mes ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+              color: mesSel === f.mes ? '#e2e8f0' : '#94a3b8' }}>
+            {f.mes}
+          </button>
+        ))}
+      </div>
+
+      {dados.map((f, idx) => {
+        const gapPago = fmtGap(f.gapPago)
+        const gapNmrr = fmtGap(f.gapNmrr)
+        const gapContratos = f.gapContratos >= 0
+        return (
+          <div key={idx} style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 14, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>{f.mes} 2026</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+              <div className="card green">
+                <div className="card-label">MRR Pago Projetado</div>
+                <div className="card-value">{fmtR(f.mrrPago)}</div>
+                <div className="card-sub">{fmtPct(f.pctPago)} da meta</div>
+              </div>
+              <div className={`card ${gapPago.val.startsWith('-') ? 'red' : 'green'}`}>
+                <div className="card-label">Gap Pago</div>
+                <div className="card-value">{f.gapPago}</div>
+                <div className="card-sub">{gapPago.val.startsWith('-') ? '⚠ Abaixo' : '✓ Acima'} da meta</div>
+              </div>
+              <div className="card amber">
+                <div className="card-label">Projeção Vendido</div>
+                <div className="card-value">{fmtR(f.projecaoVendido)}</div>
+                <div className="card-sub">{fmtPct(f.pctVendido)} do projetado</div>
+              </div>
+              <div className={`card ${f.gapContratos >= 0 ? 'green' : 'red'}`}>
+                <div className="card-label">Gap Contratos</div>
+                <div className="card-value">{f.gapContratos >= 0 ? '+' : ''}{fmt(f.gapContratos)}</div>
+                <div className="card-sub">vs meta</div>
+              </div>
+              <div className={`card ${f.gapRlzd >= 0 ? 'green' : 'red'}`}>
+                <div className="card-label">Gap Realizadas</div>
+                <div className="card-value">{f.gapRlzd >= 0 ? '+' : ''}{fmt(f.gapRlzd)}</div>
+                <div className="card-sub">reuniões</div>
+              </div>
+              <div className={`card ${f.gapAgd >= 0 ? 'green' : 'red'}`}>
+                <div className="card-label">Gap Agendadas</div>
+                <div className="card-value">{f.gapAgd >= 0 ? '+' : ''}{fmt(f.gapAgd)}</div>
+                <div className="card-sub">agendamentos</div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Metas Diárias</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+              <div className="card blue">
+                <div className="card-label">Meta Dia — Pago</div>
+                <div className="card-value">{fmtR(f.metaDiaPago)}</div>
+              </div>
+              <div className="card">
+                <div className="card-label">Meta Dia — Agend.</div>
+                <div className="card-value">{fmt(f.metaAgdDia)}</div>
+              </div>
+              <div className="card">
+                <div className="card-label">Meta Dia — Realiz.</div>
+                <div className="card-value">{fmt(f.metaRlzdDia)}</div>
+              </div>
+              <div className="card purple">
+                <div className="card-label">Meta Dia — Contratos</div>
+                <div className="card-value">{fmt(f.metaContPagoDia)}</div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -360,7 +466,7 @@ export default function Dashboard() {
         </div>
       </nav>
       <div className="sub-nav">
-        {[['MAI','Maio 2026'],['ABR','Abril 2026'],['SEMANAS','Por Semana']].map(([p,label])=>(
+        {[['MAI','Maio 2026'],['ABR','Abril 2026'],['SEMANAS','Por Semana'],['FORECAST','Forecast']].map(([p,label])=>(
           <button key={p} className={`sub-tab ${periodo===p?'active':''}`} onClick={()=>setPeriodo(p)}>{label}</button>
         ))}
       </div>
@@ -369,6 +475,7 @@ export default function Dashboard() {
       {!loading && !error && data && (
         <div className="page">
           {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
+           periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} /> :
            periodoData ? <>
              <MetricCards metricas={periodoData.metricas} />
              <ReuniaoCards cards={periodoData.reunioes?.cards} />
