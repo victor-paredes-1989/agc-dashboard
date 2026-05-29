@@ -4,6 +4,8 @@ import Head from 'next/head'
 const fmt = (n) => { const num = Number(n); return isNaN(num) ? '0' : num.toLocaleString('pt-BR') }
 const fmtDec = (n) => { const num = Number(n); return isNaN(num) ? '0,0' : num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) }
 const fmtR = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
+const fmtR1 = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` }
+const fmtNum1 = (n) => { const num = Number(n) || 0; return num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }
 const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`
 
 // Colors by CONCEPT — same concept = same color everywhere
@@ -38,7 +40,7 @@ function getConceptColor(nome, fallbackArr, idx) {
   return fallbackArr[idx % fallbackArr.length]
 }
 
-function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, formatVal, showPct = false, conceptColor = false }) {
+function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, formatVal, showPct = false, conceptColor = false, extraValueKey = null, formatExtraVal = null }) {
   if (!data || data.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>Sem dados</div>
   const total = data.reduce((s, d) => s + (Number(d[valueKey]) || 0), 0)
   const max = Math.max(...data.map(d => Number(d[valueKey]) || 0))
@@ -49,6 +51,11 @@ function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, 
         const pct = max > 0 ? (val / max) * 100 : 0
         const pctOfTotal = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0'
         const displayVal = formatVal ? formatVal(val) : val
+        const extraVal = extraValueKey ? (Number(d[extraValueKey]) || 0) : null
+        const displayExtra = extraValueKey ? (formatExtraVal ? formatExtraVal(extraVal) : extraVal) : null
+        const finalLabel = extraValueKey
+          ? `${displayVal} - ${displayExtra}${showPct ? ` - ${pctOfTotal}%` : ''}`
+          : `${displayVal}${showPct ? ` (${pctOfTotal}%)` : ''}`
         const color = conceptColor
           ? getConceptColor(d[labelKey], colorArr || CLOSER_COLORS, i)
           : (colorArr ? colorArr[i % colorArr.length] : '#3b82f6')
@@ -58,8 +65,8 @@ function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, 
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', width: showPct ? 90 : 36, textAlign: 'right', flexShrink: 0 }}>
-              {displayVal}{showPct ? ` (${pctOfTotal}%)` : ''}
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', width: extraValueKey ? 150 : (showPct ? 90 : 36), textAlign: 'right', flexShrink: 0 }}>
+              {finalLabel}
             </div>
           </div>
         )
@@ -312,7 +319,7 @@ function ReuniaoGraficos({ graficos }) {
         <div className="chart-card"><div className="chart-title">Qtd de Pagos por Origem</div>
           <BarChart data={graficos.qtdPagosPorOrigem} valueKey="qtd" conceptColor showPct /></div>
         <div className="chart-card"><div className="chart-title">Pipeline Ativo por Status</div>
-          <BarChart data={graficos.pipeline} valueKey="qtd" colorArr={Object.values(STATUS_COLORS)} showPct /></div>
+          <BarChart data={graficos.pipeline} valueKey="qtd" colorArr={Object.values(STATUS_COLORS)} showPct extraValueKey="valor" formatExtraVal={v=>fmtR1(v)} /></div>
         <div className="chart-card"><div className="chart-title">Reuniões por Closer</div>
           <BarChart data={graficos.reunioesPorCloser} valueKey="qtd" colorArr={CLOSER_COLORS} showPct /></div>
         <div className="chart-card"><div className="chart-title">Valor Fechado por Closer (R$)</div>
@@ -344,12 +351,10 @@ function ForecastView({ forecast }) {
   )
 
   const dados = mesSel ? forecast.filter(f => f.mes === mesSel) : forecast
-
-  const isPositive = (v) => Number(String(v).replace(/[^0-9.-]/g,'')) >= 0
-  const fmtGap = (v) => {
-    const s = String(v)
-    return s.startsWith('-') ? { val: s, color: '#ef4444' } : { val: s.startsWith('R') ? s : `+${s}`, color: '#10b981' }
-  }
+  const gapIsPositive = (v) => Number(v || 0) < 0
+  const gapCardClass = (v) => gapIsPositive(v) ? 'green' : 'red'
+  const gapSub = (v, label = 'da meta') => gapIsPositive(v) ? `✓ Acima ${label}` : `⚠ Abaixo ${label}`
+  const signedNumber = (v) => `${Number(v || 0) > 0 ? '+' : ''}${fmtNum1(v)}`
 
   return (
     <div>
@@ -374,42 +379,51 @@ function ForecastView({ forecast }) {
       </div>
 
       {dados.map((f, idx) => {
-        const gapPago = fmtGap(f.gapPago)
-        const gapNmrr = fmtGap(f.gapNmrr)
-        const gapContratos = f.gapContratos >= 0
+        const hasMeta = Number(f.meta || 0) > 0
+        const mrrAbaixoDaMeta = hasMeta && Number(f.mrrPago || 0) < Number(f.meta || 0)
         return (
           <div key={idx} style={{ marginBottom: 28 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 14, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>{f.mes} 2026</div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
-              <div className="card green">
-                <div className="card-label">MRR Pago Projetado</div>
-                <div className="card-value">{fmtR(f.mrrPago)}</div>
-                <div className="card-sub">{fmtPct(f.pctPago)} da meta</div>
+              <div className="card blue">
+                <div className="card-label">Meta</div>
+                <div className="card-value">{fmtR1(f.meta)}</div>
+                <div className="card-sub">meta do mês</div>
               </div>
-              <div className={`card ${gapPago.val.startsWith('-') ? 'red' : 'green'}`}>
+              <div className={`card ${mrrAbaixoDaMeta ? 'red' : 'green'}`}>
+                <div className="card-label">MRR Pago Projetado</div>
+                <div className="card-value">{fmtR1(f.mrrPago)}</div>
+                <div className="card-sub">{fmtPct(f.pctPago)} da meta {mrrAbaixoDaMeta ? '⚠ abaixo' : '✓ acima'}</div>
+              </div>
+              <div className={`card ${gapCardClass(f.gapPago)}`}>
                 <div className="card-label">Gap Pago</div>
-                <div className="card-value">{f.gapPago}</div>
-                <div className="card-sub">{gapPago.val.startsWith('-') ? '⚠ Abaixo' : '✓ Acima'} da meta</div>
+                <div className="card-value">{fmtR1(f.gapPago)}</div>
+                <div className="card-sub">{gapSub(f.gapPago)}</div>
               </div>
               <div className="card amber">
                 <div className="card-label">Projeção Vendido</div>
-                <div className="card-value">{fmtR(f.projecaoVendido)}</div>
+                <div className="card-value">{fmtR1(f.projecaoVendido)}</div>
                 <div className="card-sub">{fmtPct(f.pctVendido)} do projetado</div>
               </div>
-              <div className={`card ${f.gapContratos >= 0 ? 'green' : 'red'}`}>
-                <div className="card-label">Gap Contratos</div>
-                <div className="card-value">{f.gapContratos >= 0 ? '+' : ''}{fmt(f.gapContratos)}</div>
-                <div className="card-sub">vs meta</div>
+              <div className={`card ${gapCardClass(f.gapNmrr)}`}>
+                <div className="card-label">Gap NMRR</div>
+                <div className="card-value">{fmtR1(f.gapNmrr)}</div>
+                <div className="card-sub">{gapSub(f.gapNmrr)}</div>
               </div>
-              <div className={`card ${f.gapRlzd >= 0 ? 'green' : 'red'}`}>
+              <div className={`card ${gapCardClass(f.gapContratos)}`}>
+                <div className="card-label">Gap Contratos</div>
+                <div className="card-value">{signedNumber(f.gapContratos)}</div>
+                <div className="card-sub">{gapSub(f.gapContratos, 'vs meta')}</div>
+              </div>
+              <div className={`card ${gapCardClass(f.gapRlzd)}`}>
                 <div className="card-label">Gap Realizadas</div>
-                <div className="card-value">{f.gapRlzd >= 0 ? '+' : ''}{fmt(f.gapRlzd)}</div>
+                <div className="card-value">{signedNumber(f.gapRlzd)}</div>
                 <div className="card-sub">reuniões</div>
               </div>
-              <div className={`card ${f.gapAgd >= 0 ? 'green' : 'red'}`}>
+              <div className={`card ${gapCardClass(f.gapAgd)}`}>
                 <div className="card-label">Gap Agendadas</div>
-                <div className="card-value">{f.gapAgd >= 0 ? '+' : ''}{fmt(f.gapAgd)}</div>
+                <div className="card-value">{signedNumber(f.gapAgd)}</div>
                 <div className="card-sub">agendamentos</div>
               </div>
             </div>
@@ -418,19 +432,19 @@ function ForecastView({ forecast }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
               <div className="card blue">
                 <div className="card-label">Meta Dia — Pago</div>
-                <div className="card-value">{fmtR(f.metaDiaPago)}</div>
+                <div className="card-value">{fmtR1(f.metaDiaPago)}</div>
               </div>
               <div className="card">
                 <div className="card-label">Meta Dia — Agend.</div>
-                <div className="card-value">{fmt(f.metaAgdDia)}</div>
+                <div className="card-value">{fmtNum1(f.metaAgdDia)}</div>
               </div>
               <div className="card">
                 <div className="card-label">Meta Dia — Realiz.</div>
-                <div className="card-value">{fmt(f.metaRlzdDia)}</div>
+                <div className="card-value">{fmtNum1(f.metaRlzdDia)}</div>
               </div>
               <div className="card purple">
                 <div className="card-label">Meta Dia — Contratos</div>
-                <div className="card-value">{fmt(f.metaContPagoDia)}</div>
+                <div className="card-value">{fmtNum1(f.metaContPagoDia)}</div>
               </div>
             </div>
           </div>
