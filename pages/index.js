@@ -343,6 +343,214 @@ function ReuniaoGraficos({ graficos }) {
 }
 
 
+
+function DadosEspecificosView({ registros }) {
+  const [filtros, setFiltros] = useState({
+    empresa: 'TODAS', mes: 'TODOS', ano: 'TODOS', sdr: 'TODOS', closer: 'TODOS',
+    origem: 'TODAS', status: 'TODOS', servico: 'TODOS', dataIni: '', dataFim: '', busca: ''
+  })
+
+  const rows = registros || []
+  const setFiltro = (key, value) => setFiltros(prev => ({ ...prev, [key]: value }))
+
+  const norm = (v) => String(v || '').trim().toUpperCase()
+  const unique = (key) => [...new Set(rows.map(r => String(r[key] || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+
+  const parseDate = (value) => {
+    if (!value) return null
+    const s = String(value).trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(`${s}T00:00:00`)
+    const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/)
+    if (m) {
+      const y = m[3].length === 2 ? `20${m[3]}` : m[3]
+      return new Date(Number(y), Number(m[2]) - 1, Number(m[1]))
+    }
+    const d = new Date(s)
+    return isNaN(d.getTime()) ? null : d
+  }
+
+  const dataIni = parseDate(filtros.dataIni)
+  const dataFim = parseDate(filtros.dataFim)
+
+  const filtrados = rows.filter(r => {
+    if (filtros.empresa !== 'TODAS' && norm(r.empresa) !== norm(filtros.empresa)) return false
+    if (filtros.mes !== 'TODOS' && norm(r.mes) !== norm(filtros.mes)) return false
+    if (filtros.ano !== 'TODOS' && String(r.ano || '') !== filtros.ano) return false
+    if (filtros.sdr !== 'TODOS' && String(r.sdr || '') !== filtros.sdr) return false
+    if (filtros.closer !== 'TODOS' && String(r.closer || '') !== filtros.closer) return false
+    if (filtros.origem !== 'TODAS' && String(r.origem || '') !== filtros.origem) return false
+    if (filtros.status !== 'TODOS' && norm(r.status) !== norm(filtros.status)) return false
+    if (filtros.servico !== 'TODOS' && String(r.servico || '') !== filtros.servico) return false
+
+    const d = parseDate(r.data)
+    if (dataIni && d && d < dataIni) return false
+    if (dataFim && d && d > dataFim) return false
+
+    const busca = norm(filtros.busca)
+    if (busca) {
+      const texto = norm(`${r.cliente} ${r.informacao} ${r.sdr} ${r.closer} ${r.origem} ${r.status} ${r.servico}`)
+      if (!texto.includes(busca)) return false
+    }
+    return true
+  })
+
+  const isPago = r => norm(r.status) === 'PAGO'
+  const isDsvDso = r => ['DSV', 'DSO'].includes(norm(r.servico))
+  const pipelineStatuses = ['FECHOU', 'PM', 'RECALL', 'CONTRATO', 'ASSINADO', 'FUP']
+  const isPipeline = r => pipelineStatuses.includes(norm(r.status))
+  const sum = (arr, key = 'valor') => arr.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
+
+  const pagos = filtrados.filter(isPago)
+  const pagosNmrr = pagos.filter(r => !isDsvDso(r))
+  const dsvDso = pagos.filter(isDsvDso)
+  const pipelineRows = filtrados.filter(isPipeline)
+  const total = filtrados.length
+  const nmrr = sum(pagosNmrr)
+  const tkm = pagosNmrr.length ? nmrr / pagosNmrr.length : 0
+  const taxa = total ? (pagos.length / total) * 100 : 0
+
+  const countBy = (arr, key, fallback = 'SEM DADO') => {
+    const mapa = {}
+    arr.forEach(r => {
+      const k = String(r[key] || fallback).trim() || fallback
+      mapa[k] = (mapa[k] || 0) + 1
+    })
+    return Object.entries(mapa).sort((a,b)=>b[1]-a[1]).map(([nome,qtd])=>({ nome, qtd }))
+  }
+
+  const valueBy = (arr, key, fallback = 'SEM DADO') => {
+    const mapa = {}
+    arr.forEach(r => {
+      const k = String(r[key] || fallback).trim() || fallback
+      mapa[k] = (mapa[k] || 0) + (Number(r.valor) || 0)
+    })
+    return Object.entries(mapa).sort((a,b)=>b[1]-a[1]).map(([nome,valor])=>({ nome, valor }))
+  }
+
+  const pipelineByStatus = () => {
+    const mapa = {}
+    pipelineStatuses.forEach(s => { mapa[s] = { qtd: 0, valor: 0 } })
+    pipelineRows.forEach(r => {
+      const s = norm(r.status)
+      if (!mapa[s]) mapa[s] = { qtd: 0, valor: 0 }
+      mapa[s].qtd++
+      mapa[s].valor += Number(r.valor) || 0
+    })
+    return Object.entries(mapa).filter(([,v]) => v.qtd > 0).map(([nome,v]) => ({ nome, qtd: v.qtd, valor: v.valor }))
+  }
+
+  const evolucao = () => {
+    const mapa = {}
+    filtrados.forEach(r => {
+      const k = r.data || 'SEM DATA'
+      mapa[k] = (mapa[k] || 0) + 1
+    })
+    return Object.entries(mapa).sort((a,b) => {
+      const da = parseDate(a[0]); const db = parseDate(b[0])
+      if (da && db) return da - db
+      return a[0].localeCompare(b[0], 'pt-BR')
+    }).map(([data, qtd]) => ({ data, qtd }))
+  }
+
+  const SelectFiltro = ({ label, value, onChange, options, allLabel = 'Todos' }) => (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+      {label}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }}>
+        <option value={value.startsWith('TOD') ? value : (allLabel === 'Todas' ? 'TODAS' : 'TODOS')}>{allLabel}</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
+  )
+
+  if (!rows.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados na aba REUNIOES_GERAL</div>
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Filtros — Dados Específicos</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+          <SelectFiltro label="Empresa" value={filtros.empresa} onChange={v=>setFiltro('empresa', v)} options={unique('empresa')} allLabel="Todas" />
+          <SelectFiltro label="Mês" value={filtros.mes} onChange={v=>setFiltro('mes', v)} options={unique('mes')} />
+          <SelectFiltro label="Ano" value={filtros.ano} onChange={v=>setFiltro('ano', v)} options={unique('ano')} />
+          <SelectFiltro label="SDR" value={filtros.sdr} onChange={v=>setFiltro('sdr', v)} options={unique('sdr')} />
+          <SelectFiltro label="Closer" value={filtros.closer} onChange={v=>setFiltro('closer', v)} options={unique('closer')} />
+          <SelectFiltro label="Origem" value={filtros.origem} onChange={v=>setFiltro('origem', v)} options={unique('origem')} allLabel="Todas" />
+          <SelectFiltro label="Status" value={filtros.status} onChange={v=>setFiltro('status', v)} options={unique('status')} />
+          <SelectFiltro label="Serviço" value={filtros.servico} onChange={v=>setFiltro('servico', v)} options={unique('servico')} />
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Data inicial
+            <input type="date" value={filtros.dataIni} onChange={e=>setFiltro('dataIni', e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Data final
+            <input type="date" value={filtros.dataFim} onChange={e=>setFiltro('dataFim', e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)', gridColumn: 'span 2' }}>Buscar cliente/informação
+            <input value={filtros.busca} onChange={e=>setFiltro('busca', e.target.value)} placeholder="Digite um nome, origem, SDR..." style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }} />
+          </label>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Resumo filtrado</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
+        <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value">{fmt(total)}</div></div>
+        <div className="card green"><div className="card-label">Pagos</div><div className="card-value">{fmt(pagos.length)}</div><div className="card-sub">Taxa: {fmtPct(taxa)}</div></div>
+        <div className="card amber"><div className="card-label">Valor Pago Total</div><div className="card-value">{fmtR(sum(pagos))}</div></div>
+        <div className="card amber"><div className="card-label">NMRR</div><div className="card-value">{fmtR(nmrr)}</div><div className="card-sub">TKM: {fmtR(tkm)}</div></div>
+        <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR(sum(dsvDso))}</div><div className="card-sub">{fmt(dsvDso.length)} contratos</div></div>
+        <div className="card blue"><div className="card-label">FUP + PM</div><div className="card-value">{fmt(filtrados.filter(r => ['FUP','PM'].includes(norm(r.status))).length)}</div></div>
+        <div className="card purple"><div className="card-label">Valor Pipeline</div><div className="card-value">{fmtR(sum(pipelineRows))}</div><div className="card-sub">{fmt(pipelineRows.length)} oportunidades</div></div>
+        <div className="card red"><div className="card-label">Perdidos/Fugiram</div><div className="card-value">{fmt(filtrados.filter(r => ['FORA','FUGIU'].includes(norm(r.status))).length)}</div></div>
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Gráficos filtrados</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+        <div className="chart-card"><div className="chart-title">Status das Reuniões</div><PieChart data={countBy(filtrados, 'status')} /></div>
+        <div className="chart-card"><div className="chart-title">Pipeline por Status</div><BarChart data={pipelineByStatus()} valueKey="qtd" colorArr={Object.values(STATUS_COLORS)} showPct extraValueKey="valor" formatExtraVal={v=>fmtR1(v)} /></div>
+        <div className="chart-card"><div className="chart-title">Evolução por Data</div><LineChartWithTooltip data={evolucao()} color="#14b8a6" /></div>
+        <div className="chart-card"><div className="chart-title">Reuniões por SDR</div><BarChart data={countBy(filtrados, 'sdr')} valueKey="qtd" colorArr={SDR_COLORS} showPct /></div>
+        <div className="chart-card"><div className="chart-title">Valor Pago por SDR</div><BarChart data={valueBy(pagos, 'sdr')} valueKey="valor" colorArr={SDR_COLORS} formatVal={v=>fmtR1(v)} showPct /></div>
+        <div className="chart-card"><div className="chart-title">Valor Pago por Closer</div><BarChart data={valueBy(pagos, 'closer')} valueKey="valor" colorArr={CLOSER_COLORS} formatVal={v=>fmtR1(v)} showPct /></div>
+        <div className="chart-card"><div className="chart-title">Reuniões por Origem</div><BarChart data={countBy(filtrados, 'origem')} valueKey="qtd" conceptColor showPct /></div>
+        <div className="chart-card"><div className="chart-title">Pagos por Origem</div><BarChart data={countBy(pagos, 'origem')} valueKey="qtd" conceptColor showPct /></div>
+        <div className="chart-card"><div className="chart-title">Valor Pago por Origem</div><BarChart data={valueBy(pagos, 'origem')} valueKey="valor" conceptColor formatVal={v=>fmtR1(v)} showPct /></div>
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Registros filtrados</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>
+              {['Empresa','Mês','Ano','Origem','SDR','Closer','Data','Serviço','Cliente','Nota','Valor','Status','Data FUP'].map(h => (
+                <th key={h} style={{ textAlign: h === 'Cliente' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtrados.slice(0, 200).map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-secondary)' }}>{r.empresa}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.mes}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.ano}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.origem}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.sdr}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.closer}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{r.data}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.servico}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'left', minWidth: 140 }}>{r.cliente}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.nota}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b' }}>{fmtR(r.valor)}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right', color: STATUS_COLORS[norm(r.status)] || 'var(--text-secondary)', fontWeight: 600 }}>{r.status}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{r.dataFup}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {filtrados.length > 200 && <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 12 }}>Mostrando os primeiros 200 registros de {fmt(filtrados.length)} filtrados.</div>}
+    </div>
+  )
+}
+
 function ForecastView({ forecast }) {
   const [mesSel, setMesSel] = useState(null)
 
@@ -466,7 +674,7 @@ export default function Dashboard() {
   }, [])
 
   const currentData = data ? data[empresa] : null
-  const periodoData = currentData && periodo !== 'SEMANAS' ? currentData[periodo] : null
+  const periodoData = currentData && !['SEMANAS','FORECAST','DADOS'].includes(periodo) ? currentData[periodo] : null
 
   return (
     <>
@@ -480,7 +688,7 @@ export default function Dashboard() {
         </div>
       </nav>
       <div className="sub-nav">
-        {[['MAI','Maio 2026'],['ABR','Abril 2026'],['SEMANAS','Por Semana'],['FORECAST','Forecast']].map(([p,label])=>(
+        {[['MAI','Maio 2026'],['ABR','Abril 2026'],['SEMANAS','Por Semana'],['FORECAST','Forecast'],['DADOS','Dados Específicos']].map(([p,label])=>(
           <button key={p} className={`sub-tab ${periodo===p?'active':''}`} onClick={()=>setPeriodo(p)}>{label}</button>
         ))}
       </div>
@@ -490,6 +698,7 @@ export default function Dashboard() {
         <div className="page">
           {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
            periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} /> :
+           periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
            periodoData ? <>
              <MetricCards metricas={periodoData.metricas} />
              <ReuniaoCards cards={periodoData.reunioes?.cards} />
