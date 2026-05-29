@@ -308,7 +308,7 @@ function ReuniaoGraficos({ graficos }) {
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12, marginTop: 28 }}>Análise das Reuniões</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <div className="chart-card"><div className="chart-title">Valor Pago por Origem (R$)</div>
-          <BarChart data={graficos.valorPagoPorOrigem} valueKey="valor" conceptColor formatVal={v=>`R$${Math.round(v/1000)}k`} showPct /></div>
+          <BarChart data={graficos.valorPagoPorOrigem} valueKey="valor" conceptColor formatVal={v=>`R$${(v/1000).toFixed(1).replace('.', ',')}k`} showPct /></div>
         <div className="chart-card"><div className="chart-title">Qtd de Pagos por Origem</div>
           <BarChart data={graficos.qtdPagosPorOrigem} valueKey="qtd" conceptColor showPct /></div>
         <div className="chart-card"><div className="chart-title">Pipeline Ativo por Status</div>
@@ -316,7 +316,7 @@ function ReuniaoGraficos({ graficos }) {
         <div className="chart-card"><div className="chart-title">Reuniões por Closer</div>
           <BarChart data={graficos.reunioesPorCloser} valueKey="qtd" colorArr={CLOSER_COLORS} showPct /></div>
         <div className="chart-card"><div className="chart-title">Valor Fechado por Closer (R$)</div>
-          <BarChart data={graficos.valorPorCloser} valueKey="valor" colorArr={CLOSER_COLORS} formatVal={v=>`R$${Math.round(v/1000)}k`} showPct /></div>
+          <BarChart data={graficos.valorPorCloser} valueKey="valor" colorArr={CLOSER_COLORS} formatVal={v=>`R$${(v/1000).toFixed(1).replace('.', ',')}k`} showPct /></div>
         <div className="chart-card"><div className="chart-title">Taxa de Conversão por Closer (%)</div>
           <BarChart data={graficos.taxaCloser} valueKey="taxa" colorArr={CLOSER_COLORS} formatVal={v=>`${v}%`} /></div>
         <div className="chart-card"><div className="chart-title">Reuniões por Origem</div>
