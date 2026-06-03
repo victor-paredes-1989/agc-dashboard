@@ -7,6 +7,47 @@ const fmtR = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleStrin
 const fmtR1 = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` }
 const fmtNum1 = (n) => { const num = Number(n) || 0; return num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }
 const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`
+const parseDisplayNumber = (value) => {
+  if (value === null || value === undefined || value === '') return 0
+  let s = String(value).trim()
+  let negative = false
+
+  if (/^\(.*\)$/.test(s)) {
+    negative = true
+    s = s.replace(/[()]/g, '')
+  }
+
+  s = s.replace(/−/g, '-')
+  if (s.startsWith('-')) {
+    negative = true
+    s = s.slice(1)
+  }
+
+  s = s
+    .replace(/R\$\s*/gi, '')
+    .replace(/%/g, '')
+    .replace(/\s/g, '')
+    .replace(/[^0-9.,]/g, '')
+
+  if (!s) return 0
+
+  const lastComma = s.lastIndexOf(',')
+  const lastDot = s.lastIndexOf('.')
+
+  if (lastComma !== -1 && lastDot !== -1) {
+    s = lastComma > lastDot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '')
+  } else if (lastComma !== -1) {
+    const decimals = s.length - lastComma - 1
+    s = decimals === 3 ? s.replace(/,/g, '') : s.replace(',', '.')
+  } else if (lastDot !== -1) {
+    const decimals = s.length - lastDot - 1
+    if (decimals === 3) s = s.replace(/\./g, '')
+  }
+
+  const n = Number(s)
+  if (Number.isNaN(n)) return 0
+  return negative ? -n : n
+}
 
 // Colors by CONCEPT — same concept = same color everywhere
 const CONCEPT_COLORS = {
@@ -178,8 +219,37 @@ function SemanasComparativo({ semanas }) {
   const [metrica, setMetrica] = useState('contratosPagos')
   if (!semanas || semanas.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de semanas</div>
 
-  const abr = semanas.filter(s => String(s.semana).toUpperCase().includes('ABR'))
-  const mai = semanas.filter(s => String(s.semana).toUpperCase().includes('MAI'))
+  const monthMeta = {
+    JAN: { label: 'Janeiro', order: 1 },
+    FEV: { label: 'Fevereiro', order: 2 },
+    MAR: { label: 'Março', order: 3 },
+    ABR: { label: 'Abril', order: 4 },
+    MAI: { label: 'Maio', order: 5 },
+    JUN: { label: 'Junho', order: 6 },
+    JUL: { label: 'Julho', order: 7 },
+    AGO: { label: 'Agosto', order: 8 },
+    SET: { label: 'Setembro', order: 9 },
+    OUT: { label: 'Outubro', order: 10 },
+    NOV: { label: 'Novembro', order: 11 },
+    DEZ: { label: 'Dezembro', order: 12 },
+  }
+
+  const getMonthKey = (semana) => {
+    const txt = String(semana || '').toUpperCase()
+    return Object.keys(monthMeta).find(k => txt.includes(k)) || 'OUTROS'
+  }
+
+  const grupos = Object.entries(semanas.reduce((acc, item) => {
+    const key = getMonthKey(item.semana)
+    if (!acc[key]) acc[key] = []
+    acc[key].push(item)
+    return acc
+  }, {})).map(([key, dados]) => ({
+    key,
+    dados,
+    label: monthMeta[key]?.label || key,
+    order: monthMeta[key]?.order || 99,
+  })).sort((a, b) => a.order - b.order)
 
   const metricaOpts = [
     { key: 'leads', label: 'Leads' },
@@ -189,7 +259,8 @@ function SemanasComparativo({ semanas }) {
     { key: 'nmrr', label: 'NMRR' },
     { key: 'tkm', label: 'TKM' },
   ]
-  const isReais = metrica === 'nmrr' || metrica === 'tkm'
+
+  const chartColors = ['#8b5cf6', '#14b8a6', '#3b82f6', '#f59e0b', '#ec4899', '#f97316', '#6366f1']
 
   const TableMes = ({ dados, titulo }) => (
     <div style={{ marginBottom: 24 }}>
@@ -241,21 +312,20 @@ function SemanasComparativo({ semanas }) {
           </button>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 28 }}>
-        {[{ dados: abr, titulo: 'Abril 2026', color: '#8b5cf6' }, { dados: mai, titulo: 'Maio 2026', color: '#14b8a6' }].map(({ dados, titulo, color }) => (
-          <div key={titulo} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{titulo} — {metricaOpts.find(m => m.key === metrica)?.label}</div>
-            <MiniLineChartTooltip dados={dados} metrica={metrica} color={color} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 28 }}>
+        {grupos.map((grupo, idx) => (
+          <div key={grupo.key} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{grupo.label} — {metricaOpts.find(m => m.key === metrica)?.label}</div>
+            <MiniLineChartTooltip dados={grupo.dados} metrica={metrica} color={chartColors[idx % chartColors.length]} />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-              {dados.map((d, i) => (
-                <div key={i} style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>{d.semana.replace(' ABR','').replace(' MAI','')}</div>
+              {grupo.dados.map((d, i) => (
+                <div key={i} style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>{String(d.semana).replace(` ${grupo.key}`, '')}</div>
               ))}
             </div>
           </div>
         ))}
       </div>
-      <TableMes dados={abr} titulo="Abril 2026" />
-      <TableMes dados={mai} titulo="Maio 2026" />
+      {grupos.map(grupo => <TableMes key={grupo.key} dados={grupo.dados} titulo={`${grupo.label} 2026`} />)}
     </div>
   )
 }
@@ -263,7 +333,8 @@ function SemanasComparativo({ semanas }) {
 function MetricCards({ metricas }) {
   if (!metricas || metricas.leads === undefined) return null
   const gap = metricas.gap || ''
-  const gapPositive = !String(gap).includes('-')
+  const gapNumber = parseDisplayNumber(gap)
+  const gapPositive = gapNumber < 0
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Métricas do Mês</div>
@@ -276,7 +347,7 @@ function MetricCards({ metricas }) {
           { label: 'NMRR', value: fmtR(metricas.nmrr), sub: `TKM: ${fmtR(metricas.tkm)}`, color: 'amber' },
           { label: 'Investimento', value: fmtR(metricas.investimento), sub: `CPL: ${fmtR(metricas.cpl)}`, color: 'purple' },
           { label: 'CAC', value: fmtR(metricas.cac), sub: `por contrato | TKM: ${fmtR(metricas.tkm)}`, color: 'teal' },
-          { label: 'Gap da Meta', value: gap, sub: gapPositive ? '✓ Meta atingida' : '⚠ Abaixo da meta', color: gapPositive ? 'green' : 'red' },
+          { label: 'Gap da Meta', value: gap, sub: gapPositive ? '✓ Meta ultrapassada' : '⚠ Abaixo da meta', color: gapPositive ? 'green' : 'red' },
         ].map((c, i) => (
           <div key={i} className={`card ${c.color}`}>
             <div className="card-label">{c.label}</div>
@@ -627,12 +698,12 @@ function ForecastView({ forecast }) {
               <div className={`card ${gapCardClass(f.gapRlzd)}`}>
                 <div className="card-label">Gap Realizadas</div>
                 <div className="card-value">{signedNumber(f.gapRlzd)}</div>
-                <div className="card-sub">reuniões</div>
+                <div className="card-sub">{gapSub(f.gapRlzd, 'vs meta')}</div>
               </div>
               <div className={`card ${gapCardClass(f.gapAgd)}`}>
                 <div className="card-label">Gap Agendadas</div>
                 <div className="card-value">{signedNumber(f.gapAgd)}</div>
-                <div className="card-sub">agendamentos</div>
+                <div className="card-sub">{gapSub(f.gapAgd, 'vs meta')}</div>
               </div>
             </div>
 
