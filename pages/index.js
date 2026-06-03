@@ -377,11 +377,11 @@ function DadosEspecificosView({ registros }) {
     if (filtros.empresa !== 'TODAS' && norm(r.empresa) !== norm(filtros.empresa)) return false
     if (filtros.mes !== 'TODOS' && norm(r.mes) !== norm(filtros.mes)) return false
     if (filtros.ano !== 'TODOS' && String(r.ano || '') !== filtros.ano) return false
-    if (filtros.sdr !== 'TODOS' && String(r.sdr || '') !== filtros.sdr) return false
-    if (filtros.closer !== 'TODOS' && String(r.closer || '') !== filtros.closer) return false
-    if (filtros.origem !== 'TODAS' && String(r.origem || '') !== filtros.origem) return false
+    if (filtros.sdr !== 'TODOS' && norm(r.sdr) !== norm(filtros.sdr)) return false
+    if (filtros.closer !== 'TODOS' && norm(r.closer) !== norm(filtros.closer)) return false
+    if (filtros.origem !== 'TODAS' && norm(r.origem) !== norm(filtros.origem)) return false
     if (filtros.status !== 'TODOS' && norm(r.status) !== norm(filtros.status)) return false
-    if (filtros.servico !== 'TODOS' && String(r.servico || '') !== filtros.servico) return false
+    if (filtros.servico !== 'TODOS' && norm(r.servico) !== norm(filtros.servico)) return false
 
     const d = parseDate(r.data)
     if (dataIni && d && d < dataIni) return false
@@ -667,14 +667,22 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [empresa, setEmpresa] = useState('AI')
-  const [periodo, setPeriodo] = useState('MAI')
+  const [periodo, setPeriodo] = useState(null)
 
   useEffect(() => {
     fetch('/api/data').then(r=>r.json()).then(d=>{setData(d);setLoading(false)}).catch(e=>{setError(e.message);setLoading(false)})
   }, [])
 
+  useEffect(() => {
+    if (data && !periodo) {
+      const primeiroPeriodo = data?.PERIODOS?.[0]?.key
+      setPeriodo(primeiroPeriodo || 'DADOS')
+    }
+  }, [data, periodo])
+
   const currentData = data ? data[empresa] : null
-  const periodoData = currentData && !['SEMANAS','FORECAST','DADOS'].includes(periodo) ? currentData[periodo] : null
+  const periodosDinamicos = data?.PERIODOS || []
+  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS'].includes(periodo) ? currentData[periodo] : null
 
   return (
     <>
@@ -688,7 +696,7 @@ export default function Dashboard() {
         </div>
       </nav>
       <div className="sub-nav">
-        {[['MAI','Maio 2026'],['ABR','Abril 2026'],['SEMANAS','Por Semana'],['FORECAST','Forecast'],['DADOS','Dados Específicos']].map(([p,label])=>(
+        {[...periodosDinamicos.map(p => [p.key, p.label]), ['SEMANAS','Por Semana'], ['FORECAST','Forecast'], ['DADOS','Dados Específicos']].map(([p,label])=>(
           <button key={p} className={`sub-tab ${periodo===p?'active':''}`} onClick={()=>setPeriodo(p)}>{label}</button>
         ))}
       </div>
