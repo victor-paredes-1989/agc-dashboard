@@ -751,18 +751,27 @@ export default function Dashboard() {
     }
   }, [data, periodo])
 
+  useEffect(() => {
+    const empresas = data?.CONFIG?.empresas || []
+    if (empresas.length && !empresas.some(e => e.codigo === empresa)) {
+      setEmpresa(empresas[0].codigo)
+    }
+  }, [data, empresa])
+
+  const empresasConfig = data?.CONFIG?.empresas || [['AI','Acelera Imob'],['MO','Mundo Ótico']].map(([codigo,nome]) => ({ codigo, nome }))
+  const dashboardNome = data?.CONFIG?.dashboardNome || 'AGC Dashboard'
   const currentData = data ? data[empresa] : null
   const periodosDinamicos = data?.PERIODOS || []
   const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS'].includes(periodo) ? currentData[periodo] : null
 
   return (
     <>
-      <Head><title>AGC Dashboard</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+      <Head><title>{dashboardNome}</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
       <nav className="nav">
-        <div className="nav-logo">📊 AGC Dashboard</div>
+        <div className="nav-logo">📊 {dashboardNome}</div>
         <div className="nav-tabs">
-          {[['AI','Acelera Imob'],['MO','Mundo Ótico']].map(([e,label])=>(
-            <button key={e} className={`nav-tab ${empresa===e?'active':''}`} onClick={()=>setEmpresa(e)}>{label}</button>
+          {empresasConfig.map(({codigo,nome})=>(
+            <button key={codigo} className={`nav-tab ${empresa===codigo?'active':''}`} onClick={()=>setEmpresa(codigo)}>{nome}</button>
           ))}
         </div>
       </nav>
