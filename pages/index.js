@@ -649,13 +649,30 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
     (filters.origem === 'TODOS' || norm(r.origem) === filters.origem)
   )
 
-  const sum = (key) => filtrados.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
+  const temMeta = (r) =>
+    (Number(r.metaReunioes) || 0) > 0 ||
+    (Number(r.metaPagos) || 0) > 0 ||
+    (Number(r.metaNmrr) || 0) > 0
+
+  const filtradosComMeta = filtrados.filter(temMeta)
+  const filtradosSemMeta = filtrados.filter(r => !temMeta(r))
+
+  const sumFrom = (arr, key) => arr.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
+  const sum = (key) => sumFrom(filtradosComMeta, key)
+
+  // Cards principais comparam apenas origens que possuem meta cadastrada.
+  // Origens sem meta aparecem separadas como resultado adicional.
   const metaReunioes = sum('metaReunioes')
   const realReunioes = sum('realReunioes')
   const metaPagos = sum('metaPagos')
   const realPagos = sum('realPagos')
   const metaNmrr = sum('metaNmrr')
   const realNmrr = sum('realNmrr')
+
+  const realReunioesAdicional = sumFrom(filtradosSemMeta, 'realReunioes')
+  const realPagosAdicional = sumFrom(filtradosSemMeta, 'realPagos')
+  const realNmrrAdicional = sumFrom(filtradosSemMeta, 'realNmrr')
+
   const pct = (real, meta) => meta > 0 ? (real / meta) * 100 : 0
   const pctReunioes = pct(realReunioes, metaReunioes)
   const pctPagos = pct(realPagos, metaPagos)
@@ -663,17 +680,25 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   const cardClass = (real, meta) => meta > 0 && real >= meta ? 'green' : 'red'
   const gapClass = (gap) => Number(gap || 0) >= 0 ? 'green' : 'red'
 
-  const rankingNmrr = [...filtrados]
+  const rankingNmrr = [...filtradosComMeta]
     .sort((a, b) => (Number(b.pctNmrr) || 0) - (Number(a.pctNmrr) || 0))
     .map(r => ({ nome: r.origem, pct: Number(r.pctNmrr) || 0, valor: Number(r.realNmrr) || 0 }))
 
-  const rankingPagos = [...filtrados]
+  const rankingPagos = [...filtradosComMeta]
     .sort((a, b) => (Number(b.pctPagos) || 0) - (Number(a.pctPagos) || 0))
     .map(r => ({ nome: r.origem, pct: Number(r.pctPagos) || 0, valor: Number(r.realPagos) || 0 }))
 
   const realPorOrigem = [...filtrados]
     .sort((a, b) => (Number(b.realNmrr) || 0) - (Number(a.realNmrr) || 0))
     .map(r => ({ nome: r.origem, valor: Number(r.realNmrr) || 0, meta: Number(r.metaNmrr) || 0 }))
+
+  const reunioesPorOrigem = [...filtrados]
+    .sort((a, b) => (Number(b.realReunioes) || 0) - (Number(a.realReunioes) || 0))
+    .map(r => ({ nome: r.origem, qtd: Number(r.realReunioes) || 0 }))
+
+  const pagosPorOrigem = [...filtrados]
+    .sort((a, b) => (Number(b.realPagos) || 0) - (Number(a.realPagos) || 0))
+    .map(r => ({ nome: r.origem, qtd: Number(r.realPagos) || 0 }))
 
   if (!list.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de metas por origem. Atualize a aba PERFORMANCE_ORIGEM na planilha.</div>
 
@@ -704,12 +729,19 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
         <div className={`card ${gapClass(realPagos - metaPagos)}`}><div className="card-label">Gap Pagos</div><div className="card-value">{(realPagos - metaPagos) >= 0 ? '+' : ''}{fmtNum1(realPagos - metaPagos)}</div><div className="card-sub">real - meta</div></div>
         <div className={`card ${cardClass(realNmrr, metaNmrr)}`}><div className="card-label">NMRR</div><div className="card-value">{fmtR1(realNmrr)}</div><div className="card-sub">Meta: {fmtR1(metaNmrr)} · {fmtPct(pctNmrr)}</div></div>
         <div className={`card ${gapClass(realNmrr - metaNmrr)}`}><div className="card-label">Gap NMRR</div><div className="card-value">{fmtR1(realNmrr - metaNmrr)}</div><div className="card-sub">real - meta</div></div>
+        <div className="card blue"><div className="card-label">Adicional sem Meta</div><div className="card-value">{fmtR1(realNmrrAdicional)}</div><div className="card-sub">{fmtNum1(realReunioesAdicional)} reuniões · {fmtNum1(realPagosAdicional)} pagos</div></div>
+      </div>
+
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
+        Os cards principais consideram apenas origens com meta cadastrada. Origens sem meta aparecem como resultado adicional e também entram nos gráficos de volume real.
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
         <div className="chart-card"><div className="chart-title">% Meta NMRR por Origem</div><BarChart data={rankingNmrr} valueKey="pct" conceptColor formatVal={v=>fmtPct(v)} /></div>
         <div className="chart-card"><div className="chart-title">% Meta Pagos por Origem</div><BarChart data={rankingPagos} valueKey="pct" conceptColor formatVal={v=>fmtPct(v)} /></div>
         <div className="chart-card"><div className="chart-title">NMRR Real por Origem</div><BarChart data={realPorOrigem} valueKey="valor" conceptColor formatVal={v=>fmtR1(v)} /></div>
+        <div className="chart-card"><div className="chart-title">Reuniões Reais por Origem</div><BarChart data={reunioesPorOrigem} valueKey="qtd" conceptColor showPct /></div>
+        <div className="chart-card"><div className="chart-title">Pagos Reais por Origem</div><BarChart data={pagosPorOrigem} valueKey="qtd" conceptColor showPct /></div>
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Detalhamento por Origem</div>
