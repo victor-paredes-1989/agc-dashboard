@@ -622,6 +622,116 @@ function DadosEspecificosView({ registros }) {
   )
 }
 
+
+function MetasOrigemView({ performance, empresaSelecionada }) {
+  const [filters, setFilters] = useState({ empresa: empresaSelecionada || 'TODOS', ano: 'TODOS', mes: 'TODOS', origem: 'TODOS' })
+
+  useEffect(() => {
+    if (empresaSelecionada) setFilters(f => ({ ...f, empresa: empresaSelecionada }))
+  }, [empresaSelecionada])
+
+  const norm = (v) => String(v || '').trim().toUpperCase()
+  const list = Array.isArray(performance) ? performance : []
+  const unique = (key) => [...new Set(list.map(r => norm(r[key])).filter(Boolean))].sort()
+  const opts = {
+    empresa: unique('empresa'),
+    ano: unique('ano').sort((a,b)=>Number(b)-Number(a)),
+    mes: unique('mes'),
+    origem: unique('origem'),
+  }
+
+  const setFilter = (key, value) => setFilters(f => ({ ...f, [key]: value }))
+
+  const filtrados = list.filter(r =>
+    (filters.empresa === 'TODOS' || norm(r.empresa) === filters.empresa) &&
+    (filters.ano === 'TODOS' || norm(r.ano) === filters.ano) &&
+    (filters.mes === 'TODOS' || norm(r.mes) === filters.mes) &&
+    (filters.origem === 'TODOS' || norm(r.origem) === filters.origem)
+  )
+
+  const sum = (key) => filtrados.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
+  const metaReunioes = sum('metaReunioes')
+  const realReunioes = sum('realReunioes')
+  const metaPagos = sum('metaPagos')
+  const realPagos = sum('realPagos')
+  const metaNmrr = sum('metaNmrr')
+  const realNmrr = sum('realNmrr')
+  const pct = (real, meta) => meta > 0 ? (real / meta) * 100 : 0
+  const pctReunioes = pct(realReunioes, metaReunioes)
+  const pctPagos = pct(realPagos, metaPagos)
+  const pctNmrr = pct(realNmrr, metaNmrr)
+  const cardClass = (real, meta) => meta > 0 && real >= meta ? 'green' : 'red'
+  const gapClass = (gap) => Number(gap || 0) >= 0 ? 'green' : 'red'
+
+  const rankingNmrr = [...filtrados]
+    .sort((a, b) => (Number(b.pctNmrr) || 0) - (Number(a.pctNmrr) || 0))
+    .map(r => ({ nome: r.origem, pct: Number(r.pctNmrr) || 0, valor: Number(r.realNmrr) || 0 }))
+
+  const rankingPagos = [...filtrados]
+    .sort((a, b) => (Number(b.pctPagos) || 0) - (Number(a.pctPagos) || 0))
+    .map(r => ({ nome: r.origem, pct: Number(r.pctPagos) || 0, valor: Number(r.realPagos) || 0 }))
+
+  const realPorOrigem = [...filtrados]
+    .sort((a, b) => (Number(b.realNmrr) || 0) - (Number(a.realNmrr) || 0))
+    .map(r => ({ nome: r.origem, valor: Number(r.realNmrr) || 0, meta: Number(r.metaNmrr) || 0 }))
+
+  if (!list.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de metas por origem. Atualize a aba PERFORMANCE_ORIGEM na planilha.</div>
+
+  const Select = ({ label, value, options, onChange }) => (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      {label}
+      <select value={value} onChange={e=>onChange(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', minWidth: 150 }}>
+        <option value="TODOS">Todos</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
+  )
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Filtros — Metas por Origem</div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+        <Select label="Empresa" value={filters.empresa} options={opts.empresa} onChange={v=>setFilter('empresa', v)} />
+        <Select label="Ano" value={filters.ano} options={opts.ano} onChange={v=>setFilter('ano', v)} />
+        <Select label="Mês" value={filters.mes} options={opts.mes} onChange={v=>setFilter('mes', v)} />
+        <Select label="Origem" value={filters.origem} options={opts.origem} onChange={v=>setFilter('origem', v)} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 28 }}>
+        <div className={`card ${cardClass(realReunioes, metaReunioes)}`}><div className="card-label">Reuniões</div><div className="card-value">{fmtNum1(realReunioes)} / {fmtNum1(metaReunioes)}</div><div className="card-sub">{fmtPct(pctReunioes)} da meta</div></div>
+        <div className={`card ${gapClass(realReunioes - metaReunioes)}`}><div className="card-label">Gap Reuniões</div><div className="card-value">{(realReunioes - metaReunioes) >= 0 ? '+' : ''}{fmtNum1(realReunioes - metaReunioes)}</div><div className="card-sub">real - meta</div></div>
+        <div className={`card ${cardClass(realPagos, metaPagos)}`}><div className="card-label">Pagos</div><div className="card-value">{fmtNum1(realPagos)} / {fmtNum1(metaPagos)}</div><div className="card-sub">{fmtPct(pctPagos)} da meta</div></div>
+        <div className={`card ${gapClass(realPagos - metaPagos)}`}><div className="card-label">Gap Pagos</div><div className="card-value">{(realPagos - metaPagos) >= 0 ? '+' : ''}{fmtNum1(realPagos - metaPagos)}</div><div className="card-sub">real - meta</div></div>
+        <div className={`card ${cardClass(realNmrr, metaNmrr)}`}><div className="card-label">NMRR</div><div className="card-value">{fmtR1(realNmrr)}</div><div className="card-sub">Meta: {fmtR1(metaNmrr)} · {fmtPct(pctNmrr)}</div></div>
+        <div className={`card ${gapClass(realNmrr - metaNmrr)}`}><div className="card-label">Gap NMRR</div><div className="card-value">{fmtR1(realNmrr - metaNmrr)}</div><div className="card-sub">real - meta</div></div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+        <div className="chart-card"><div className="chart-title">% Meta NMRR por Origem</div><BarChart data={rankingNmrr} valueKey="pct" conceptColor formatVal={v=>fmtPct(v)} /></div>
+        <div className="chart-card"><div className="chart-title">% Meta Pagos por Origem</div><BarChart data={rankingPagos} valueKey="pct" conceptColor formatVal={v=>fmtPct(v)} /></div>
+        <div className="chart-card"><div className="chart-title">NMRR Real por Origem</div><BarChart data={realPorOrigem} valueKey="valor" conceptColor formatVal={v=>fmtR1(v)} /></div>
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Detalhamento por Origem</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead><tr>{['Empresa','Ano','Mês','Origem','Meta Reuniões','Real Reuniões','Gap','%','Meta Pagos','Real Pagos','Gap','%','Meta NMRR','Real NMRR','Gap','%'].map((h, i) => <th key={i} style={{ textAlign: i < 4 ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {filtrados.map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <td style={{ padding: '9px 8px' }}>{r.empresa}</td><td style={{ padding: '9px 8px' }}>{r.ano}</td><td style={{ padding: '9px 8px' }}>{r.mes}</td><td style={{ padding: '9px 8px', fontWeight: 600 }}>{r.origem}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapReunioes) >= 0 ? '#10b981' : '#ef4444' }}>{Number(r.gapReunioes) >= 0 ? '+' : ''}{fmtNum1(r.gapReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctReunioes)}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapPagos) >= 0 ? '#10b981' : '#ef4444' }}>{Number(r.gapPagos) >= 0 ? '+' : ''}{fmtNum1(r.gapPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctPagos)}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtR1(r.metaNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b' }}>{fmtR1(r.realNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapNmrr) >= 0 ? '#10b981' : '#ef4444' }}>{fmtR1(r.gapNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctNmrr)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function ForecastView({ forecast }) {
   const [mesSel, setMesSel] = useState(null)
 
@@ -762,7 +872,7 @@ export default function Dashboard() {
   const dashboardNome = data?.CONFIG?.dashboardNome || 'AGC Dashboard'
   const currentData = data ? data[empresa] : null
   const periodosDinamicos = data?.PERIODOS || []
-  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS'].includes(periodo) ? currentData[periodo] : null
+  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM'].includes(periodo) ? currentData[periodo] : null
 
   return (
     <>
@@ -776,7 +886,7 @@ export default function Dashboard() {
         </div>
       </nav>
       <div className="sub-nav">
-        {[...periodosDinamicos.map(p => [p.key, p.label]), ['SEMANAS','Por Semana'], ['FORECAST','Forecast'], ['DADOS','Dados Específicos']].map(([p,label])=>(
+        {[...periodosDinamicos.map(p => [p.key, p.label]), ['SEMANAS','Por Semana'], ['FORECAST','Forecast'], ['DADOS','Dados Específicos'], ['METAS_ORIGEM','Metas por Origem']].map(([p,label])=>(
           <button key={p} className={`sub-tab ${periodo===p?'active':''}`} onClick={()=>setPeriodo(p)}>{label}</button>
         ))}
       </div>
@@ -787,6 +897,7 @@ export default function Dashboard() {
           {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
            periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} /> :
            periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
+           periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
            periodoData ? <>
              <MetricCards metricas={periodoData.metricas} />
              <ReuniaoCards cards={periodoData.reunioes?.cards} />
