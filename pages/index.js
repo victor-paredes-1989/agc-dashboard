@@ -116,6 +116,65 @@ function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, 
   )
 }
 
+
+function ProgressByOriginChart({ data, emptyLabel = 'Sem dados' }) {
+  if (!data || data.length === 0) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>{emptyLabel}</div>
+  }
+
+  return (
+    <div>
+      {data.slice(0, 12).map((d, i) => {
+        const pct = Number(d.pct) || 0
+        const barPct = Math.max(0, Math.min(pct, 100))
+        const color = getConceptColor(d.nome, CLOSER_COLORS, i)
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
+            <div style={{ flex: '0 1 68%', background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+              <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
+              <div>{fmtNum1(d.realPagos)} - {fmtR1(d.realNmrr)}</div>
+              <div>{fmtPct(pct)}</div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AdditionalOriginChart({ data }) {
+  if (!data || data.length === 0) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>Sem adicionais sem meta</div>
+  }
+
+  const max = Math.max(...data.map(d => Number(d.realNmrr) || 0), 1)
+
+  return (
+    <div>
+      {data.slice(0, 12).map((d, i) => {
+        const val = Number(d.realNmrr) || 0
+        const barPct = max > 0 ? (val / max) * 100 : 0
+        const color = getConceptColor(d.nome, CLOSER_COLORS, i)
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
+            <div style={{ flex: '0 1 68%', background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+              <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
+              <div>{fmtNum1(d.realPagos)} - {fmtR1(d.realNmrr)}</div>
+              <div>sem meta</div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function PieChart({ data }) {
   if (!data || data.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>Sem dados</div>
   const total = data.reduce((s, d) => s + d.qtd, 0)
@@ -630,8 +689,45 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
     if (empresaSelecionada) setFilters(f => ({ ...f, empresa: empresaSelecionada }))
   }, [empresaSelecionada])
 
+  const clean = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const norm = (v) => String(v || '').trim().toUpperCase()
-  const list = Array.isArray(performance) ? performance : []
+  const normalizarOrigem = (v) => {
+    const o = clean(v)
+    if (!o) return 'SEM ORIGEM'
+    if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(o)) return 'IB'
+    if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(o)) return 'RECUPERAÇÃO'
+    if (['INDIC', 'INDICACAO'].includes(o)) return 'INDICAÇÃO'
+    return norm(v)
+  }
+
+  const rawList = Array.isArray(performance) ? performance : []
+  const list = Object.values(rawList.reduce((acc, r) => {
+    const empresa = norm(r.empresa)
+    const ano = String(r.ano || '').trim()
+    const mes = norm(r.mes)
+    const origem = normalizarOrigem(r.origem)
+    if (!empresa || !ano || !mes || !origem) return acc
+    const key = `${empresa}|${ano}|${mes}|${origem}`
+    if (!acc[key]) {
+      acc[key] = { empresa, ano, mes, origem, metaReunioes: 0, realReunioes: 0, gapReunioes: 0, pctReunioes: 0, metaPagos: 0, realPagos: 0, gapPagos: 0, pctPagos: 0, metaNmrr: 0, realNmrr: 0, gapNmrr: 0, pctNmrr: 0 }
+    }
+    acc[key].metaReunioes += Number(r.metaReunioes) || 0
+    acc[key].realReunioes += Number(r.realReunioes) || 0
+    acc[key].metaPagos += Number(r.metaPagos) || 0
+    acc[key].realPagos += Number(r.realPagos) || 0
+    acc[key].metaNmrr += Number(r.metaNmrr) || 0
+    acc[key].realNmrr += Number(r.realNmrr) || 0
+    return acc
+  }, {})).map(r => ({
+    ...r,
+    gapReunioes: r.realReunioes - r.metaReunioes,
+    pctReunioes: r.metaReunioes > 0 ? (r.realReunioes / r.metaReunioes) * 100 : 0,
+    gapPagos: r.realPagos - r.metaPagos,
+    pctPagos: r.metaPagos > 0 ? (r.realPagos / r.metaPagos) * 100 : 0,
+    gapNmrr: r.realNmrr - r.metaNmrr,
+    pctNmrr: r.metaNmrr > 0 ? (r.realNmrr / r.metaNmrr) * 100 : 0,
+  }))
+
   const unique = (key) => [...new Set(list.map(r => norm(r[key])).filter(Boolean))].sort()
   const opts = {
     empresa: unique('empresa'),
@@ -680,24 +776,13 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   const cardClass = (real, meta) => meta > 0 && real >= meta ? 'green' : 'red'
   const gapClass = (gap) => Number(gap || 0) >= 0 ? 'green' : 'red'
 
-  const progressoContratos = [...filtradosComMeta]
-    .filter(r => (Number(r.metaPagos) || 0) > 0)
-    .sort((a, b) => (Number(b.pctPagos) || 0) - (Number(a.pctPagos) || 0))
-    .map(r => ({
-      nome: r.origem,
-      pct: Number(r.pctPagos) || 0,
-      realPagos: Number(r.realPagos) || 0,
-      metaPagos: Number(r.metaPagos) || 0,
-      realNmrr: Number(r.realNmrr) || 0,
-      metaNmrr: Number(r.metaNmrr) || 0,
-    }))
-
-  const progressoNmrr = [...filtradosComMeta]
-    .filter(r => (Number(r.metaNmrr) || 0) > 0)
+  const progressoOrigem = [...filtradosComMeta]
+    .filter(r => (Number(r.metaNmrr) || 0) > 0 || (Number(r.metaPagos) || 0) > 0)
     .sort((a, b) => (Number(b.pctNmrr) || 0) - (Number(a.pctNmrr) || 0))
     .map(r => ({
       nome: r.origem,
       pct: Number(r.pctNmrr) || 0,
+      pctPagos: Number(r.pctPagos) || 0,
       realPagos: Number(r.realPagos) || 0,
       metaPagos: Number(r.metaPagos) || 0,
       realNmrr: Number(r.realNmrr) || 0,
@@ -748,16 +833,14 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
       </div>
 
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
-        Os gráficos abaixo mostram o progresso real contra a meta. Exemplo: SS → 1 - R$ 2.000,0 - 20,0% significa 1 contrato pago, R$ 2.000,0 de NMRR e 20,0% da meta batida.
+        O gráfico abaixo mostra o progresso real por origem. Exemplo: SS → 1 - R$ 2.000,0 / 20,0% significa 1 contrato pago, R$ 2.000,0 de NMRR e 20,0% da meta de NMRR batida.
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
-        <div className="chart-card"><div className="chart-title">Progresso de Contratos por Origem</div>
-          <BarChart data={progressoContratos} valueKey="pct" conceptColor formatVal={(v,d)=>`${fmtNum1(d.realPagos)} - ${fmtR1(d.realNmrr)} - ${fmtPct(v)}`} /></div>
-        <div className="chart-card"><div className="chart-title">Progresso de NMRR por Origem</div>
-          <BarChart data={progressoNmrr} valueKey="pct" conceptColor formatVal={(v,d)=>`${fmtNum1(d.realPagos)} - ${fmtR1(d.realNmrr)} - ${fmtPct(v)}`} /></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 28 }}>
+        <div className="chart-card"><div className="chart-title">Progresso por Origem</div>
+          <ProgressByOriginChart data={progressoOrigem} /></div>
         <div className="chart-card"><div className="chart-title">Adicionais sem Meta</div>
-          <BarChart data={adicionaisSemMeta} valueKey="valor" conceptColor formatVal={(v,d)=>`${fmtNum1(d.realPagos)} - ${fmtR1(d.realNmrr)} - sem meta`} /></div>
+          <AdditionalOriginChart data={adicionaisSemMeta} /></div>
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Detalhamento por Origem</div>
