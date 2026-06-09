@@ -483,7 +483,39 @@ function DadosEspecificosView({ registros }) {
   const rows = registros || []
   const setFiltro = (key, value) => setFiltros(prev => ({ ...prev, [key]: value }))
 
-  const norm = (v) => String(v || '').trim().toUpperCase()
+  const norm = (v) => String(v || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  const canonical = (key, value) => {
+    const v = norm(value)
+    if (!v) return ''
+
+    if (key === 'origem') {
+      if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(v)) return 'IB'
+      if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(v)) return 'RECUPERACAO'
+      if (['INDIC', 'INDICACAO'].includes(v)) return 'INDICACAO'
+    }
+
+    if (key === 'status') {
+      if (['CONTRATOS', 'EM CONTRATO', 'CLIENTE EM CONTRATO'].includes(v)) return 'CONTRATO'
+      if (['PAGO', 'PAGOS'].includes(v)) return 'PAGO'
+      if (['FORA', 'PERDIDO', 'PERDIDOS'].includes(v)) return 'FORA'
+    }
+
+    return v
+  }
+
+  const matchFiltro = (key, rowValue, filtroValue, allValues = ['TODOS']) => {
+    if (allValues.includes(filtroValue)) return true
+    const r = canonical(key, rowValue)
+    const f = canonical(key, filtroValue)
+    if (!f) return true
+    if (!r) return false
+    return r === f || r.includes(f) || f.includes(r)
+  }
   const unique = (key) => [...new Set(rows.map(r => String(r[key] || '').trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'pt-BR'))
 
@@ -504,14 +536,14 @@ function DadosEspecificosView({ registros }) {
   const dataFim = parseDate(filtros.dataFim)
 
   const filtrados = rows.filter(r => {
-    if (filtros.empresa !== 'TODAS' && norm(r.empresa) !== norm(filtros.empresa)) return false
-    if (filtros.mes !== 'TODOS' && norm(r.mes) !== norm(filtros.mes)) return false
-    if (filtros.ano !== 'TODOS' && String(r.ano || '') !== filtros.ano) return false
-    if (filtros.sdr !== 'TODOS' && norm(r.sdr) !== norm(filtros.sdr)) return false
-    if (filtros.closer !== 'TODOS' && norm(r.closer) !== norm(filtros.closer)) return false
-    if (filtros.origem !== 'TODAS' && norm(r.origem) !== norm(filtros.origem)) return false
-    if (filtros.status !== 'TODOS' && norm(r.status) !== norm(filtros.status)) return false
-    if (filtros.servico !== 'TODOS' && norm(r.servico) !== norm(filtros.servico)) return false
+    if (!matchFiltro('empresa', r.empresa, filtros.empresa, ['TODAS'])) return false
+    if (!matchFiltro('mes', r.mes, filtros.mes, ['TODOS'])) return false
+    if (filtros.ano !== 'TODOS' && String(r.ano || '').trim() !== String(filtros.ano || '').trim()) return false
+    if (!matchFiltro('sdr', r.sdr, filtros.sdr, ['TODOS'])) return false
+    if (!matchFiltro('closer', r.closer, filtros.closer, ['TODOS'])) return false
+    if (!matchFiltro('origem', r.origem, filtros.origem, ['TODAS'])) return false
+    if (!matchFiltro('status', r.status, filtros.status, ['TODOS'])) return false
+    if (!matchFiltro('servico', r.servico, filtros.servico, ['TODOS'])) return false
 
     const d = parseDate(r.data)
     if (dataIni && d && d < dataIni) return false
@@ -583,15 +615,18 @@ function DadosEspecificosView({ registros }) {
     }).map(([data, qtd]) => ({ data, qtd }))
   }
 
-  const SelectFiltro = ({ label, value, onChange, options, allLabel = 'Todos' }) => (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-      {label}
-      <select value={value} onChange={e => onChange(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }}>
-        <option value={value.startsWith('TOD') ? value : (allLabel === 'Todas' ? 'TODAS' : 'TODOS')}>{allLabel}</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </label>
-  )
+  const SelectFiltro = ({ label, value, onChange, options, allLabel = 'Todos' }) => {
+    const allValue = allLabel === 'Todas' ? 'TODAS' : 'TODOS'
+    return (
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+        {label}
+        <select value={value} onChange={e => onChange(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }}>
+          <option value={allValue}>{allLabel}</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </label>
+    )
+  }
 
   if (!rows.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados na aba REUNIOES_GERAL</div>
 
@@ -690,7 +725,39 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   }, [empresaSelecionada])
 
   const clean = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const norm = (v) => String(v || '').trim().toUpperCase()
+  const norm = (v) => String(v || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  const canonical = (key, value) => {
+    const v = norm(value)
+    if (!v) return ''
+
+    if (key === 'origem') {
+      if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(v)) return 'IB'
+      if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(v)) return 'RECUPERACAO'
+      if (['INDIC', 'INDICACAO'].includes(v)) return 'INDICACAO'
+    }
+
+    if (key === 'status') {
+      if (['CONTRATOS', 'EM CONTRATO', 'CLIENTE EM CONTRATO'].includes(v)) return 'CONTRATO'
+      if (['PAGO', 'PAGOS'].includes(v)) return 'PAGO'
+      if (['FORA', 'PERDIDO', 'PERDIDOS'].includes(v)) return 'FORA'
+    }
+
+    return v
+  }
+
+  const matchFiltro = (key, rowValue, filtroValue, allValues = ['TODOS']) => {
+    if (allValues.includes(filtroValue)) return true
+    const r = canonical(key, rowValue)
+    const f = canonical(key, filtroValue)
+    if (!f) return true
+    if (!r) return false
+    return r === f || r.includes(f) || f.includes(r)
+  }
   const normalizarOrigem = (v) => {
     const o = clean(v)
     if (!o) return 'SEM ORIGEM'
