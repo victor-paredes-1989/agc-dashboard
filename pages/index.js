@@ -930,116 +930,281 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   )
 }
 
-function ForecastView({ forecast }) {
-  const [mesSel, setMesSel] = useState(null)
 
-  if (!forecast || forecast.length === 0) return (
+function monthNumberFromName(mes) {
+  const key = String(mes || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const map = { JANEIRO:1, FEVEREIRO:2, MARCO:3, ABRIL:4, MAIO:5, JUNHO:6, JULHO:7, AGOSTO:8, SETEMBRO:9, OUTUBRO:10, NOVEMBRO:11, DEZEMBRO:12 }
+  return map[key] || 1
+}
+
+function daysInMonth(ano, mes) {
+  return new Date(Number(ano || new Date().getFullYear()), monthNumberFromName(mes), 0).getDate()
+}
+
+function dayFromDate(value) {
+  if (!value) return null
+  if (value instanceof Date && !isNaN(value)) return value.getDate()
+  const s = String(value).trim()
+  const matchBR = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
+  if (matchBR) return Math.max(1, Math.min(31, Number(matchBR[1]) || 1))
+  const matchISO = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/)
+  if (matchISO) return Math.max(1, Math.min(31, Number(matchISO[3]) || 1))
+  return null
+}
+
+function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, supermeta }) {
+  const totalDias = daysInMonth(ano, mes)
+  const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
+  const porDia = Object.fromEntries(dias.map(d => [d, 0]))
+  const tipoNorm = String(tipo || 'GERAL').toUpperCase()
+  const nomeNorm = String(nome || '').toUpperCase()
+  const empresaNorm = String(empresa || '').toUpperCase()
+  const mesNorm = String(mes || '').toUpperCase()
+  const anoNorm = String(ano || '')
+
+  ;(registros || []).forEach(r => {
+    if (String(r.empresa || '').toUpperCase() !== empresaNorm) return
+    if (String(r.mes || '').toUpperCase() !== mesNorm) return
+    if (String(r.ano || '') !== anoNorm) return
+
+    const status = String(r.status || '').toUpperCase().trim()
+    const dia = dayFromDate(r.data)
+    if (!dia || dia > totalDias) return
+
+    if (tipoNorm === 'SDR') {
+      if (String(r.sdr || '').toUpperCase().trim() !== nomeNorm) return
+      porDia[dia] += 1
+      return
+    }
+
+    if (tipoNorm === 'CLOSER') {
+      if (String(r.closer || '').toUpperCase().trim() !== nomeNorm) return
+      if (status !== 'PAGO') return
+      porDia[dia] += Number(r.valor) || 0
+      return
+    }
+
+    // Geral da empresa = NMRR/valor pago do mês, considerando somente PAGO.
+    if (status !== 'PAGO') return
+    porDia[dia] += Number(r.valor) || 0
+  })
+
+  let acumulado = 0
+  let ultimoDiaComDado = 0
+  const real = dias.map(d => {
+    acumulado += Number(porDia[d]) || 0
+    if ((Number(porDia[d]) || 0) > 0) ultimoDiaComDado = d
+    return { dia: d, valor: acumulado }
+  })
+
+  const realizado = acumulado
+  const metaNum = Number(meta) || 0
+  const superNum = Number(supermeta) || 0
+  const baseDia = Math.max(ultimoDiaComDado, 1)
+  const previsaoFinal = baseDia > 0 ? (realizado / baseDia) * totalDias : 0
+
+  return {
+    dias,
+    totalDias,
+    realizado,
+    meta: metaNum,
+    supermeta: superNum,
+    pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
+    previsaoFinal,
+    ultimoDiaComDado,
+    real,
+    metaLine: dias.map(d => ({ dia: d, valor: (metaNum / totalDias) * d })),
+    superLine: dias.map(d => ({ dia: d, valor: (superNum / totalDias) * d })),
+    previsaoLine: dias.map(d => ({ dia: d, valor: (previsaoFinal / totalDias) * d })),
+  }
+}
+
+function ForecastCurveChart({ dados, tipo }) {
+  if (!dados) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
+
+  const w = 720, h = 260, padX = 34, padY = 22
+  const allVals = [
+    ...dados.real.map(p => p.valor),
+    ...dados.metaLine.map(p => p.valor),
+    ...dados.superLine.map(p => p.valor),
+    ...dados.previsaoLine.map(p => p.valor),
+  ]
+  const max = Math.max(...allVals, 1)
+  const x = (dia) => padX + ((dia - 1) / Math.max(dados.totalDias - 1, 1)) * (w - padX * 2)
+  const y = (valor) => h - padY - (valor / max) * (h - padY * 2)
+  const line = (arr) => arr.map(p => `${x(p.dia)},${y(p.valor)}`).join(' ')
+  const fmtAxis = tipo === 'SDR' ? fmtNum1 : fmtR1
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 280 }} preserveAspectRatio="none">
+        {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
+          <g key={i}>
+            <line x1={padX} x2={w-padX} y1={padY + g*(h-padY*2)} y2={padY + g*(h-padY*2)} stroke="rgba(255,255,255,0.08)" />
+            <text x="4" y={padY + g*(h-padY*2) + 4} fill="#94a3b8" fontSize="10">{fmtAxis(max * (1-g))}</text>
+          </g>
+        ))}
+        <polyline points={line(dados.metaLine)} fill="none" stroke="#8b5cf6" strokeWidth="2" />
+        {dados.supermeta > 0 && <polyline points={line(dados.superLine)} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="5 5" />}
+        <polyline points={line(dados.previsaoLine)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 6" />
+        <polyline points={line(dados.real)} fill="none" stroke="#ef4444" strokeWidth="3" />
+        {dados.real.filter(p => p.valor > 0).map((p, i) => <circle key={i} cx={x(p.dia)} cy={y(p.valor)} r="3" fill="#ef4444" />)}
+        {[1, 5, 10, 15, 20, 25, dados.totalDias].filter((d, i, arr) => d <= dados.totalDias && arr.indexOf(d) === i).map(d => (
+          <text key={d} x={x(d)} y={h-4} fill="#94a3b8" fontSize="10" textAnchor="middle">{d}</text>
+        ))}
+      </svg>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
+        <span><b style={{ color: '#ef4444' }}>●</b> Realizado</span>
+        <span><b style={{ color: '#8b5cf6' }}>—</b> Meta</span>
+        <span><b style={{ color: '#f59e0b' }}>--</b> Supermeta</span>
+        <span><b style={{ color: '#94a3b8' }}>--</b> Previsão</span>
+      </div>
+    </div>
+  )
+}
+
+function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSelecionada = 'AI' }) {
+  const [mesSel, setMesSel] = useState(null)
+  const [tipoVisao, setTipoVisao] = useState('GERAL')
+  const [nomeSel, setNomeSel] = useState('')
+
+  const forecastList = Array.isArray(forecast) ? forecast : []
+  const equipeList = Array.isArray(forecastEquipe) ? forecastEquipe : []
+  const meses = [...new Set([
+    ...forecastList.map(f => String(f.mes || '').toUpperCase()).filter(Boolean),
+    ...equipeList.filter(e => String(e.empresa || '').toUpperCase() === String(empresaSelecionada).toUpperCase()).map(e => String(e.mes || '').toUpperCase()).filter(Boolean),
+  ])]
+
+  const mesAtivo = mesSel || meses[0] || ''
+  const anoAtivo = String((forecastList.find(f => String(f.mes || '').toUpperCase() === mesAtivo)?.ano) || (equipeList.find(e => String(e.mes || '').toUpperCase() === mesAtivo)?.ano) || new Date().getFullYear())
+  const forecastMes = forecastList.find(f => String(f.mes || '').toUpperCase() === mesAtivo) || forecastList[0] || {}
+
+  const pessoas = equipeList
+    .filter(e => String(e.empresa || '').toUpperCase() === String(empresaSelecionada).toUpperCase())
+    .filter(e => String(e.mes || '').toUpperCase() === mesAtivo)
+    .filter(e => String(e.tipo || '').toUpperCase() === tipoVisao)
+
+  const nomes = pessoas.map(e => e.nome).filter(Boolean)
+  const nomeAtivo = tipoVisao === 'GERAL' ? '' : (nomes.includes(nomeSel) ? nomeSel : (nomes[0] || ''))
+  const metaPessoa = pessoas.find(e => e.nome === nomeAtivo) || {}
+
+  if (!forecastList.length && !equipeList.length) return (
     <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de forecast</div>
   )
 
-  const dados = mesSel ? forecast.filter(f => f.mes === mesSel) : forecast
+  const metaGrafico = tipoVisao === 'GERAL' ? Number(forecastMes.meta || 0) : Number(metaPessoa.meta || 0)
+  const supermetaGrafico = tipoVisao === 'GERAL' ? 0 : Number(metaPessoa.supermeta || 0)
+  const dadosGrafico = buildDailyForecast({
+    registros,
+    empresa: empresaSelecionada,
+    mes: mesAtivo,
+    ano: anoAtivo,
+    tipo: tipoVisao,
+    nome: nomeAtivo,
+    meta: metaGrafico,
+    supermeta: supermetaGrafico,
+  })
+
+  const unidade = tipoVisao === 'SDR' ? 'reuniões' : 'NMRR pago'
+  const valorFmt = tipoVisao === 'SDR' ? fmtNum1 : fmtR1
+  const necessario = Math.max((metaGrafico - dadosGrafico.realizado) / Math.max(dadosGrafico.totalDias - Math.max(dadosGrafico.ultimoDiaComDado, 1), 1), 0)
+
   const gapIsPositive = (v) => Number(v || 0) < 0
   const gapCardClass = (v) => gapIsPositive(v) ? 'green' : 'red'
   const gapSub = (v, label = 'da meta') => gapIsPositive(v) ? `✓ Acima ${label}` : `⚠ Abaixo ${label}`
   const signedNumber = (v) => `${Number(v || 0) > 0 ? '+' : ''}${fmtNum1(v)}`
 
+  const FilterButton = ({ value, label }) => (
+    <button onClick={() => { setTipoVisao(value); setNomeSel('') }}
+      style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid', fontSize: 12, cursor: 'pointer',
+        background: tipoVisao === value ? 'rgba(255,255,255,0.12)' : 'transparent',
+        borderColor: tipoVisao === value ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+        color: tipoVisao === value ? '#e2e8f0' : '#94a3b8' }}>
+      {label}
+    </button>
+  )
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Filtrar:</span>
-        <button onClick={() => setMesSel(null)}
-          style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer',
-            background: mesSel === null ? 'rgba(255,255,255,0.12)' : 'transparent',
-            borderColor: mesSel === null ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-            color: mesSel === null ? '#e2e8f0' : '#94a3b8' }}>
-          Todos os meses
-        </button>
-        {forecast.map(f => (
-          <button key={f.mes} onClick={() => setMesSel(f.mes)}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Mês:</span>
+        {meses.map(m => (
+          <button key={m} onClick={() => setMesSel(m)}
             style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer',
-              background: mesSel === f.mes ? 'rgba(255,255,255,0.12)' : 'transparent',
-              borderColor: mesSel === f.mes ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-              color: mesSel === f.mes ? '#e2e8f0' : '#94a3b8' }}>
-            {f.mes}
+              background: mesAtivo === m ? 'rgba(255,255,255,0.12)' : 'transparent',
+              borderColor: mesAtivo === m ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+              color: mesAtivo === m ? '#e2e8f0' : '#94a3b8' }}>
+            {m}
           </button>
         ))}
       </div>
 
-      {dados.map((f, idx) => {
-        const hasMeta = Number(f.meta || 0) > 0
-        const mrrAbaixoDaMeta = hasMeta && Number(f.mrrPago || 0) < Number(f.meta || 0)
-        return (
-          <div key={idx} style={{ marginBottom: 28 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 14, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>{f.mes} 2026</div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Visão:</span>
+        <FilterButton value="GERAL" label="Forecast mensal" />
+        <FilterButton value="CLOSER" label="Por Closer" />
+        <FilterButton value="SDR" label="Por SDR" />
+        {tipoVisao !== 'GERAL' && (
+          <select value={nomeAtivo} onChange={e => setNomeSel(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', minWidth: 180 }}>
+            {nomes.length === 0 && <option value="">Sem pessoas cadastradas</option>}
+            {nomes.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        )}
+      </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
-              <div className="card blue">
-                <div className="card-label">Meta</div>
-                <div className="card-value">{fmtR1(f.meta)}</div>
-                <div className="card-sub">meta do mês</div>
-              </div>
-              <div className={`card ${mrrAbaixoDaMeta ? 'red' : 'green'}`}>
-                <div className="card-label">MRR Pago Projetado</div>
-                <div className="card-value">{fmtR1(f.mrrPago)}</div>
-                <div className="card-sub">{fmtPct(f.pctPago)} da meta {mrrAbaixoDaMeta ? '⚠ abaixo' : '✓ acima'}</div>
-              </div>
-              <div className={`card ${gapCardClass(f.gapPago)}`}>
-                <div className="card-label">Gap Pago</div>
-                <div className="card-value">{fmtR1(f.gapPago)}</div>
-                <div className="card-sub">{gapSub(f.gapPago)}</div>
-              </div>
-              <div className="card amber">
-                <div className="card-label">Projeção Vendido</div>
-                <div className="card-value">{fmtR1(f.projecaoVendido)}</div>
-                <div className="card-sub">{fmtPct(f.pctVendido)} do projetado</div>
-              </div>
-              <div className={`card ${gapCardClass(f.gapNmrr)}`}>
-                <div className="card-label">Gap NMRR</div>
-                <div className="card-value">{fmtR1(f.gapNmrr)}</div>
-                <div className="card-sub">{gapSub(f.gapNmrr)}</div>
-              </div>
-              <div className={`card ${gapCardClass(f.gapContratos)}`}>
-                <div className="card-label">Gap Contratos</div>
-                <div className="card-value">{signedNumber(f.gapContratos)}</div>
-                <div className="card-sub">{gapSub(f.gapContratos, 'vs meta')}</div>
-              </div>
-              <div className={`card ${gapCardClass(f.gapRlzd)}`}>
-                <div className="card-label">Gap Realizadas</div>
-                <div className="card-value">{signedNumber(f.gapRlzd)}</div>
-                <div className="card-sub">{gapSub(f.gapRlzd, 'vs meta')}</div>
-              </div>
-              <div className={`card ${gapCardClass(f.gapAgd)}`}>
-                <div className="card-label">Gap Agendadas</div>
-                <div className="card-value">{signedNumber(f.gapAgd)}</div>
-                <div className="card-sub">{gapSub(f.gapAgd, 'vs meta')}</div>
-              </div>
+      <div className="chart-card" style={{ marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 0.75fr)', gap: 18, alignItems: 'stretch' }}>
+          <div>
+            <div className="chart-title">Evolução do Forecast — {tipoVisao === 'GERAL' ? empresaSelecionada : nomeAtivo} · {mesAtivo} {anoAtivo}</div>
+            <ForecastCurveChart dados={dadosGrafico} tipo={tipoVisao} />
+          </div>
+          <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 18, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 22 }}>
+            <div>
+              <div className="card-label">Realizado no mês</div>
+              <div className="card-value">{valorFmt(dadosGrafico.realizado)}</div>
+              <div className="card-sub">Previsão final: {valorFmt(dadosGrafico.previsaoFinal)}</div>
             </div>
-
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Metas Diárias</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-              <div className="card blue">
-                <div className="card-label">Meta Dia — Pago</div>
-                <div className="card-value">{fmtR1(f.metaDiaPago)}</div>
+            <div>
+              <div className="card-label">Objetivo do mês</div>
+              <div className="card-value">{valorFmt(metaGrafico)}</div>
+              <div style={{ width: '100%', background: 'rgba(255,255,255,0.08)', height: 8, borderRadius: 999, margin: '8px 0' }}>
+                <div style={{ width: `${Math.min(Math.max(dadosGrafico.pctMeta, 0), 100)}%`, height: '100%', borderRadius: 999, background: '#8b5cf6' }} />
               </div>
-              <div className="card">
-                <div className="card-label">Meta Dia — Agend.</div>
-                <div className="card-value">{fmtNum1(f.metaAgdDia)}</div>
+              <div className="card-sub">{fmtPct(dadosGrafico.pctMeta)} realizado</div>
+            </div>
+            {supermetaGrafico > 0 && (
+              <div>
+                <div className="card-label">Supermeta</div>
+                <div className="card-value">{valorFmt(supermetaGrafico)}</div>
               </div>
-              <div className="card">
-                <div className="card-label">Meta Dia — Realiz.</div>
-                <div className="card-value">{fmtNum1(f.metaRlzdDia)}</div>
-              </div>
-              <div className="card purple">
-                <div className="card-label">Meta Dia — Contratos</div>
-                <div className="card-value">{fmtNum1(f.metaContPagoDia)}</div>
-              </div>
+            )}
+            <div>
+              <div className="card-label">Necessário por dia restante</div>
+              <div className="card-value">{valorFmt(necessario)}</div>
+              <div className="card-sub">Unidade: {unidade}</div>
             </div>
           </div>
-        )
-      })}
+        </div>
+      </div>
+
+      {forecastMes && forecastMes.mes && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Resumo do Forecast Mensal</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div className="card blue"><div className="card-label">Meta</div><div className="card-value">{fmtR1(forecastMes.meta)}</div><div className="card-sub">meta do mês</div></div>
+            <div className={`card ${Number(forecastMes.meta || 0) > 0 && Number(forecastMes.mrrPago || 0) < Number(forecastMes.meta || 0) ? 'red' : 'green'}`}><div className="card-label">MRR Pago Projetado</div><div className="card-value">{fmtR1(forecastMes.mrrPago)}</div><div className="card-sub">{fmtPct(forecastMes.pctPago)} da meta</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapPago)}`}><div className="card-label">Gap Pago</div><div className="card-value">{fmtR1(forecastMes.gapPago)}</div><div className="card-sub">{gapSub(forecastMes.gapPago)}</div></div>
+            <div className="card amber"><div className="card-label">Projeção Vendido</div><div className="card-value">{fmtR1(forecastMes.projecaoVendido)}</div><div className="card-sub">{fmtPct(forecastMes.pctVendido)} do projetado</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapContratos)}`}><div className="card-label">Gap Contratos</div><div className="card-value">{signedNumber(forecastMes.gapContratos)}</div><div className="card-sub">{gapSub(forecastMes.gapContratos, 'vs meta')}</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapRlzd)}`}><div className="card-label">Gap Realizadas</div><div className="card-value">{signedNumber(forecastMes.gapRlzd)}</div><div className="card-sub">{gapSub(forecastMes.gapRlzd, 'vs meta')}</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapAgd)}`}><div className="card-label">Gap Agendadas</div><div className="card-value">{signedNumber(forecastMes.gapAgd)}</div><div className="card-sub">{gapSub(forecastMes.gapAgd, 'vs meta')}</div></div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
 export default function Dashboard() {
   const [data, setData] = useState(null)
@@ -1093,7 +1258,7 @@ export default function Dashboard() {
       {!loading && !error && data && (
         <div className="page">
           {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
-           periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} /> :
+           periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
            periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
            periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
            periodoData ? <>
