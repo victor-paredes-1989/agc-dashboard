@@ -952,6 +952,28 @@ function dayFromDate(value) {
   return null
 }
 
+function isOperationalDay(ano, mes, dia) {
+  // Considera dias úteis + sábado. Domingo fica fora do forecast.
+  const dt = new Date(Number(ano), monthNumberFromName(mes) - 1, Number(dia))
+  return dt.getDay() !== 0
+}
+
+function countOperationalDays({ ano, mes, start = 1, end }) {
+  const totalDias = daysInMonth(ano, mes)
+  const ini = Math.max(1, Number(start) || 1)
+  const fim = Math.min(totalDias, Number(end) || totalDias)
+  let total = 0
+  for (let d = ini; d <= fim; d++) {
+    if (isOperationalDay(ano, mes, d)) total++
+  }
+  return total
+}
+
+function isCurrentSelectedMonth(ano, mes) {
+  const today = new Date()
+  return Number(ano) === today.getFullYear() && monthNumberFromName(mes) === today.getMonth() + 1
+}
+
 function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, supermeta }) {
   const totalDias = daysInMonth(ano, mes)
   const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
@@ -997,11 +1019,29 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
     return { dia: d, valor: acumulado }
   })
 
+  const today = new Date()
+  const mesAtual = isCurrentSelectedMonth(ano, mes)
+  // Para o mês atual, o forecast usa o dia de hoje como corte.
+  // Para meses anteriores, ele considera o mês fechado e a previsão final = realizado.
+  // Para mês futuro/sem dados, usa o último dia com dado ou dia 1 como segurança.
+  const cutoffDia = mesAtual
+    ? Math.min(today.getDate(), totalDias)
+    : (ultimoDiaComDado ? totalDias : 1)
+
   const realizado = acumulado
   const metaNum = Number(meta) || 0
   const superNum = Number(supermeta) || 0
-  const baseDia = Math.max(ultimoDiaComDado, 1)
-  const previsaoFinal = baseDia > 0 ? (realizado / baseDia) * totalDias : 0
+  const diasOperacionaisMes = countOperationalDays({ ano, mes, start: 1, end: totalDias })
+  const diasOperacionaisDecorridos = countOperationalDays({ ano, mes, start: 1, end: cutoffDia })
+  const diasOperacionaisRestantes = mesAtual
+    ? countOperationalDays({ ano, mes, start: cutoffDia + 1, end: totalDias })
+    : 0
+
+  const mediaDia = diasOperacionaisDecorridos > 0 ? realizado / diasOperacionaisDecorridos : 0
+  const previsaoFinal = mesAtual ? realizado + (mediaDia * diasOperacionaisRestantes) : realizado
+
+  const operationalCountUntil = (dia) => countOperationalDays({ ano, mes, start: 1, end: dia })
+  const operationalCountBetween = (start, end) => countOperationalDays({ ano, mes, start, end })
 
   return {
     dias,
@@ -1011,11 +1051,21 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
     supermeta: superNum,
     pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
     previsaoFinal,
+    mediaDia,
+    cutoffDia,
     ultimoDiaComDado,
+    diasOperacionaisMes,
+    diasOperacionaisDecorridos,
+    diasOperacionaisRestantes,
     real,
-    metaLine: dias.map(d => ({ dia: d, valor: (metaNum / totalDias) * d })),
-    superLine: dias.map(d => ({ dia: d, valor: (superNum / totalDias) * d })),
-    previsaoLine: dias.map(d => ({ dia: d, valor: (previsaoFinal / totalDias) * d })),
+    // A linha da meta também respeita dias úteis + sábados; domingos ficam estáveis.
+    metaLine: dias.map(d => ({ dia: d, valor: diasOperacionaisMes > 0 ? (metaNum / diasOperacionaisMes) * operationalCountUntil(d) : 0 })),
+    superLine: dias.map(d => ({ dia: d, valor: diasOperacionaisMes > 0 ? (superNum / diasOperacionaisMes) * operationalCountUntil(d) : 0 })),
+    // A previsão parte do realizado no dia de corte e projeta o ritmo só nos dias úteis + sábados restantes.
+    previsaoLine: dias.map(d => {
+      if (d <= cutoffDia) return { dia: d, valor: real[d - 1]?.valor || 0 }
+      return { dia: d, valor: realizado + (mediaDia * operationalCountBetween(cutoffDia + 1, d)) }
+    }),
   }
 }
 
@@ -1107,7 +1157,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 
   const unidade = tipoVisao === 'SDR' ? 'reuniões' : 'NMRR pago'
   const valorFmt = tipoVisao === 'SDR' ? fmtNum1 : fmtR1
-  const necessario = Math.max((metaGrafico - dadosGrafico.realizado) / Math.max(dadosGrafico.totalDias - Math.max(dadosGrafico.ultimoDiaComDado, 1), 1), 0)
+  const necessario = Math.max((metaGrafico - dadosGrafico.realizado) / Math.max(dadosGrafico.diasOperacionaisRestantes, 1), 0)
 
   const gapIsPositive = (v) => Number(v || 0) < 0
   const gapCardClass = (v) => gapIsPositive(v) ? 'green' : 'red'
@@ -1162,7 +1212,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
             <div>
               <div className="card-label">Realizado no mês</div>
               <div className="card-value">{valorFmt(dadosGrafico.realizado)}</div>
-              <div className="card-sub">Previsão final: {valorFmt(dadosGrafico.previsaoFinal)}</div>
+              <div className="card-sub">Previsão final: {valorFmt(dadosGrafico.previsaoFinal)} · média/dia: {valorFmt(dadosGrafico.mediaDia)}</div>
             </div>
             <div>
               <div className="card-label">Objetivo do mês</div>
@@ -1179,9 +1229,9 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
               </div>
             )}
             <div>
-              <div className="card-label">Necessário por dia restante</div>
+              <div className="card-label">Necessário por dia útil/sábado restante</div>
               <div className="card-value">{valorFmt(necessario)}</div>
-              <div className="card-sub">Unidade: {unidade}</div>
+              <div className="card-sub">{dadosGrafico.diasOperacionaisRestantes} dias restantes · Unidade: {unidade}</div>
             </div>
           </div>
         </div>
