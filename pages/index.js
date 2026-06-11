@@ -49,18 +49,17 @@ const parseDisplayNumber = (value) => {
   return negative ? -n : n
 }
 
-// Colors by CONCEPT — same concept = same color everywhere
 const CONCEPT_COLORS = {
-  'IB': '#3b82f6',        // blue
-  'SS': '#10b981',        // green
-  'REC. BASE': '#8b5cf6', // purple
-  'INDICAÇÃO': '#f59e0b', // amber
-  'MQL': '#14b8a6',       // teal
-  'LIVE': '#ec4899',      // pink
-  'API': '#f97316',       // orange
-  'CHURN': '#ef4444',     // red
-  'RECUP': '#6366f1',     // indigo
-  'INDIC': '#f59e0b',     // amber (same as INDICAÇÃO)
+  'IB': '#3b82f6',
+  'SS': '#10b981',
+  'REC. BASE': '#8b5cf6',
+  'INDICAÇÃO': '#f59e0b',
+  'MQL': '#14b8a6',
+  'LIVE': '#ec4899',
+  'API': '#f97316',
+  'CHURN': '#ef4444',
+  'RECUP': '#6366f1',
+  'INDIC': '#f59e0b',
   'SEM ORIGEM': '#64748b',
 }
 
@@ -103,7 +102,7 @@ function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, 
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 80, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d[labelKey]}>{d[labelKey]}</div>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+            <div style={{ flex: 1, background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: extraValueKey ? 150 : (showPct ? 90 : 36), textAlign: 'right', flexShrink: 0 }}>
@@ -121,7 +120,6 @@ function ProgressByOriginChart({ data, emptyLabel = 'Sem dados' }) {
   if (!data || data.length === 0) {
     return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>{emptyLabel}</div>
   }
-
   return (
     <div>
       {data.slice(0, 12).map((d, i) => {
@@ -131,7 +129,7 @@ function ProgressByOriginChart({ data, emptyLabel = 'Sem dados' }) {
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
-            <div style={{ flex: '0 1 68%', background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+            <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
               <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
@@ -149,9 +147,7 @@ function AdditionalOriginChart({ data }) {
   if (!data || data.length === 0) {
     return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>Sem adicionais sem meta</div>
   }
-
   const max = Math.max(...data.map(d => Number(d.realNmrr) || 0), 1)
-
   return (
     <div>
       {data.slice(0, 12).map((d, i) => {
@@ -161,7 +157,7 @@ function AdditionalOriginChart({ data }) {
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
-            <div style={{ flex: '0 1 68%', background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+            <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
               <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
@@ -193,8 +189,8 @@ function PieChart({ data }) {
   })
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-      <svg viewBox="0 0 100 100" style={{ width: 90, height: 90, flexShrink: 0 }}>
-        {slices.map((s, i) => <path key={i} d={s.path} fill={s.color} stroke="#1a1d27" strokeWidth="1" />)}
+      <svg viewBox="0 0 100 100" style={{ width: 90, height: 90, flexShrink: 0 }} className="pie-chart-svg">
+        {slices.map((s, i) => <path key={i} d={s.path} fill={s.color} strokeWidth="1" />)}
       </svg>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
         {slices.map((s, i) => (
@@ -226,14 +222,14 @@ function LineChartWithTooltip({ data, color = '#14b8a6' }) {
         <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
         {points.map((p, i) => (
           <circle key={i} cx={p.x} cy={p.y} r="4" fill={color} style={{ cursor: 'pointer' }}
-            onMouseEnter={(e) => setTooltip({ x: p.x, y: p.y, label: p.data.data, qtd: p.data.qtd })}
+            onMouseEnter={() => setTooltip({ x: p.x, y: p.y, label: p.data.data, qtd: p.data.qtd })}
             onMouseLeave={() => setTooltip(null)} />
         ))}
       </svg>
       {tooltip && (
-        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: '#1e2235', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: '#e2e8f0', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
-          <div style={{ color: 'var(--text-muted)' }}>{tooltip.label}</div>
-          <div style={{ fontWeight: 600 }}>{tooltip.qtd} reuniões</div>
+        <div className="tooltip-box" style={{ top: 0, left: '50%', transform: 'translateX(-50%)' }}>
+          <div className="tooltip-label">{tooltip.label}</div>
+          <div className="tooltip-value">{tooltip.qtd} reuniões</div>
         </div>
       )}
     </div>
@@ -265,9 +261,9 @@ function MiniLineChartTooltip({ dados, metrica, color }) {
         ))}
       </svg>
       {tooltip && (
-        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', background: '#1e2235', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: '#e2e8f0', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
-          <div style={{ color: 'var(--text-muted)' }}>{tooltip.semana}</div>
-          <div style={{ fontWeight: 600 }}>{isReais ? fmtR(tooltip.val) : fmt(tooltip.val)}</div>
+        <div className="tooltip-box" style={{ top: 0, left: '50%', transform: 'translateX(-50%)' }}>
+          <div className="tooltip-label">{tooltip.semana}</div>
+          <div className="tooltip-value">{isReais ? fmtR(tooltip.val) : fmt(tooltip.val)}</div>
         </div>
       )}
     </div>
@@ -279,18 +275,10 @@ function SemanasComparativo({ semanas }) {
   if (!semanas || semanas.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de semanas</div>
 
   const monthMeta = {
-    JAN: { label: 'Janeiro', order: 1 },
-    FEV: { label: 'Fevereiro', order: 2 },
-    MAR: { label: 'Março', order: 3 },
-    ABR: { label: 'Abril', order: 4 },
-    MAI: { label: 'Maio', order: 5 },
-    JUN: { label: 'Junho', order: 6 },
-    JUL: { label: 'Julho', order: 7 },
-    AGO: { label: 'Agosto', order: 8 },
-    SET: { label: 'Setembro', order: 9 },
-    OUT: { label: 'Outubro', order: 10 },
-    NOV: { label: 'Novembro', order: 11 },
-    DEZ: { label: 'Dezembro', order: 12 },
+    JAN: { label: 'Janeiro', order: 1 }, FEV: { label: 'Fevereiro', order: 2 }, MAR: { label: 'Março', order: 3 },
+    ABR: { label: 'Abril', order: 4 }, MAI: { label: 'Maio', order: 5 }, JUN: { label: 'Junho', order: 6 },
+    JUL: { label: 'Julho', order: 7 }, AGO: { label: 'Agosto', order: 8 }, SET: { label: 'Setembro', order: 9 },
+    OUT: { label: 'Outubro', order: 10 }, NOV: { label: 'Novembro', order: 11 }, DEZ: { label: 'Dezembro', order: 12 },
   }
 
   const getMonthKey = (semana) => {
@@ -304,22 +292,15 @@ function SemanasComparativo({ semanas }) {
     acc[key].push(item)
     return acc
   }, {})).map(([key, dados]) => ({
-    key,
-    dados,
-    label: monthMeta[key]?.label || key,
-    order: monthMeta[key]?.order || 99,
+    key, dados, label: monthMeta[key]?.label || key, order: monthMeta[key]?.order || 99,
   })).sort((a, b) => a.order - b.order)
 
   const metricaOpts = [
-    { key: 'leads', label: 'Leads' },
-    { key: 'agendamentos', label: 'Agendamentos' },
-    { key: 'realizadas', label: 'Realizadas' },
-    { key: 'contratosPagos', label: 'Contratos' },
-    { key: 'nmrr', label: 'NMRR' },
-    { key: 'tkm', label: 'TKM' },
+    { key: 'leads', label: 'Leads' }, { key: 'agendamentos', label: 'Agendamentos' },
+    { key: 'realizadas', label: 'Realizadas' }, { key: 'contratosPagos', label: 'Contratos' },
+    { key: 'nmrr', label: 'NMRR' }, { key: 'tkm', label: 'TKM' },
   ]
-
-  const chartColors = ['#8b5cf6', '#14b8a6', '#3b82f6', '#f59e0b', '#ec4899', '#f97316', '#6366f1']
+  const chartColors = ['#8b5cf6','#14b8a6','#3b82f6','#f59e0b','#ec4899','#f97316','#6366f1']
 
   const TableMes = ({ dados, titulo }) => (
     <div style={{ marginBottom: 24 }}>
@@ -335,7 +316,7 @@ function SemanasComparativo({ semanas }) {
           </thead>
           <tbody>
             {dados.map((s, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 8px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{s.semana}</td>
                 <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmt(s.leads)}</td>
                 <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.mql || '-'}</td>
@@ -364,9 +345,9 @@ function SemanasComparativo({ semanas }) {
         {metricaOpts.map(m => (
           <button key={m.key} onClick={() => setMetrica(m.key)}
             style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer',
-              background: metrica === m.key ? 'rgba(255,255,255,0.12)' : 'transparent',
-              borderColor: metrica === m.key ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-              color: metrica === m.key ? '#e2e8f0' : '#94a3b8' }}>
+              background: metrica === m.key ? 'rgba(99,102,241,0.15)' : 'transparent',
+              borderColor: metrica === m.key ? 'rgba(99,102,241,0.4)' : 'var(--border)',
+              color: metrica === m.key ? 'var(--text-primary)' : 'var(--text-muted)' }}>
             {m.label}
           </button>
         ))}
@@ -473,7 +454,6 @@ function ReuniaoGraficos({ graficos }) {
 }
 
 
-
 function DadosEspecificosView({ registros }) {
   const [filtros, setFiltros] = useState({
     empresa: 'TODAS', mes: 'TODOS', ano: 'TODOS', sdr: 'TODOS', closer: 'TODOS',
@@ -487,24 +467,21 @@ function DadosEspecificosView({ registros }) {
     .trim()
     .toUpperCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
 
   const canonical = (key, value) => {
     const v = norm(value)
     if (!v) return ''
-
     if (key === 'origem') {
       if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(v)) return 'IB'
       if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(v)) return 'RECUPERACAO'
       if (['INDIC', 'INDICACAO'].includes(v)) return 'INDICACAO'
     }
-
     if (key === 'status') {
       if (['CONTRATOS', 'EM CONTRATO', 'CLIENTE EM CONTRATO'].includes(v)) return 'CONTRATO'
       if (['PAGO', 'PAGOS'].includes(v)) return 'PAGO'
       if (['FORA', 'PERDIDO', 'PERDIDOS'].includes(v)) return 'FORA'
     }
-
     return v
   }
 
@@ -544,11 +521,9 @@ function DadosEspecificosView({ registros }) {
     if (!matchFiltro('origem', r.origem, filtros.origem, ['TODAS'])) return false
     if (!matchFiltro('status', r.status, filtros.status, ['TODOS'])) return false
     if (!matchFiltro('servico', r.servico, filtros.servico, ['TODOS'])) return false
-
     const d = parseDate(r.data)
     if (dataIni && d && d < dataIni) return false
     if (dataFim && d && d > dataFim) return false
-
     const busca = norm(filtros.busca)
     if (busca) {
       const texto = norm(`${r.cliente} ${r.informacao} ${r.sdr} ${r.closer} ${r.origem} ${r.status} ${r.servico}`)
@@ -620,7 +595,7 @@ function DadosEspecificosView({ registros }) {
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
         {label}
-        <select value={value} onChange={e => onChange(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }}>
+        <select value={value} onChange={e => onChange(e.target.value)} className="field-input">
           <option value={allValue}>{allLabel}</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
@@ -644,13 +619,13 @@ function DadosEspecificosView({ registros }) {
           <SelectFiltro label="Status" value={filtros.status} onChange={v=>setFiltro('status', v)} options={unique('status')} />
           <SelectFiltro label="Serviço" value={filtros.servico} onChange={v=>setFiltro('servico', v)} options={unique('servico')} />
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Data inicial
-            <input type="date" value={filtros.dataIni} onChange={e=>setFiltro('dataIni', e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }} />
+            <input type="date" value={filtros.dataIni} onChange={e=>setFiltro('dataIni', e.target.value)} className="field-input" />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Data final
-            <input type="date" value={filtros.dataFim} onChange={e=>setFiltro('dataFim', e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }} />
+            <input type="date" value={filtros.dataFim} onChange={e=>setFiltro('dataFim', e.target.value)} className="field-input" />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)', gridColumn: 'span 2' }}>Buscar cliente/informação
-            <input value={filtros.busca} onChange={e=>setFiltro('busca', e.target.value)} placeholder="Digite um nome, origem, SDR..." style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', fontSize: 12 }} />
+            <input value={filtros.busca} onChange={e=>setFiltro('busca', e.target.value)} placeholder="Digite um nome, origem, SDR..." className="field-input" />
           </label>
         </div>
       </div>
@@ -692,7 +667,7 @@ function DadosEspecificosView({ registros }) {
           </thead>
           <tbody>
             {filtrados.slice(0, 200).map((r, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-secondary)' }}>{r.empresa}</td>
                 <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.mes}</td>
                 <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.ano}</td>
@@ -724,40 +699,25 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
     if (empresaSelecionada) setFilters(f => ({ ...f, empresa: empresaSelecionada }))
   }, [empresaSelecionada])
 
-  const clean = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const norm = (v) => String(v || '')
-    .trim()
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+  const clean = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const norm = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
   const canonical = (key, value) => {
     const v = norm(value)
     if (!v) return ''
-
     if (key === 'origem') {
       if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(v)) return 'IB'
       if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(v)) return 'RECUPERACAO'
       if (['INDIC', 'INDICACAO'].includes(v)) return 'INDICACAO'
     }
-
     if (key === 'status') {
       if (['CONTRATOS', 'EM CONTRATO', 'CLIENTE EM CONTRATO'].includes(v)) return 'CONTRATO'
       if (['PAGO', 'PAGOS'].includes(v)) return 'PAGO'
       if (['FORA', 'PERDIDO', 'PERDIDOS'].includes(v)) return 'FORA'
     }
-
     return v
   }
 
-  const matchFiltro = (key, rowValue, filtroValue, allValues = ['TODOS']) => {
-    if (allValues.includes(filtroValue)) return true
-    const r = canonical(key, rowValue)
-    const f = canonical(key, filtroValue)
-    if (!f) return true
-    if (!r) return false
-    return r === f || r.includes(f) || f.includes(r)
-  }
   const normalizarOrigem = (v) => {
     const o = clean(v)
     if (!o) return 'SEM ORIGEM'
@@ -776,7 +736,7 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
     if (!empresa || !ano || !mes || !origem) return acc
     const key = `${empresa}|${ano}|${mes}|${origem}`
     if (!acc[key]) {
-      acc[key] = { empresa, ano, mes, origem, metaReunioes: 0, realReunioes: 0, gapReunioes: 0, pctReunioes: 0, metaPagos: 0, realPagos: 0, gapPagos: 0, pctPagos: 0, metaNmrr: 0, realNmrr: 0, gapNmrr: 0, pctNmrr: 0 }
+      acc[key] = { empresa, ano, mes, origem, metaReunioes: 0, realReunioes: 0, metaPagos: 0, realPagos: 0, metaNmrr: 0, realNmrr: 0 }
     }
     acc[key].metaReunioes += Number(r.metaReunioes) || 0
     acc[key].realReunioes += Number(r.realReunioes) || 0
@@ -813,9 +773,7 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   )
 
   const temMeta = (r) =>
-    (Number(r.metaReunioes) || 0) > 0 ||
-    (Number(r.metaPagos) || 0) > 0 ||
-    (Number(r.metaNmrr) || 0) > 0
+    (Number(r.metaReunioes) || 0) > 0 || (Number(r.metaPagos) || 0) > 0 || (Number(r.metaNmrr) || 0) > 0
 
   const filtradosComMeta = filtrados.filter(temMeta)
   const filtradosSemMeta = filtrados.filter(r => !temMeta(r))
@@ -823,15 +781,9 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   const sumFrom = (arr, key) => arr.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
   const sum = (key) => sumFrom(filtradosComMeta, key)
 
-  // Cards principais comparam apenas origens que possuem meta cadastrada.
-  // Origens sem meta aparecem separadas como resultado adicional.
-  const metaReunioes = sum('metaReunioes')
-  const realReunioes = sum('realReunioes')
-  const metaPagos = sum('metaPagos')
-  const realPagos = sum('realPagos')
-  const metaNmrr = sum('metaNmrr')
-  const realNmrr = sum('realNmrr')
-
+  const metaReunioes = sum('metaReunioes'), realReunioes = sum('realReunioes')
+  const metaPagos = sum('metaPagos'), realPagos = sum('realPagos')
+  const metaNmrr = sum('metaNmrr'), realNmrr = sum('realNmrr')
   const realReunioesAdicional = sumFrom(filtradosSemMeta, 'realReunioes')
   const realPagosAdicional = sumFrom(filtradosSemMeta, 'realPagos')
   const realNmrrAdicional = sumFrom(filtradosSemMeta, 'realNmrr')
@@ -846,33 +798,19 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   const progressoOrigem = [...filtradosComMeta]
     .filter(r => (Number(r.metaNmrr) || 0) > 0 || (Number(r.metaPagos) || 0) > 0)
     .sort((a, b) => (Number(b.pctNmrr) || 0) - (Number(a.pctNmrr) || 0))
-    .map(r => ({
-      nome: r.origem,
-      pct: Number(r.pctNmrr) || 0,
-      pctPagos: Number(r.pctPagos) || 0,
-      realPagos: Number(r.realPagos) || 0,
-      metaPagos: Number(r.metaPagos) || 0,
-      realNmrr: Number(r.realNmrr) || 0,
-      metaNmrr: Number(r.metaNmrr) || 0,
-    }))
+    .map(r => ({ nome: r.origem, pct: Number(r.pctNmrr) || 0, pctPagos: Number(r.pctPagos) || 0, realPagos: Number(r.realPagos) || 0, metaPagos: Number(r.metaPagos) || 0, realNmrr: Number(r.realNmrr) || 0, metaNmrr: Number(r.metaNmrr) || 0 }))
 
   const adicionaisSemMeta = [...filtradosSemMeta]
     .filter(r => (Number(r.realReunioes) || 0) > 0 || (Number(r.realPagos) || 0) > 0 || (Number(r.realNmrr) || 0) > 0)
     .sort((a, b) => (Number(b.realNmrr) || 0) - (Number(a.realNmrr) || 0))
-    .map(r => ({
-      nome: r.origem,
-      valor: Number(r.realNmrr) || 0,
-      realReunioes: Number(r.realReunioes) || 0,
-      realPagos: Number(r.realPagos) || 0,
-      realNmrr: Number(r.realNmrr) || 0,
-    }))
+    .map(r => ({ nome: r.origem, valor: Number(r.realNmrr) || 0, realReunioes: Number(r.realReunioes) || 0, realPagos: Number(r.realPagos) || 0, realNmrr: Number(r.realNmrr) || 0 }))
 
   if (!list.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de metas por origem. Atualize a aba PERFORMANCE_ORIGEM na planilha.</div>
 
   const Select = ({ label, value, options, onChange }) => (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
       {label}
-      <select value={value} onChange={e=>onChange(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', minWidth: 150 }}>
+      <select value={value} onChange={e=>onChange(e.target.value)} className="field-input" style={{ minWidth: 150 }}>
         <option value="TODOS">Todos</option>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
@@ -904,10 +842,8 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 28 }}>
-        <div className="chart-card"><div className="chart-title">Progresso por Origem</div>
-          <ProgressByOriginChart data={progressoOrigem} /></div>
-        <div className="chart-card"><div className="chart-title">Adicionais sem Meta</div>
-          <AdditionalOriginChart data={adicionaisSemMeta} /></div>
+        <div className="chart-card"><div className="chart-title">Progresso por Origem</div><ProgressByOriginChart data={progressoOrigem} /></div>
+        <div className="chart-card"><div className="chart-title">Adicionais sem Meta</div><AdditionalOriginChart data={adicionaisSemMeta} /></div>
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Detalhamento por Origem</div>
@@ -916,7 +852,7 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
           <thead><tr>{['Empresa','Ano','Mês','Origem','Meta Reuniões','Real Reuniões','Gap','%','Meta Pagos','Real Pagos','Gap','%','Meta NMRR','Real NMRR','Gap','%'].map((h, i) => <th key={i} style={{ textAlign: i < 4 ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
           <tbody>
             {filtrados.map((r, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 8px' }}>{r.empresa}</td><td style={{ padding: '9px 8px' }}>{r.ano}</td><td style={{ padding: '9px 8px' }}>{r.mes}</td><td style={{ padding: '9px 8px', fontWeight: 600 }}>{r.origem}</td>
                 <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapReunioes) >= 0 ? '#10b981' : '#ef4444' }}>{Number(r.gapReunioes) >= 0 ? '+' : ''}{fmtNum1(r.gapReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctReunioes)}</td>
                 <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapPagos) >= 0 ? '#10b981' : '#ef4444' }}>{Number(r.gapPagos) >= 0 ? '+' : ''}{fmtNum1(r.gapPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctPagos)}</td>
@@ -932,7 +868,7 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
 
 
 function monthNumberFromName(mes) {
-  const key = String(mes || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const key = String(mes || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   const map = { JANEIRO:1, FEVEREIRO:2, MARCO:3, ABRIL:4, MAIO:5, JUNHO:6, JULHO:7, AGOSTO:8, SETEMBRO:9, OUTUBRO:10, NOVEMBRO:11, DEZEMBRO:12 }
   return map[key] || 1
 }
@@ -953,7 +889,6 @@ function dayFromDate(value) {
 }
 
 function isOperationalDay(ano, mes, dia) {
-  // Considera dias úteis + sábado. Domingo fica fora do forecast.
   const dt = new Date(Number(ano), monthNumberFromName(mes) - 1, Number(dia))
   return dt.getDay() !== 0
 }
@@ -1006,7 +941,6 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
       return
     }
 
-    // Geral da empresa = NMRR/valor pago do mês, considerando somente PAGO.
     if (status !== 'PAGO') return
     porDia[dia] += Number(r.valor) || 0
   })
@@ -1021,9 +955,6 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
 
   const today = new Date()
   const mesAtual = isCurrentSelectedMonth(ano, mes)
-  // Para o mês atual, o forecast usa o dia de hoje como corte.
-  // Para meses anteriores, ele considera o mês fechado e a previsão final = realizado.
-  // Para mês futuro/sem dados, usa o último dia com dado ou dia 1 como segurança.
   const cutoffDia = mesAtual
     ? Math.min(today.getDate(), totalDias)
     : (ultimoDiaComDado ? totalDias : 1)
@@ -1044,24 +975,13 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
   const operationalCountBetween = (start, end) => countOperationalDays({ ano, mes, start, end })
 
   return {
-    dias,
-    totalDias,
-    realizado,
-    meta: metaNum,
-    supermeta: superNum,
+    dias, totalDias, realizado, meta: metaNum, supermeta: superNum,
     pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
-    previsaoFinal,
-    mediaDia,
-    cutoffDia,
-    ultimoDiaComDado,
-    diasOperacionaisMes,
-    diasOperacionaisDecorridos,
-    diasOperacionaisRestantes,
+    previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
+    diasOperacionaisMes, diasOperacionaisDecorridos, diasOperacionaisRestantes,
     real,
-    // A linha da meta também respeita dias úteis + sábados; domingos ficam estáveis.
     metaLine: dias.map(d => ({ dia: d, valor: diasOperacionaisMes > 0 ? (metaNum / diasOperacionaisMes) * operationalCountUntil(d) : 0 })),
     superLine: dias.map(d => ({ dia: d, valor: diasOperacionaisMes > 0 ? (superNum / diasOperacionaisMes) * operationalCountUntil(d) : 0 })),
-    // A previsão parte do realizado no dia de corte e projeta o ritmo só nos dias úteis + sábados restantes.
     previsaoLine: dias.map(d => {
       if (d <= cutoffDia) return { dia: d, valor: real[d - 1]?.valor || 0 }
       return { dia: d, valor: realizado + (mediaDia * operationalCountBetween(cutoffDia + 1, d)) }
@@ -1069,7 +989,10 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
   }
 }
 
+// ── Forecast chart with hover tooltips on last points ─────────
 function ForecastCurveChart({ dados, tipo }) {
+  const [tooltip, setTooltip] = useState(null)
+
   if (!dados) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
 
   const w = 720, h = 260, padX = 34, padY = 22
@@ -1080,30 +1003,80 @@ function ForecastCurveChart({ dados, tipo }) {
     ...dados.previsaoLine.map(p => p.valor),
   ]
   const max = Math.max(...allVals, 1)
-  const x = (dia) => padX + ((dia - 1) / Math.max(dados.totalDias - 1, 1)) * (w - padX * 2)
-  const y = (valor) => h - padY - (valor / max) * (h - padY * 2)
-  const line = (arr) => arr.map(p => `${x(p.dia)},${y(p.valor)}`).join(' ')
+  const xPos = (dia) => padX + ((dia - 1) / Math.max(dados.totalDias - 1, 1)) * (w - padX * 2)
+  const yPos = (valor) => h - padY - (valor / max) * (h - padY * 2)
+  const line = (arr) => arr.map(p => `${xPos(p.dia)},${yPos(p.valor)}`).join(' ')
   const fmtAxis = tipo === 'SDR' ? fmtNum1 : fmtR1
+  const fmtVal = tipo === 'SDR' ? fmtNum1 : fmtR
+
+  // Find last meaningful data point for each series
+  const realPoints = dados.real.filter(p => p.valor > 0)
+  const lastReal = realPoints[realPoints.length - 1]
+  const lastMeta = dados.metaLine[dados.metaLine.length - 1]
+  const lastSuper = dados.supermeta > 0 ? dados.superLine[dados.superLine.length - 1] : null
+  const lastPrevisao = dados.previsaoLine[dados.previsaoLine.length - 1]
+
+  const endPoints = [
+    lastReal && { key: 'real', label: 'Realizado', color: '#ef4444', last: lastReal },
+    { key: 'meta', label: 'Meta', color: '#8b5cf6', last: lastMeta },
+    lastSuper && { key: 'super', label: 'Supermeta', color: '#f59e0b', last: lastSuper },
+    lastPrevisao && { key: 'prev', label: 'Previsão', color: '#94a3b8', last: lastPrevisao },
+  ].filter(Boolean)
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 280 }} preserveAspectRatio="none">
+        {/* Grid */}
         {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
           <g key={i}>
-            <line x1={padX} x2={w-padX} y1={padY + g*(h-padY*2)} y2={padY + g*(h-padY*2)} stroke="rgba(255,255,255,0.08)" />
+            <line x1={padX} x2={w-padX} y1={padY + g*(h-padY*2)} y2={padY + g*(h-padY*2)} stroke="rgba(148,163,184,0.15)" />
             <text x="4" y={padY + g*(h-padY*2) + 4} fill="#94a3b8" fontSize="10">{fmtAxis(max * (1-g))}</text>
           </g>
         ))}
+
+        {/* Lines */}
         <polyline points={line(dados.metaLine)} fill="none" stroke="#8b5cf6" strokeWidth="2" />
         {dados.supermeta > 0 && <polyline points={line(dados.superLine)} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="5 5" />}
         <polyline points={line(dados.previsaoLine)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 6" />
         <polyline points={line(dados.real)} fill="none" stroke="#ef4444" strokeWidth="3" />
-        {dados.real.filter(p => p.valor > 0).map((p, i) => <circle key={i} cx={x(p.dia)} cy={y(p.valor)} r="3" fill="#ef4444" />)}
+
+        {/* Regular real dots (excluding last) */}
+        {realPoints.map((p, i) => i < realPoints.length - 1 && (
+          <circle key={i} cx={xPos(p.dia)} cy={yPos(p.valor)} r="3" fill="#ef4444" />
+        ))}
+
+        {/* Last-point markers with hover for all series */}
+        {endPoints.map((s) => {
+          const cx = xPos(s.last.dia)
+          const cy = yPos(s.last.valor)
+          const isHovered = tooltip?.key === s.key
+          return (
+            <g key={s.key}>
+              <circle cx={cx} cy={cy} r={isHovered ? 9 : 7} fill="none" stroke={s.color} strokeWidth="1.5" opacity={isHovered ? 0.8 : 0.45} />
+              <circle cx={cx} cy={cy} r={isHovered ? 6 : 5} fill={s.color}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setTooltip({ key: s.key, label: s.label, valor: s.last.valor, color: s.color })}
+                onMouseLeave={() => setTooltip(null)}
+              />
+            </g>
+          )
+        })}
+
+        {/* Day labels */}
         {[1, 5, 10, 15, 20, 25, dados.totalDias].filter((d, i, arr) => d <= dados.totalDias && arr.indexOf(d) === i).map(d => (
-          <text key={d} x={x(d)} y={h-4} fill="#94a3b8" fontSize="10" textAnchor="middle">{d}</text>
+          <text key={d} x={xPos(d)} y={h-4} fill="#94a3b8" fontSize="10" textAnchor="middle">{d}</text>
         ))}
       </svg>
-      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
+
+      {/* Tooltip shown top-right when hovering a last point */}
+      {tooltip && (
+        <div className="tooltip-box" style={{ position: 'absolute', top: 8, right: 8, borderLeft: `3px solid ${tooltip.color}` }}>
+          <div className="tooltip-label">{tooltip.label} — valor final</div>
+          <div className="tooltip-value" style={{ color: tooltip.color }}>{fmtVal(tooltip.valor)}</div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
         <span><b style={{ color: '#ef4444' }}>●</b> Realizado</span>
         <span><b style={{ color: '#8b5cf6' }}>—</b> Meta</span>
         <span><b style={{ color: '#f59e0b' }}>--</b> Supermeta</span>
@@ -1113,6 +1086,7 @@ function ForecastCurveChart({ dados, tipo }) {
   )
 }
 
+// ── Forecast view with month dropdown ─────────────────────────
 function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSelecionada = 'AI' }) {
   const [mesSel, setMesSel] = useState(null)
   const [tipoVisao, setTipoVisao] = useState('GERAL')
@@ -1144,16 +1118,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 
   const metaGrafico = tipoVisao === 'GERAL' ? Number(forecastMes.meta || 0) : Number(metaPessoa.meta || 0)
   const supermetaGrafico = tipoVisao === 'GERAL' ? 0 : Number(metaPessoa.supermeta || 0)
-  const dadosGrafico = buildDailyForecast({
-    registros,
-    empresa: empresaSelecionada,
-    mes: mesAtivo,
-    ano: anoAtivo,
-    tipo: tipoVisao,
-    nome: nomeAtivo,
-    meta: metaGrafico,
-    supermeta: supermetaGrafico,
-  })
+  const dadosGrafico = buildDailyForecast({ registros, empresa: empresaSelecionada, mes: mesAtivo, ano: anoAtivo, tipo: tipoVisao, nome: nomeAtivo, meta: metaGrafico, supermeta: supermetaGrafico })
 
   const unidade = tipoVisao === 'SDR' ? 'reuniões' : 'NMRR pago'
   const valorFmt = tipoVisao === 'SDR' ? fmtNum1 : fmtR1
@@ -1167,26 +1132,21 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
   const FilterButton = ({ value, label }) => (
     <button onClick={() => { setTipoVisao(value); setNomeSel('') }}
       style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid', fontSize: 12, cursor: 'pointer',
-        background: tipoVisao === value ? 'rgba(255,255,255,0.12)' : 'transparent',
-        borderColor: tipoVisao === value ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-        color: tipoVisao === value ? '#e2e8f0' : '#94a3b8' }}>
+        background: tipoVisao === value ? 'rgba(99,102,241,0.15)' : 'transparent',
+        borderColor: tipoVisao === value ? 'rgba(99,102,241,0.4)' : 'var(--border)',
+        color: tipoVisao === value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
       {label}
     </button>
   )
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Mês:</span>
-        {meses.map(m => (
-          <button key={m} onClick={() => setMesSel(m)}
-            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer',
-              background: mesAtivo === m ? 'rgba(255,255,255,0.12)' : 'transparent',
-              borderColor: mesAtivo === m ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-              color: mesAtivo === m ? '#e2e8f0' : '#94a3b8' }}>
-            {m}
-          </button>
-        ))}
+      {/* Month dropdown */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Mês do forecast:</label>
+        <select value={mesAtivo} onChange={e => setMesSel(e.target.value)} className="field-input" style={{ minWidth: 160 }}>
+          {meses.map(m => <option key={m} value={m}>{m} {anoAtivo}</option>)}
+        </select>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1195,7 +1155,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
         <FilterButton value="CLOSER" label="Por Closer" />
         <FilterButton value="SDR" label="Por SDR" />
         {tipoVisao !== 'GERAL' && (
-          <select value={nomeAtivo} onChange={e => setNomeSel(e.target.value)} style={{ background: 'var(--bg-card)', color: '#e2e8f0', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', minWidth: 180 }}>
+          <select value={nomeAtivo} onChange={e => setNomeSel(e.target.value)} className="field-input" style={{ minWidth: 180 }}>
             {nomes.length === 0 && <option value="">Sem pessoas cadastradas</option>}
             {nomes.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
@@ -1217,7 +1177,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
             <div>
               <div className="card-label">Objetivo do mês</div>
               <div className="card-value">{valorFmt(metaGrafico)}</div>
-              <div style={{ width: '100%', background: 'rgba(255,255,255,0.08)', height: 8, borderRadius: 999, margin: '8px 0' }}>
+              <div style={{ width: '100%', background: 'var(--bar-track)', height: 8, borderRadius: 999, margin: '8px 0' }}>
                 <div style={{ width: `${Math.min(Math.max(dadosGrafico.pctMeta, 0), 100)}%`, height: '100%', borderRadius: 999, background: '#8b5cf6' }} />
               </div>
               <div className="card-sub">{fmtPct(dadosGrafico.pctMeta)} realizado</div>
@@ -1256,12 +1216,26 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 }
 
 
+// ── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [empresa, setEmpresa] = useState('AI')
   const [periodo, setPeriodo] = useState(null)
+  const [darkMode, setDarkMode] = useState(true)
+
+  // Load saved theme from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('agc-theme')
+    if (saved) setDarkMode(saved === 'dark')
+  }, [])
+
+  // Apply theme attribute to <html>
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+    localStorage.setItem('agc-theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
 
   useEffect(() => {
     fetch('/api/data').then(r=>r.json()).then(d=>{setData(d);setLoading(false)}).catch(e=>{setError(e.message);setLoading(false)})
@@ -1287,9 +1261,20 @@ export default function Dashboard() {
   const periodosDinamicos = data?.PERIODOS || []
   const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM'].includes(periodo) ? currentData[periodo] : null
 
+  const specialViews = [
+    ['SEMANAS', 'Por Semana'],
+    ['FORECAST', 'Forecast'],
+    ['DADOS', 'Dados Específicos'],
+    ['METAS_ORIGEM', 'Metas por Origem'],
+  ]
+
+  // True when the active period is a monthly period (not a special view)
+  const isMesAtivo = periodosDinamicos.some(p => p.key === periodo)
+
   return (
     <>
       <Head><title>{dashboardNome}</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+
       <nav className="nav">
         <div className="nav-logo">📊 {dashboardNome}</div>
         <div className="nav-tabs">
@@ -1297,12 +1282,38 @@ export default function Dashboard() {
             <button key={codigo} className={`nav-tab ${empresa===codigo?'active':''}`} onClick={()=>setEmpresa(codigo)}>{nome}</button>
           ))}
         </div>
+        {/* Light / dark theme toggle */}
+        <button className="theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Mudar para tema claro' : 'Mudar para tema escuro'}>
+          <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
+          <span>{darkMode ? 'Claro' : 'Escuro'}</span>
+        </button>
       </nav>
+
       <div className="sub-nav">
-        {[...periodosDinamicos.map(p => [p.key, p.label]), ['SEMANAS','Por Semana'], ['FORECAST','Forecast'], ['DADOS','Dados Específicos'], ['METAS_ORIGEM','Metas por Origem']].map(([p,label])=>(
+        {/* Month dropdown — replaces the inline month buttons */}
+        {periodosDinamicos.length > 0 && (
+          <div className="period-select-wrapper">
+            <select
+              className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
+              value={isMesAtivo ? periodo : ''}
+              onChange={e => e.target.value && setPeriodo(e.target.value)}
+            >
+              {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
+              {periodosDinamicos.map(p => (
+                <option key={p.key} value={p.key}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {periodosDinamicos.length > 0 && <div className="nav-divider" />}
+
+        {/* Special view tabs */}
+        {specialViews.map(([p, label]) => (
           <button key={p} className={`sub-tab ${periodo===p?'active':''}`} onClick={()=>setPeriodo(p)}>{label}</button>
         ))}
       </div>
+
       {loading && <div className="loading">Carregando dados...</div>}
       {error && <div className="error">Erro ao carregar: {error}</div>}
       {!loading && !error && data && (
