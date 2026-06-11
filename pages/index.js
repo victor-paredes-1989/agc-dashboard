@@ -1248,11 +1248,14 @@ export default function Dashboard() {
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const d = await res.json()
-      if (d.error) throw new Error(d.error)
+      // `d.error` indica falha total de auth/leitura sem cache anterior
+      if (d.error && !d.GERAL) throw new Error(d.error)
       setData(d)
       setError(null)
       const ts = d.syncedAt ? new Date(d.syncedAt) : new Date()
       setLastSync(ts.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+      // Avisar se os dados vieram do cache stale (erro na última atualização)
+      if (d.error || d._stale) setSyncError(`Dados em cache — última leitura falhou: ${d.error || 'erro desconhecido'}`)
     } catch (e) {
       if (!data) setError(e.message)
       else setSyncError('Falha ao sincronizar — usando dados anteriores')
