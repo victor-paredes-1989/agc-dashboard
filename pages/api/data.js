@@ -2,11 +2,16 @@ import { getAllDashData } from '../../lib/sheets'
 
 export default async function handler(req, res) {
   try {
-    const data = await getAllDashData()
+    const force = req.query.force === '1'
+    const data = await getAllDashData({ force })
 
-    // Durante a fase de ajustes, não cachear a API.
-    // Isso faz o dashboard refletir a planilha mais rápido após atualizar dados/abas.
-    res.setHeader('Cache-Control', 'no-store, max-age=0')
+    // Cache 25 min no CDN, servir stale durante revalidação.
+    // Com ?force=1, sem cache para forçar nova busca imediata.
+    if (force) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0')
+    } else {
+      res.setHeader('Cache-Control', 's-maxage=1500, stale-while-revalidate=60')
+    }
 
     res.status(200).json(data)
   } catch (err) {
