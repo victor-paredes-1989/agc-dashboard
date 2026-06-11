@@ -1220,7 +1220,10 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState(null)
+  const [syncError, setSyncError] = useState(null)
+  const [lastSync, setLastSync] = useState(null)
   const [empresa, setEmpresa] = useState('AI')
   const [periodo, setPeriodo] = useState(null)
   const [darkMode, setDarkMode] = useState(true)
@@ -1237,8 +1240,33 @@ export default function Dashboard() {
     localStorage.setItem('agc-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
+  const fetchData = useRef(null)
+  fetchData.current = async (force = false) => {
+    if (force) { setSyncing(true); setSyncError(null) }
+    try {
+      const url = force ? '/api/data?force=1' : '/api/data'
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const d = await res.json()
+      if (d.error) throw new Error(d.error)
+      setData(d)
+      setError(null)
+      const ts = d.syncedAt ? new Date(d.syncedAt) : new Date()
+      setLastSync(ts.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+    } catch (e) {
+      if (!data) setError(e.message)
+      else setSyncError('Falha ao sincronizar — usando dados anteriores')
+    } finally {
+      setLoading(false)
+      setSyncing(false)
+    }
+  }
+
+  // Initial load + auto-refresh every 30 minutes
   useEffect(() => {
-    fetch('/api/data').then(r=>r.json()).then(d=>{setData(d);setLoading(false)}).catch(e=>{setError(e.message);setLoading(false)})
+    fetchData.current(false)
+    const interval = setInterval(() => fetchData.current(false), 30 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -1282,12 +1310,44 @@ export default function Dashboard() {
             <button key={codigo} className={`nav-tab ${empresa===codigo?'active':''}`} onClick={()=>setEmpresa(codigo)}>{nome}</button>
           ))}
         </div>
+        {/* Sync button + last updated */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, flexShrink: 0 }}>
+          {lastSync && !syncing && (
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              Atualizado às {lastSync}
+            </span>
+          )}
+          <button
+            onClick={() => fetchData.current(true)}
+            disabled={syncing}
+            title="Sincronizar dados da planilha agora"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',
+              borderRadius: 8, border: '1px solid var(--border)', background: 'transparent',
+              color: syncing ? 'var(--text-muted)' : 'var(--text-secondary)',
+              fontSize: 12, cursor: syncing ? 'default' : 'pointer', whiteSpace: 'nowrap',
+              transition: 'color 0.2s',
+            }}
+          >
+            <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+            <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+          </button>
+        </div>
+
         {/* Light / dark theme toggle */}
         <button className="theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Mudar para tema claro' : 'Mudar para tema escuro'}>
           <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
           <span>{darkMode ? 'Claro' : 'Escuro'}</span>
         </button>
       </nav>
+
+      {/* Discrete sync error banner */}
+      {syncError && (
+        <div style={{ background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.25)', padding: '6px 24px', fontSize: 12, color: '#ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>⚠ {syncError}</span>
+          <button onClick={() => setSyncError(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       <div className="sub-nav">
         {/* Month dropdown — replaces the inline month buttons */}
