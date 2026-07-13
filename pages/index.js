@@ -454,6 +454,114 @@ function ReuniaoGraficos({ graficos }) {
 }
 
 
+const COMPARATIVO_MES_LABEL = {
+  JANEIRO: 'Jan', FEVEREIRO: 'Fev', MARCO: 'Mar', ABRIL: 'Abr', MAIO: 'Mai', JUNHO: 'Jun',
+  JULHO: 'Jul', AGOSTO: 'Ago', SETEMBRO: 'Set', OUTUBRO: 'Out', NOVEMBRO: 'Nov', DEZEMBRO: 'Dez',
+}
+
+const COMPARATIVO_DIMENSOES = [
+  { key: 'CLOSER', label: 'Closer', campo: 'closer' },
+  { key: 'SDR', label: 'SDR', campo: 'sdr' },
+  { key: 'ORIGEM', label: 'Origem', campo: 'origem' },
+  { key: 'SERVICO', label: 'Serviço', campo: 'servico' },
+]
+
+function ComparativoMensalView({ registros }) {
+  const rows = registros || []
+  const norm = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+
+  const [dimensaoKey, setDimensaoKey] = useState('CLOSER')
+  const [empresaSel, setEmpresaSel] = useState('')
+  const [valorSel, setValorSel] = useState('')
+
+  const dimensao = COMPARATIVO_DIMENSOES.find(d => d.key === dimensaoKey) || COMPARATIVO_DIMENSOES[0]
+
+  const empresas = [...new Set(rows.map(r => norm(r.empresa)).filter(Boolean))].sort()
+  const empresaAtiva = empresas.includes(empresaSel) ? empresaSel : (empresas[0] || '')
+
+  const valoresDisponiveis = [...new Set(
+    rows.filter(r => norm(r.empresa) === empresaAtiva).map(r => String(r[dimensao.campo] || '').trim()).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+
+  const valorAtivo = valoresDisponiveis.includes(valorSel) ? valorSel : (valoresDisponiveis[0] || '')
+
+  const registrosPagos = rows.filter(r =>
+    norm(r.empresa) === empresaAtiva &&
+    norm(r[dimensao.campo]) === norm(valorAtivo) &&
+    norm(r.status) === 'PAGO'
+  )
+
+  const porMes = {}
+  registrosPagos.forEach(r => {
+    const ano = String(r.ano || '').trim()
+    if (!ano) return
+    const mesKey = norm(r.mes)
+    const mesNum = monthNumberFromName(r.mes)
+    const chave = `${ano}${String(mesNum).padStart(2, '0')}`
+    if (!porMes[chave]) porMes[chave] = { nome: `${COMPARATIVO_MES_LABEL[mesKey] || r.mes}/${ano.slice(-2)}`, valor: 0, qtd: 0 }
+    porMes[chave].valor += Number(r.valor) || 0
+    porMes[chave].qtd += 1
+  })
+  const comparativo = Object.keys(porMes).sort().map(k => porMes[k]).slice(-10)
+
+  const totalPeriodo = comparativo.reduce((s, d) => s + d.valor, 0)
+  const mediaMensal = comparativo.length ? totalPeriodo / comparativo.length : 0
+  const melhorMes = comparativo.reduce((best, d) => (!best || d.valor > best.valor) ? d : best, null)
+
+  const DimensaoButton = ({ value, label }) => (
+    <button onClick={() => { setDimensaoKey(value); setValorSel('') }}
+      style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid', fontSize: 12, cursor: 'pointer',
+        background: dimensaoKey === value ? 'rgba(99,102,241,0.15)' : 'transparent',
+        borderColor: dimensaoKey === value ? 'rgba(99,102,241,0.4)' : 'var(--border)',
+        color: dimensaoKey === value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+      {label}
+    </button>
+  )
+
+  if (!rows.length) return null
+
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Comparativo Mensal</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Comparar por:</span>
+          {COMPARATIVO_DIMENSOES.map(d => <DimensaoButton key={d.key} value={d.key} label={d.label} />)}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Empresa
+            <select value={empresaAtiva} onChange={e => { setEmpresaSel(e.target.value); setValorSel('') }} className="field-input">
+              {empresas.map(e => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>{dimensao.label}
+            <select value={valorAtivo} onChange={e => setValorSel(e.target.value)} className="field-input">
+              {valoresDisponiveis.length === 0 && <option value="">Sem dados</option>}
+              {valoresDisponiveis.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {comparativo.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem reuniões pagas para essa combinação</div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+            <div className="card amber"><div className="card-label">Total no Período</div><div className="card-value">{fmtR(totalPeriodo)}</div></div>
+            <div className="card blue"><div className="card-label">Média Mensal</div><div className="card-value">{fmtR(mediaMensal)}</div></div>
+            <div className="card green"><div className="card-label">Melhor Mês</div><div className="card-value">{melhorMes ? fmtR(melhorMes.valor) : '-'}</div><div className="card-sub">{melhorMes?.nome || ''}</div></div>
+          </div>
+          <div className="chart-card">
+            <div className="chart-title">{dimensao.label} — {valorAtivo} · {empresaAtiva} · Resultado mês a mês</div>
+            <BarChart data={comparativo} valueKey="valor" labelKey="nome" formatVal={v => fmtR1(v)} extraValueKey="qtd" formatExtraVal={v => `${v} pagos`} />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function DadosEspecificosView({ registros }) {
   const [filtros, setFiltros] = useState({
     empresa: 'TODAS', mes: 'TODOS', ano: 'TODOS', sdr: 'TODOS', closer: 'TODOS',
@@ -607,6 +715,8 @@ function DadosEspecificosView({ registros }) {
 
   return (
     <div>
+      <ComparativoMensalView registros={rows} />
+
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Filtros — Dados Específicos</div>
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
