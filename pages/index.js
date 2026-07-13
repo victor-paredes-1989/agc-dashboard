@@ -459,102 +459,172 @@ const COMPARATIVO_MES_LABEL = {
   JULHO: 'Jul', AGOSTO: 'Ago', SETEMBRO: 'Set', OUTUBRO: 'Out', NOVEMBRO: 'Nov', DEZEMBRO: 'Dez',
 }
 
-const COMPARATIVO_DIMENSOES = [
+function VerticalBarChart({ data, valueKey = 'qtd', labelKey = 'nome', extraValueKey = null, formatExtraVal = null, color = '#3b82f6' }) {
+  if (!data || data.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '32px 0' }}>Sem dados</div>
+  const max = Math.max(...data.map(d => Number(d[valueKey]) || 0), 1)
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: 240, padding: '12px 4px 0', overflowX: 'auto', borderBottom: '1px solid var(--border)' }}>
+        {data.map((d, i) => {
+          const val = Number(d[valueKey]) || 0
+          const pct = max > 0 ? Math.max((val / max) * 100, val > 0 ? 3 : 0) : 0
+          const extraVal = extraValueKey ? (Number(d[extraValueKey]) || 0) : null
+          return (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', flex: '0 0 60px' }}>
+              {extraValueKey && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2, whiteSpace: 'nowrap' }}>{formatExtraVal ? formatExtraVal(extraVal) : extraVal}</div>}
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, marginBottom: 6, whiteSpace: 'nowrap' }}>{fmt(val)}</div>
+              <div style={{ width: 34, height: `${pct}%`, borderRadius: '5px 5px 0 0', background: color, opacity: 0.85, transition: 'height 0.5s' }} />
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 14, padding: '8px 4px 0' }}>
+        {data.map((d, i) => (
+          <div key={i} style={{ flex: '0 0 60px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{d[labelKey]}</div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const COMPARATIVO_POSICOES = [
   { key: 'CLOSER', label: 'Closer', campo: 'closer' },
   { key: 'SDR', label: 'SDR', campo: 'sdr' },
-  { key: 'ORIGEM', label: 'Origem', campo: 'origem' },
-  { key: 'SERVICO', label: 'Serviço', campo: 'servico' },
 ]
 
-function ComparativoMensalView({ registros }) {
+function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
   const rows = registros || []
   const norm = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
-  const [dimensaoKey, setDimensaoKey] = useState('CLOSER')
   const [empresaSel, setEmpresaSel] = useState('')
-  const [valorSel, setValorSel] = useState('')
-
-  const dimensao = COMPARATIVO_DIMENSOES.find(d => d.key === dimensaoKey) || COMPARATIVO_DIMENSOES[0]
+  const [posicaoKey, setPosicaoKey] = useState('CLOSER')
+  const [pessoaSel, setPessoaSel] = useState('')
+  const [evento, setEvento] = useState('REUNIAO')
+  const [origemSel, setOrigemSel] = useState('')
 
   const empresas = [...new Set(rows.map(r => norm(r.empresa)).filter(Boolean))].sort()
-  const empresaAtiva = empresas.includes(empresaSel) ? empresaSel : (empresas[0] || '')
+  const empresaAtiva = empresas.includes(empresaSel) ? empresaSel : (empresas.includes(norm(empresaSelecionada)) ? norm(empresaSelecionada) : (empresas[0] || ''))
 
-  const valoresDisponiveis = [...new Set(
-    rows.filter(r => norm(r.empresa) === empresaAtiva).map(r => String(r[dimensao.campo] || '').trim()).filter(Boolean)
+  const posicao = COMPARATIVO_POSICOES.find(p => p.key === posicaoKey) || COMPARATIVO_POSICOES[0]
+
+  const pessoas = [...new Set(
+    rows.filter(r => norm(r.empresa) === empresaAtiva).map(r => String(r[posicao.campo] || '').trim()).filter(Boolean)
   )].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const pessoaAtiva = pessoas.includes(pessoaSel) ? pessoaSel : (pessoas[0] || '')
 
-  const valorAtivo = valoresDisponiveis.includes(valorSel) ? valorSel : (valoresDisponiveis[0] || '')
+  const registrosPessoa = rows.filter(r => norm(r.empresa) === empresaAtiva && norm(r[posicao.campo]) === norm(pessoaAtiva))
 
-  const registrosPagos = rows.filter(r =>
-    norm(r.empresa) === empresaAtiva &&
-    norm(r[dimensao.campo]) === norm(valorAtivo) &&
-    norm(r.status) === 'PAGO'
-  )
+  const origens = [...new Set(registrosPessoa.map(r => String(r.origem || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const origemAtiva = origens.includes(origemSel) ? origemSel : ''
+
+  const registrosFiltrados = registrosPessoa.filter(r => {
+    if (origemAtiva && norm(r.origem) !== norm(origemAtiva)) return false
+    if (evento === 'VENDAS' && norm(r.status) !== 'PAGO') return false
+    return true
+  })
 
   const porMes = {}
-  registrosPagos.forEach(r => {
+  registrosFiltrados.forEach(r => {
     const ano = String(r.ano || '').trim()
     if (!ano) return
     const mesKey = norm(r.mes)
     const mesNum = monthNumberFromName(r.mes)
     const chave = `${ano}${String(mesNum).padStart(2, '0')}`
-    if (!porMes[chave]) porMes[chave] = { nome: `${COMPARATIVO_MES_LABEL[mesKey] || r.mes}/${ano.slice(-2)}`, valor: 0, qtd: 0 }
-    porMes[chave].valor += Number(r.valor) || 0
+    if (!porMes[chave]) porMes[chave] = { nome: `${COMPARATIVO_MES_LABEL[mesKey] || r.mes}/${ano.slice(-2)}`, qtd: 0, valor: 0 }
     porMes[chave].qtd += 1
+    porMes[chave].valor += Number(r.valor) || 0
   })
-  const comparativo = Object.keys(porMes).sort().map(k => porMes[k]).slice(-10)
+  const comparativo = Object.keys(porMes).sort().map(k => porMes[k])
 
-  const totalPeriodo = comparativo.reduce((s, d) => s + d.valor, 0)
-  const mediaMensal = comparativo.length ? totalPeriodo / comparativo.length : 0
-  const melhorMes = comparativo.reduce((best, d) => (!best || d.valor > best.valor) ? d : best, null)
+  const totalQtd = comparativo.reduce((s, d) => s + d.qtd, 0)
+  const totalValor = comparativo.reduce((s, d) => s + d.valor, 0)
+  const mediaMensal = comparativo.length ? totalQtd / comparativo.length : 0
+  const melhorMes = comparativo.reduce((best, d) => (!best || d.qtd > best.qtd) ? d : best, null)
 
-  const DimensaoButton = ({ value, label }) => (
-    <button onClick={() => { setDimensaoKey(value); setValorSel('') }}
-      style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid', fontSize: 12, cursor: 'pointer',
-        background: dimensaoKey === value ? 'rgba(99,102,241,0.15)' : 'transparent',
-        borderColor: dimensaoKey === value ? 'rgba(99,102,241,0.4)' : 'var(--border)',
-        color: dimensaoKey === value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+  const ToggleButton = ({ active, onClick, label }) => (
+    <button onClick={onClick}
+      style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid', fontSize: 13, cursor: 'pointer',
+        background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+        borderColor: active ? 'rgba(99,102,241,0.4)' : 'var(--border)',
+        color: active ? 'var(--text-primary)' : 'var(--text-muted)' }}>
       {label}
     </button>
   )
 
-  if (!rows.length) return null
+  const eventoLabel = evento === 'REUNIAO' ? 'Reuniões' : 'Vendas'
+
+  if (!rows.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados na aba REUNIOES_GERAL</div>
 
   return (
-    <div style={{ marginBottom: 32 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Comparativo Mensal</div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Comparar por:</span>
-          {COMPARATIVO_DIMENSOES.map(d => <DimensaoButton key={d.key} value={d.key} label={d.label} />)}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Empresa
-            <select value={empresaAtiva} onChange={e => { setEmpresaSel(e.target.value); setValorSel('') }} className="field-input">
-              {empresas.map(e => <option key={e} value={e}>{e}</option>)}
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>{dimensao.label}
-            <select value={valorAtivo} onChange={e => setValorSel(e.target.value)} className="field-input">
-              {valoresDisponiveis.length === 0 && <option value="">Sem dados</option>}
-              {valoresDisponiveis.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
+    <div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Empresa</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {empresas.map(e => (
+                <ToggleButton key={e} active={empresaAtiva === e} label={e} onClick={() => { setEmpresaSel(e); setPessoaSel(''); setOrigemSel('') }} />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Posição</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {COMPARATIVO_POSICOES.map(p => (
+                <ToggleButton key={p.key} active={posicaoKey === p.key} label={p.label} onClick={() => { setPosicaoKey(p.key); setPessoaSel(''); setOrigemSel('') }} />
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>{posicao.label}
+              <select value={pessoaAtiva} onChange={e => { setPessoaSel(e.target.value); setOrigemSel('') }} className="field-input">
+                {pessoas.length === 0 && <option value="">Sem dados</option>}
+                {pessoas.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Evento</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <ToggleButton active={evento === 'REUNIAO'} label="Reunião" onClick={() => setEvento('REUNIAO')} />
+                <ToggleButton active={evento === 'VENDAS'} label="Vendas" onClick={() => setEvento('VENDAS')} />
+              </div>
+            </div>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Origem
+              <select value={origemAtiva} onChange={e => setOrigemSel(e.target.value)} className="field-input">
+                <option value="">Todas as origens</option>
+                {origens.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </label>
+          </div>
         </div>
       </div>
 
       {comparativo.length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem reuniões pagas para essa combinação</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem registros para essa combinação</div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
-            <div className="card amber"><div className="card-label">Total no Período</div><div className="card-value">{fmtR(totalPeriodo)}</div></div>
-            <div className="card blue"><div className="card-label">Média Mensal</div><div className="card-value">{fmtR(mediaMensal)}</div></div>
-            <div className="card green"><div className="card-label">Melhor Mês</div><div className="card-value">{melhorMes ? fmtR(melhorMes.valor) : '-'}</div><div className="card-sub">{melhorMes?.nome || ''}</div></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div className="card"><div className="card-label">Total no Período</div><div className="card-value">{fmt(totalQtd)}</div><div className="card-sub">{eventoLabel.toLowerCase()}</div></div>
+            <div className="card blue"><div className="card-label">Média Mensal</div><div className="card-value">{fmtDec(mediaMensal)}</div></div>
+            <div className="card green"><div className="card-label">Melhor Mês</div><div className="card-value">{melhorMes ? fmt(melhorMes.qtd) : '-'}</div><div className="card-sub">{melhorMes?.nome || ''}</div></div>
+            {evento === 'VENDAS' && (
+              <div className="card amber"><div className="card-label">Valor Total Pago</div><div className="card-value">{fmtR(totalValor)}</div></div>
+            )}
           </div>
           <div className="chart-card">
-            <div className="chart-title">{dimensao.label} — {valorAtivo} · {empresaAtiva} · Resultado mês a mês</div>
-            <BarChart data={comparativo} valueKey="valor" labelKey="nome" formatVal={v => fmtR1(v)} extraValueKey="qtd" formatExtraVal={v => `${v} pagos`} />
+            <div className="chart-title">{posicao.label} — {pessoaAtiva} · {empresaAtiva}{origemAtiva ? ` · ${origemAtiva}` : ''} · {eventoLabel} mês a mês</div>
+            <VerticalBarChart
+              data={comparativo}
+              valueKey="qtd"
+              labelKey="nome"
+              extraValueKey={evento === 'VENDAS' ? 'valor' : null}
+              formatExtraVal={v => fmtR1(v)}
+              color={evento === 'VENDAS' ? '#10b981' : '#3b82f6'}
+            />
           </div>
         </>
       )}
@@ -715,8 +785,6 @@ function DadosEspecificosView({ registros }) {
 
   return (
     <div>
-      <ComparativoMensalView registros={rows} />
-
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Filtros — Dados Específicos</div>
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
@@ -1400,13 +1468,14 @@ export default function Dashboard() {
   const dashboardNome = data?.CONFIG?.dashboardNome || 'AGC Dashboard'
   const currentData = data ? data[empresa] : null
   const periodosDinamicos = data?.PERIODOS || []
-  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM'].includes(periodo) ? currentData[periodo] : null
+  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO'].includes(periodo) ? currentData[periodo] : null
 
   const specialViews = [
     ['SEMANAS', 'Por Semana'],
     ['FORECAST', 'Forecast'],
     ['DADOS', 'Dados Específicos'],
     ['METAS_ORIGEM', 'Metas por Origem'],
+    ['COMPARATIVO', 'Comparativo Mensal'],
   ]
 
   // True when the active period is a monthly period (not a special view)
@@ -1495,6 +1564,7 @@ export default function Dashboard() {
            periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
            periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
            periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
+           periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
            periodoData ? <>
              <MetricCards metricas={periodoData.metricas} />
              <ReuniaoCards cards={periodoData.reunioes?.cards} />
