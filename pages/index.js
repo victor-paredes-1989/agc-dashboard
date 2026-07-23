@@ -1424,8 +1424,8 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
               onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor })}
               onMouseLeave={() => setTooltip(null)}>
               <rect x={x} y={by} width={barW} height={bh} rx="3" fill={color} opacity={isHov ? 1 : 0.78} />
-              {bh > 22 && <text x={cx} y={by - 5} textAnchor="middle" fontSize="8" fill={color} opacity="0.9">{formatVal(d.valor)}</text>}
-              <text x={cx} y={H - 5} textAnchor="middle" fontSize="8.5" fill="#64748b">{d.mes}</text>
+              {bh > 14 && <text x={cx} y={by - 6} textAnchor="middle" fontSize="11" fill={color} opacity="0.95" fontWeight="600">{formatVal(d.valor)}</text>}
+              <text x={cx} y={H - 5} textAnchor="middle" fontSize="9.5" fill="#64748b">{d.mes}</text>
             </g>
           )
         })}
@@ -1434,6 +1434,64 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
         <div className="tooltip-box" style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)' }}>
           <div className="tooltip-label">{tooltip.label}</div>
           <div className="tooltip-value" style={{ color }}>{formatVal(tooltip.valor)}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
+  const [tooltip, setTooltip] = useState(null)
+  if (!data || !data.length || data.every(d => !(Number(d.valor) || 0))) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
+  }
+  const vals = data.map(d => Number(d.valor) || 0)
+  const max = Math.max(...vals, 1)
+  const W = 600, H = 190, padL = 8, padR = 8, padTop = 30, padBot = 38
+  const chartW = W - padL - padR, chartH = H - padTop - padBot
+  const n = data.length
+  const slotW = chartW / n
+  const barW = Math.max(6, Math.min(44, slotW * 0.62))
+  const bX = (i) => padL + i * slotW + slotW / 2 - barW / 2
+  const bH = (v) => Math.max(2, (Number(v) || 0) / max * chartH)
+  const bY = (v) => padTop + chartH - bH(v)
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
+        {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
+          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke="rgba(148,163,184,0.1)" strokeWidth="1" />
+        ))}
+        {data.map((d, i) => {
+          const x = bX(i), bh = bH(d.valor), by = bY(d.valor), cx = x + barW / 2
+          const isHov = tooltip?.i === i
+          return (
+            <g key={i} style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor, pagos: d.pagos, valorPago: d.valorPago })}
+              onMouseLeave={() => setTooltip(null)}>
+              <rect x={x} y={by} width={barW} height={bh} rx="3" fill={color} opacity={isHov ? 1 : 0.78} />
+              {bh > 14 && <text x={cx} y={by - 6} textAnchor="middle" fontSize="11" fill={color} opacity="0.95" fontWeight="600">{fmt(d.valor)}</text>}
+              <text x={cx} y={H - 5} textAnchor="middle" fontSize="9.5" fill="#64748b">{d.mes}</text>
+            </g>
+          )
+        })}
+      </svg>
+      {tooltip && (
+        <div className="tooltip-box" style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)', minWidth: 160 }}>
+          <div className="tooltip-label">{tooltip.label}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Realizadas</span>
+              <span style={{ fontSize: 12, color, fontWeight: 600 }}>{fmt(tooltip.valor)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Pagos</span>
+              <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>{fmt(tooltip.pagos)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Valor Pago</span>
+              <span style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600 }}>{fmtR1(tooltip.valorPago)}</span>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1497,25 +1555,43 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     return emp === empresaSelecionada.toUpperCase().trim() || emp === ''
   })
 
-  // Unique months present in GERAL for filtered year
+  const MES_ORDER = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO']
+  const MES_ABBR  = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
+
+  // Unique months present in GERAL for filtered year, sorted chronologically
   function geralMeses() {
     const mesSet = new Map()
     geralEmpresa.forEach(r => {
       const ano = String(r.ano || '').trim()
-      const mes = String(r.mes || '').trim()
+      const mes = String(r.mes || '').trim().toUpperCase()
       if (!ano || !mes) return
       if (anoFiltro !== 'todos' && ano !== anoFiltro) return
       const k = `${ano}-${mes}`
-      if (!mesSet.has(k)) mesSet.set(k, { key: k, mes: `${mes.slice(0,3)}/${ano.slice(-2)}`, label: `${mes} ${ano}`, ano, mesRaw: mes })
+      if (!mesSet.has(k)) {
+        const mi = MES_ORDER.indexOf(mes)
+        const abbr = mi >= 0 ? MES_ABBR[mi] : mes.slice(0,3)
+        mesSet.set(k, { key: k, mes: `${abbr}/${ano.slice(-2)}`, label: `${mes} ${ano}`, ano, mesRaw: mes, sortKey: `${ano}-${String(mi+1).padStart(2,'0')}` })
+      }
     })
-    return [...mesSet.values()].sort((a, b) => a.key.localeCompare(b.key))
+    return [...mesSet.values()].sort((a, b) => a.sortKey.localeCompare(b.sortKey))
   }
 
   function buildGeralSeries(field) {
     const mesesG = geralMeses()
-    // collect all unique values for this field
-    const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))]
+    const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))].sort()
     return { mesesG, vals }
+  }
+
+  function geralStats(mg, field, val) {
+    const rows = geralEmpresa.filter(r => {
+      const ano = String(r.ano || '').trim()
+      const mes = String(r.mes || '').trim().toUpperCase()
+      if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
+      return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === val
+    })
+    const pagos = rows.filter(r => String(r.status || '').trim().toUpperCase() === 'PAGO')
+    const valor = pagos.reduce((s, r) => s + (Number(r.valor) || 0), 0)
+    return { realizadas: rows.length, pagos: pagos.length, valor }
   }
 
   // Reset subFiltro when category changes
@@ -1529,27 +1605,21 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   const renderGeralCharts = (field, colorArr) => {
     const { mesesG, vals } = buildGeralSeries(field)
     if (!mesesG.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Sem dados em GERAL para filtros selecionados.</div>
-
-    const filtered = subFiltro === 'todos' ? vals : [subFiltro]
-    if (!filtered.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Nenhum item encontrado.</div>
+    const displayVals = subFiltro === 'todos' ? vals : [subFiltro]
+    if (!displayVals.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Nenhum item encontrado.</div>
 
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
-        {(subFiltro === 'todos' ? vals : [subFiltro]).map((val, vi) => {
+        {displayVals.map((val, vi) => {
           const color = colorArr[vi % colorArr.length]
           const chartData = mesesG.map(mg => {
-            const count = geralEmpresa.filter(r => {
-              const ano = String(r.ano || '').trim()
-              const mes = String(r.mes || '').trim()
-              if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
-              return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === val
-            }).length
-            return { mes: mg.mes, label: mg.label, valor: count }
+            const s = geralStats(mg, field, val)
+            return { mes: mg.mes, label: mg.label, valor: s.realizadas, pagos: s.pagos, valorPago: s.valor }
           })
           return (
             <div key={val} className="chart-card">
               <div className="chart-title">{val} · reuniões mês a mês</div>
-              <VerticalBarChartMonths data={chartData} color={color} formatVal={fmt} />
+              <VerticalBarChartMonthsGeral data={chartData} color={color} />
             </div>
           )
         })}
@@ -1568,7 +1638,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             <tr>
               <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
               {displayVals.map((v, vi) => (
-                <th key={v} style={{ textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
+                <th key={v} colSpan={3} style={{ textAlign: 'center', color: colorArr[vi % colorArr.length], fontWeight: 600, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
+              ))}
+            </tr>
+            <tr>
+              <th style={{ borderBottom: '1px solid var(--border)' }}></th>
+              {displayVals.map((v) => (
+                ['Realizadas','Pagos','Valor Pago'].map(h => (
+                  <th key={`${v}-${h}`} style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 10, padding: '6px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))
               ))}
             </tr>
           </thead>
@@ -1577,13 +1655,13 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
               <tr key={mg.key} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
                 {displayVals.map((v, vi) => {
-                  const count = geralEmpresa.filter(r => {
-                    const ano = String(r.ano || '').trim()
-                    const mes = String(r.mes || '').trim()
-                    if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
-                    return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === v
-                  }).length
-                  return <td key={v} style={{ padding: '9px 8px', textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 500 }}>{fmt(count)}</td>
+                  const s = geralStats(mg, field, v)
+                  const c = colorArr[vi % colorArr.length]
+                  return [
+                    <td key={`${v}-r`} style={{ padding: '9px 8px', textAlign: 'right', color: c, fontWeight: 500 }}>{fmt(s.realizadas)}</td>,
+                    <td key={`${v}-p`} style={{ padding: '9px 8px', textAlign: 'right', color: '#10b981', fontWeight: 500 }}>{fmt(s.pagos)}</td>,
+                    <td key={`${v}-v`} style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b', fontWeight: 500 }}>{fmtR1(s.valor)}</td>,
+                  ]
                 })}
               </tr>
             ))}
