@@ -1440,112 +1440,252 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
   )
 }
 
-function EvolucaoMensalView({ periodos, getData, empresaSelecionada }) {
-  const [metricasSel, setMetricasSel] = useState(['nmrr', 'contratosPagos', 'leads', 'realizadas', 'mql'])
+const SEL_STYLE = {
+  background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8,
+  color: 'var(--text-primary)', padding: '7px 12px', fontSize: 13, cursor: 'pointer', outline: 'none',
+}
 
-  const METRICAS = [
-    { key: 'nmrr',              label: 'NMRR (MRR Pago)',       color: '#f59e0b', fmt: fmtR1 },
-    { key: 'contratosPagos',    label: 'Contratos Pagos',        color: '#10b981', fmt: fmt },
-    { key: 'leads',             label: 'Leads',                  color: '#3b82f6', fmt: fmt },
-    { key: 'realizadas',        label: 'Realizadas',             color: '#14b8a6', fmt: fmt },
-    { key: 'agendamentos',      label: 'Agendamentos',           color: '#6366f1', fmt: fmt },
-    { key: 'mql',               label: 'MQL %',                  color: '#8b5cf6', fmt: fmtPct },
-    { key: 'valorVendido',      label: 'MRR Vendido',            color: '#a78bfa', fmt: fmtR1 },
-    { key: 'contratosVendidos', label: 'Contratos Vendidos',     color: '#22d3ee', fmt: fmt },
-    { key: 'investimento',      label: 'Investimento Ads',       color: '#f97316', fmt: fmtR1 },
-    { key: 'cpl',               label: 'CPL',                    color: '#ec4899', fmt: fmtR1 },
-    { key: 'cac',               label: 'CAC',                    color: '#ef4444', fmt: fmtR1 },
-    { key: 'tkm',               label: 'TKM',                    color: '#94a3b8', fmt: fmtR1 },
-    { key: '_pagos',            label: 'Fechamentos (GERAL)',    color: '#34d399', fmt: fmt },
-    { key: '_totalReunioes',    label: 'Total Reuniões (GERAL)', color: '#60a5fa', fmt: fmt },
-    { key: '_nmrrGeral',        label: 'NMRR Reuniões (GERAL)',  color: '#fbbf24', fmt: fmtR1 },
+function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }) {
+  const CATEGORIAS = [
+    { key: 'comercial', label: 'Dados Comerciais' },
+    { key: 'marketing', label: 'Dados Marketing' },
+    { key: 'origem',    label: 'Origem' },
+    { key: 'closer',    label: 'Closer' },
+    { key: 'sdr',       label: 'SDR' },
   ]
 
-  // Cronológico: mais antigo → mais recente (para os gráficos)
-  const meses = [...periodos].reverse().map(p => {
+  const COMERCIAL = [
+    { key: 'agendamentos', label: 'Agendamentos',  color: '#6366f1', fmt: fmt },
+    { key: 'realizadas',   label: 'Comparecimento',color: '#14b8a6', fmt: fmt },
+    { key: 'contratosPagos',label:'Pagos',         color: '#10b981', fmt: fmt },
+    { key: 'nmrr',         label: 'NMRR',          color: '#f59e0b', fmt: fmtR1 },
+  ]
+  const MARKETING = [
+    { key: 'investimento', label: 'Invest. Anúncios', color: '#f97316', fmt: fmtR1 },
+    { key: 'cpl',          label: 'CPL',              color: '#ec4899', fmt: fmtR1 },
+    { key: 'leads',        label: 'Leads',            color: '#3b82f6', fmt: fmt },
+  ]
+
+  const [categoria, setCategoria] = useState('comercial')
+  const [anoFiltro, setAnoFiltro] = useState('todos')
+  const [subFiltro, setSubFiltro] = useState('todos')
+
+  // Months from periodos (oldest first) filtered by year
+  const mesesBase = [...periodos].reverse()
+  const anosDisp = [...new Set(mesesBase.map(p => p.ano))].sort()
+
+  const mesesFiltrados = anoFiltro === 'todos' ? mesesBase : mesesBase.filter(p => p.ano === anoFiltro)
+
+  const meses = mesesFiltrados.map(p => {
     const d = getData(empresaSelecionada, p.key)
     const m = d?.metricas || {}, c = d?.reunioes?.cards || {}
     return {
-      key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label,
-      nmrr: Number(m.nmrr) || 0, contratosPagos: Number(m.contratosPagos) || 0,
-      leads: Number(m.leads) || 0, realizadas: Number(m.realizadas) || 0,
-      agendamentos: Number(m.agendamentos) || 0, mql: Number(m.mql) || 0,
-      valorVendido: Number(m.valorVendido) || 0, contratosVendidos: Number(m.contratosVendidos) || 0,
-      investimento: Number(m.investimento) || 0, cpl: Number(m.cpl) || 0,
-      cac: Number(m.cac) || 0, tkm: Number(m.tkm) || 0,
-      _pagos: Number(c.pagos) || 0, _totalReunioes: Number(c.total) || 0, _nmrrGeral: Number(c.nmrr) || 0,
+      key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
+      agendamentos: Number(m.agendamentos) || 0,
+      realizadas: Number(m.realizadas) || 0,
+      contratosPagos: Number(m.contratosPagos) || 0,
+      nmrr: Number(m.nmrr) || 0,
+      investimento: Number(m.investimento) || 0,
+      cpl: Number(m.cpl) || 0,
+      leads: Number(m.leads) || 0,
     }
   })
 
-  const toggle = (key) => setMetricasSel(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
-  const ativas = METRICAS.filter(m => metricasSel.includes(m.key))
+  // For GERAL-based categories (origem/closer/sdr), aggregate month-over-month
+  const geralEmpresa = (geralData || []).filter(r => {
+    const emp = String(r.empresa || '').toUpperCase().trim()
+    return emp === empresaSelecionada.toUpperCase().trim() || emp === ''
+  })
 
-  if (!meses.length) return (
-    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '48px 0', textAlign: 'center' }}>
-      Sem períodos mensais. Verifique se existem abas "DASH AI XXX XX" / "DASH MO XXX XX" na planilha.
-    </div>
-  )
+  // Unique months present in GERAL for filtered year
+  function geralMeses() {
+    const mesSet = new Map()
+    geralEmpresa.forEach(r => {
+      const ano = String(r.ano || '').trim()
+      const mes = String(r.mes || '').trim()
+      if (!ano || !mes) return
+      if (anoFiltro !== 'todos' && ano !== anoFiltro) return
+      const k = `${ano}-${mes}`
+      if (!mesSet.has(k)) mesSet.set(k, { key: k, mes: `${mes.slice(0,3)}/${ano.slice(-2)}`, label: `${mes} ${ano}`, ano, mesRaw: mes })
+    })
+    return [...mesSet.values()].sort((a, b) => a.key.localeCompare(b.key))
+  }
 
-  return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
-        Métricas — {empresaSelecionada} &nbsp;·&nbsp; {meses.length} {meses.length === 1 ? 'mês' : 'meses'} disponíveis
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 28 }}>
-        {METRICAS.map(m => {
-          const ativa = metricasSel.includes(m.key)
+  function buildGeralSeries(field) {
+    const mesesG = geralMeses()
+    // collect all unique values for this field
+    const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))]
+    return { mesesG, vals }
+  }
+
+  // Reset subFiltro when category changes
+  function changeCategoria(cat) {
+    setCategoria(cat)
+    setSubFiltro('todos')
+  }
+
+  const dropdownStyle = { ...SEL_STYLE, minWidth: 160 }
+
+  const renderGeralCharts = (field, colorArr) => {
+    const { mesesG, vals } = buildGeralSeries(field)
+    if (!mesesG.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Sem dados em GERAL para filtros selecionados.</div>
+
+    const filtered = subFiltro === 'todos' ? vals : [subFiltro]
+    if (!filtered.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Nenhum item encontrado.</div>
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
+        {(subFiltro === 'todos' ? vals : [subFiltro]).map((val, vi) => {
+          const color = colorArr[vi % colorArr.length]
+          const chartData = mesesG.map(mg => {
+            const count = geralEmpresa.filter(r => {
+              const ano = String(r.ano || '').trim()
+              const mes = String(r.mes || '').trim()
+              if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
+              return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === val
+            }).length
+            return { mes: mg.mes, label: mg.label, valor: count }
+          })
           return (
-            <button key={m.key} onClick={() => toggle(m.key)} style={{
-              padding: '5px 14px', borderRadius: 20, border: '1px solid', fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
-              background: ativa ? m.color + '20' : 'transparent',
-              borderColor: ativa ? m.color + 'aa' : 'var(--border)',
-              color: ativa ? m.color : 'var(--text-muted)',
-            }}>{m.label}</button>
+            <div key={val} className="chart-card">
+              <div className="chart-title">{val} · reuniões mês a mês</div>
+              <VerticalBarChartMonths data={chartData} color={color} formatVal={fmt} />
+            </div>
           )
         })}
       </div>
+    )
+  }
 
-      {ativas.length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 14, textAlign: 'center', padding: '32px 0' }}>Selecione ao menos uma métrica acima.</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
-          {ativas.map(m => (
-            <div key={m.key} className="chart-card">
-              <div className="chart-title">{m.label} — {empresaSelecionada} · mês a mês</div>
-              <VerticalBarChartMonths
-                data={meses.map(mes => ({ mes: mes.mes, label: mes.label, valor: mes[m.key] }))}
-                color={m.color} formatVal={m.fmt}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
-        Tabela resumo — {empresaSelecionada}
-      </div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
+  const renderGeralTable = (field, colorArr) => {
+    const { mesesG, vals } = buildGeralSeries(field)
+    const displayVals = subFiltro === 'todos' ? vals : [subFiltro]
+    if (!mesesG.length || !displayVals.length) return null
+    return (
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 24 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
               <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
-              {(ativas.length ? ativas : METRICAS.slice(0, 6)).map(m => (
-                <th key={m.key} style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{m.label}</th>
+              {displayVals.map((v, vi) => (
+                <th key={v} style={{ textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {[...meses].reverse().map(mes => (
-              <tr key={mes.key} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mes.label}</td>
-                {(ativas.length ? ativas : METRICAS.slice(0, 6)).map(m => (
-                  <td key={m.key} style={{ padding: '9px 8px', textAlign: 'right', color: m.color, fontWeight: 500 }}>{m.fmt(mes[m.key])}</td>
-                ))}
+            {[...mesesG].reverse().map(mg => (
+              <tr key={mg.key} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
+                {displayVals.map((v, vi) => {
+                  const count = geralEmpresa.filter(r => {
+                    const ano = String(r.ano || '').trim()
+                    const mes = String(r.mes || '').trim()
+                    if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
+                    return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === v
+                  }).length
+                  return <td key={v} style={{ padding: '9px 8px', textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 500 }}>{fmt(count)}</td>
+                })}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+    )
+  }
+
+  if (!mesesBase.length) return (
+    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '48px 0', textAlign: 'center' }}>
+      Sem períodos mensais. Verifique se existem abas "DASH AI XXX XX" / "DASH MO XXX XX" na planilha.
+    </div>
+  )
+
+  const isGeral = ['origem', 'closer', 'sdr'].includes(categoria)
+  const geralField = categoria === 'origem' ? 'origem' : categoria === 'closer' ? 'closer' : 'sdr'
+  const geralColors = categoria === 'closer' ? CLOSER_COLORS : SDR_COLORS
+
+  const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
+
+  const currentMetrics = categoria === 'comercial' ? COMERCIAL : MARKETING
+
+  return (
+    <div>
+      {/* Dropdowns row */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Categoria</label>
+          <select style={dropdownStyle} value={categoria} onChange={e => changeCategoria(e.target.value)}>
+            {CATEGORIAS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Ano</label>
+          <select style={dropdownStyle} value={anoFiltro} onChange={e => setAnoFiltro(e.target.value)}>
+            <option value="todos">Todos os anos</option>
+            {anosDisp.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        {isGeral && (
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              {categoria === 'origem' ? 'Origem' : categoria === 'closer' ? 'Closer' : 'SDR'}
+            </label>
+            <select style={dropdownStyle} value={subFiltro} onChange={e => setSubFiltro(e.target.value)}>
+              <option value="todos">Ver todos</option>
+              {geralVals.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+        )}
+        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', alignSelf: 'flex-end', paddingBottom: 2 }}>
+          {empresaSelecionada} &nbsp;·&nbsp; {isGeral ? `${geralEmpresa.filter(r => anoFiltro === 'todos' || String(r.ano||'').trim() === anoFiltro).length} reuniões` : `${meses.length} ${meses.length === 1 ? 'mês' : 'meses'}`}
+        </div>
+      </div>
+
+      {/* Charts */}
+      {!isGeral ? (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
+            {currentMetrics.map(m => (
+              <div key={m.key} className="chart-card">
+                <div className="chart-title">{m.label} — {empresaSelecionada} · mês a mês</div>
+                <VerticalBarChartMonths
+                  data={meses.map(mes => ({ mes: mes.mes, label: mes.label, valor: mes[m.key] }))}
+                  color={m.color} formatVal={m.fmt}
+                />
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+            Tabela resumo — {empresaSelecionada}
+          </div>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
+                  {currentMetrics.map(m => (
+                    <th key={m.key} style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{m.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...meses].reverse().map(mes => (
+                  <tr key={mes.key} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mes.label}</td>
+                    {currentMetrics.map(m => (
+                      <td key={m.key} style={{ padding: '9px 8px', textAlign: 'right', color: m.color, fontWeight: 500 }}>{m.fmt(mes[m.key])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <>
+          {renderGeralCharts(geralField, geralColors)}
+          {renderGeralTable(geralField, geralColors)}
+        </>
+      )}
     </div>
   )
 }
@@ -1719,7 +1859,7 @@ export default function Dashboard() {
         <div className="page">
           {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
            periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-           periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} /> :
+           periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
            periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
            periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
            periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
