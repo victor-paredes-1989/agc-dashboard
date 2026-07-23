@@ -1394,6 +1394,162 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 }
 
 
+// ── Evolução Mensal — gráfico de barras verticais simples ──────
+function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String }) {
+  const [tooltip, setTooltip] = useState(null)
+  if (!data || !data.length || data.every(d => !(Number(d.valor) || 0))) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
+  }
+  const vals = data.map(d => Number(d.valor) || 0)
+  const max = Math.max(...vals, 1)
+  const W = 600, H = 190, padL = 8, padR = 8, padTop = 30, padBot = 38
+  const chartW = W - padL - padR, chartH = H - padTop - padBot
+  const n = data.length
+  const slotW = chartW / n
+  const barW = Math.max(6, Math.min(44, slotW * 0.62))
+  const bX = (i) => padL + i * slotW + slotW / 2 - barW / 2
+  const bH = (v) => Math.max(2, (Number(v) || 0) / max * chartH)
+  const bY = (v) => padTop + chartH - bH(v)
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
+        {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
+          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke="rgba(148,163,184,0.1)" strokeWidth="1" />
+        ))}
+        {data.map((d, i) => {
+          const x = bX(i), bh = bH(d.valor), by = bY(d.valor), cx = x + barW / 2
+          const isHov = tooltip?.i === i
+          return (
+            <g key={i} style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor })}
+              onMouseLeave={() => setTooltip(null)}>
+              <rect x={x} y={by} width={barW} height={bh} rx="3" fill={color} opacity={isHov ? 1 : 0.78} />
+              {bh > 22 && <text x={cx} y={by - 5} textAnchor="middle" fontSize="8" fill={color} opacity="0.9">{formatVal(d.valor)}</text>}
+              <text x={cx} y={H - 5} textAnchor="middle" fontSize="8.5" fill="#64748b">{d.mes}</text>
+            </g>
+          )
+        })}
+      </svg>
+      {tooltip && (
+        <div className="tooltip-box" style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)' }}>
+          <div className="tooltip-label">{tooltip.label}</div>
+          <div className="tooltip-value" style={{ color }}>{formatVal(tooltip.valor)}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EvolucaoMensalView({ periodos, getData, empresaSelecionada }) {
+  const [metricasSel, setMetricasSel] = useState(['nmrr', 'contratosPagos', 'leads', 'realizadas', 'mql'])
+
+  const METRICAS = [
+    { key: 'nmrr',              label: 'NMRR (MRR Pago)',       color: '#f59e0b', fmt: fmtR1 },
+    { key: 'contratosPagos',    label: 'Contratos Pagos',        color: '#10b981', fmt: fmt },
+    { key: 'leads',             label: 'Leads',                  color: '#3b82f6', fmt: fmt },
+    { key: 'realizadas',        label: 'Realizadas',             color: '#14b8a6', fmt: fmt },
+    { key: 'agendamentos',      label: 'Agendamentos',           color: '#6366f1', fmt: fmt },
+    { key: 'mql',               label: 'MQL %',                  color: '#8b5cf6', fmt: fmtPct },
+    { key: 'valorVendido',      label: 'MRR Vendido',            color: '#a78bfa', fmt: fmtR1 },
+    { key: 'contratosVendidos', label: 'Contratos Vendidos',     color: '#22d3ee', fmt: fmt },
+    { key: 'investimento',      label: 'Investimento Ads',       color: '#f97316', fmt: fmtR1 },
+    { key: 'cpl',               label: 'CPL',                    color: '#ec4899', fmt: fmtR1 },
+    { key: 'cac',               label: 'CAC',                    color: '#ef4444', fmt: fmtR1 },
+    { key: 'tkm',               label: 'TKM',                    color: '#94a3b8', fmt: fmtR1 },
+    { key: '_pagos',            label: 'Fechamentos (GERAL)',    color: '#34d399', fmt: fmt },
+    { key: '_totalReunioes',    label: 'Total Reuniões (GERAL)', color: '#60a5fa', fmt: fmt },
+    { key: '_nmrrGeral',        label: 'NMRR Reuniões (GERAL)',  color: '#fbbf24', fmt: fmtR1 },
+  ]
+
+  // Cronológico: mais antigo → mais recente (para os gráficos)
+  const meses = [...periodos].reverse().map(p => {
+    const d = getData(empresaSelecionada, p.key)
+    const m = d?.metricas || {}, c = d?.reunioes?.cards || {}
+    return {
+      key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label,
+      nmrr: Number(m.nmrr) || 0, contratosPagos: Number(m.contratosPagos) || 0,
+      leads: Number(m.leads) || 0, realizadas: Number(m.realizadas) || 0,
+      agendamentos: Number(m.agendamentos) || 0, mql: Number(m.mql) || 0,
+      valorVendido: Number(m.valorVendido) || 0, contratosVendidos: Number(m.contratosVendidos) || 0,
+      investimento: Number(m.investimento) || 0, cpl: Number(m.cpl) || 0,
+      cac: Number(m.cac) || 0, tkm: Number(m.tkm) || 0,
+      _pagos: Number(c.pagos) || 0, _totalReunioes: Number(c.total) || 0, _nmrrGeral: Number(c.nmrr) || 0,
+    }
+  })
+
+  const toggle = (key) => setMetricasSel(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
+  const ativas = METRICAS.filter(m => metricasSel.includes(m.key))
+
+  if (!meses.length) return (
+    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '48px 0', textAlign: 'center' }}>
+      Sem períodos mensais. Verifique se existem abas "DASH AI XXX XX" / "DASH MO XXX XX" na planilha.
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+        Métricas — {empresaSelecionada} &nbsp;·&nbsp; {meses.length} {meses.length === 1 ? 'mês' : 'meses'} disponíveis
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 28 }}>
+        {METRICAS.map(m => {
+          const ativa = metricasSel.includes(m.key)
+          return (
+            <button key={m.key} onClick={() => toggle(m.key)} style={{
+              padding: '5px 14px', borderRadius: 20, border: '1px solid', fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
+              background: ativa ? m.color + '20' : 'transparent',
+              borderColor: ativa ? m.color + 'aa' : 'var(--border)',
+              color: ativa ? m.color : 'var(--text-muted)',
+            }}>{m.label}</button>
+          )
+        })}
+      </div>
+
+      {ativas.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, textAlign: 'center', padding: '32px 0' }}>Selecione ao menos uma métrica acima.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
+          {ativas.map(m => (
+            <div key={m.key} className="chart-card">
+              <div className="chart-title">{m.label} — {empresaSelecionada} · mês a mês</div>
+              <VerticalBarChartMonths
+                data={meses.map(mes => ({ mes: mes.mes, label: mes.label, valor: mes[m.key] }))}
+                color={m.color} formatVal={m.fmt}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+        Tabela resumo — {empresaSelecionada}
+      </div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
+              {(ativas.length ? ativas : METRICAS.slice(0, 6)).map(m => (
+                <th key={m.key} style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{m.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[...meses].reverse().map(mes => (
+              <tr key={mes.key} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mes.label}</td>
+                {(ativas.length ? ativas : METRICAS.slice(0, 6)).map(m => (
+                  <td key={m.key} style={{ padding: '9px 8px', textAlign: 'right', color: m.color, fontWeight: 500 }}>{m.fmt(mes[m.key])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
   const [data, setData] = useState(null)
@@ -1468,14 +1624,15 @@ export default function Dashboard() {
   const dashboardNome = data?.CONFIG?.dashboardNome || 'AGC Dashboard'
   const currentData = data ? data[empresa] : null
   const periodosDinamicos = data?.PERIODOS || []
-  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO'].includes(periodo) ? currentData[periodo] : null
+  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO'].includes(periodo) ? currentData[periodo] : null
 
   const specialViews = [
     ['SEMANAS', 'Por Semana'],
     ['FORECAST', 'Forecast'],
+    ['EVOLUCAO', 'Evolução Mensal'],
+    ['COMPARATIVO', 'Comparativo Mensal'],
     ['DADOS', 'Dados Específicos'],
     ['METAS_ORIGEM', 'Metas por Origem'],
-    ['COMPARATIVO', 'Comparativo Mensal'],
   ]
 
   // True when the active period is a monthly period (not a special view)
@@ -1562,6 +1719,7 @@ export default function Dashboard() {
         <div className="page">
           {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
            periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
+           periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} /> :
            periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
            periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
            periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
