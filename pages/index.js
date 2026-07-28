@@ -1861,48 +1861,40 @@ export default function Dashboard() {
       <Head><title>{dashboardNome}</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
 
       <nav className="nav">
-        <div className="nav-logo">📊 {dashboardNome}</div>
+        <div className="nav-logo">
+          <span style={{ color: 'var(--accent)', marginRight: 7, fontSize: 17 }}>◆</span>
+          {dashboardNome}
+        </div>
         <div className="nav-tabs">
           {empresasConfig.map(({codigo,nome})=>(
             <button key={codigo} className={`nav-tab ${empresa===codigo?'active':''}`} onClick={()=>setEmpresa(codigo)}>{nome}</button>
           ))}
         </div>
-        {/* Sync button + last updated */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, flexShrink: 0 }}>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
           {lastSync && !syncing && (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-              Atualizado às {lastSync}
-            </span>
+            <span className="last-sync">Atualizado às {lastSync}</span>
           )}
           <button
+            className="sync-btn"
             onClick={() => fetchData.current(true)}
             disabled={syncing}
             title="Sincronizar dados da planilha agora"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',
-              borderRadius: 8, border: '1px solid var(--border)', background: 'transparent',
-              color: syncing ? 'var(--text-muted)' : 'var(--text-secondary)',
-              fontSize: 12, cursor: syncing ? 'default' : 'pointer', whiteSpace: 'nowrap',
-              transition: 'color 0.2s',
-            }}
           >
-            <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+            <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 14 }}>↻</span>
             <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
           </button>
+          <button className="theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Tema claro' : 'Tema escuro'}>
+            <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
+            <span>{darkMode ? 'Claro' : 'Escuro'}</span>
+          </button>
         </div>
-
-        {/* Light / dark theme toggle */}
-        <button className="theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Mudar para tema claro' : 'Mudar para tema escuro'}>
-          <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
-          <span>{darkMode ? 'Claro' : 'Escuro'}</span>
-        </button>
       </nav>
 
-      {/* Discrete sync error banner */}
       {syncError && (
-        <div style={{ background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.25)', padding: '6px 24px', fontSize: 12, color: '#ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="sync-banner">
           <span>⚠ {syncError}</span>
-          <button onClick={() => setSyncError(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+          <button onClick={() => setSyncError(null)}>×</button>
         </div>
       )}
 
