@@ -1855,91 +1855,160 @@ export default function Dashboard() {
 
   // True when the active period is a monthly period (not a special view)
   const isMesAtivo = periodosDinamicos.some(p => p.key === periodo)
+  const periodoAtivo = periodosDinamicos.find(p => p.key === periodo)
+  const nomeEmpresa = empresasConfig.find(e => e.codigo === empresa)?.nome || empresa
+
+  // Hero section data
+  const heroMetricas = periodoData?.metricas || {}
+  const nmrr = Number(heroMetricas.nmrr) || 0
+  const investimento = Number(heroMetricas.investimento) || 0
+  const contratosPagos = Number(heroMetricas.contratosPagos) || 0
+  const leads = Number(heroMetricas.leads) || 0
 
   return (
     <>
       <Head><title>{dashboardNome}</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
 
-      <nav className="nav">
-        <div className="nav-logo">
-          <span style={{ color: 'var(--accent)', marginRight: 7, fontSize: 17 }}>◆</span>
-          {dashboardNome}
-        </div>
-        <div className="nav-tabs">
-          {empresasConfig.map(({codigo,nome})=>(
-            <button key={codigo} className={`nav-tab ${empresa===codigo?'active':''}`} onClick={()=>setEmpresa(codigo)}>{nome}</button>
-          ))}
-        </div>
+      <div className="app-layout">
+        {/* ── Sidebar ── */}
+        <aside className="sidebar">
+          <div className="sidebar-logo">◆</div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-          {lastSync && !syncing && (
-            <span className="last-sync">Atualizado às {lastSync}</span>
-          )}
-          <button
-            className="sync-btn"
-            onClick={() => fetchData.current(true)}
-            disabled={syncing}
-            title="Sincronizar dados da planilha agora"
-          >
-            <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 14 }}>↻</span>
-            <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
-          </button>
-          <button className="theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Tema claro' : 'Tema escuro'}>
-            <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
-            <span>{darkMode ? 'Claro' : 'Escuro'}</span>
-          </button>
-        </div>
-      </nav>
-
-      {syncError && (
-        <div className="sync-banner">
-          <span>⚠ {syncError}</span>
-          <button onClick={() => setSyncError(null)}>×</button>
-        </div>
-      )}
-
-      <div className="sub-nav">
-        {/* Month dropdown — replaces the inline month buttons */}
-        {periodosDinamicos.length > 0 && (
-          <div className="period-select-wrapper">
-            <select
-              className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
-              value={isMesAtivo ? periodo : ''}
-              onChange={e => e.target.value && setPeriodo(e.target.value)}
+          {empresasConfig.map(({ codigo, nome }) => (
+            <button
+              key={codigo}
+              className={`sidebar-item ${empresa === codigo ? 'active' : ''}`}
+              onClick={() => setEmpresa(codigo)}
+              title={nome}
             >
-              {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
-              {periodosDinamicos.map(p => (
-                <option key={p.key} value={p.key}>{p.label}</option>
-              ))}
-            </select>
+              <span className="sidebar-icon">{codigo}</span>
+              <span className="sidebar-label">{nome.split(' ')[0]}</span>
+            </button>
+          ))}
+
+          <div className="sidebar-divider" />
+
+          <div className="sidebar-footer">
+            <button
+              className="sidebar-action"
+              onClick={() => fetchData.current(true)}
+              disabled={syncing}
+              title={syncing ? 'Sincronizando…' : 'Sincronizar'}
+            >
+              <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+            </button>
+            <button
+              className="sidebar-action"
+              onClick={() => setDarkMode(d => !d)}
+              title={darkMode ? 'Tema claro' : 'Tema escuro'}
+            >
+              {darkMode ? '☀️' : '🌙'}
+            </button>
           </div>
-        )}
+        </aside>
 
-        {periodosDinamicos.length > 0 && <div className="nav-divider" />}
+        {/* ── Main area ── */}
+        <div className="main-area">
+          {/* Top bar */}
+          <header className="top-bar">
+            <div className="top-bar-title">
+              <span>◆</span>{nomeEmpresa}
+            </div>
 
-        {/* Special view tabs */}
-        {specialViews.map(([p, label]) => (
-          <button key={p} className={`sub-tab ${periodo===p?'active':''}`} onClick={()=>setPeriodo(p)}>{label}</button>
-        ))}
-      </div>
+            <div className="sub-nav" style={{ flex: 1, height: '100%', border: 'none', background: 'transparent', padding: '0 8px' }}>
+              {periodosDinamicos.length > 0 && (
+                <div className="period-select-wrapper">
+                  <select
+                    className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
+                    value={isMesAtivo ? periodo : ''}
+                    onChange={e => e.target.value && setPeriodo(e.target.value)}
+                  >
+                    {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
+                    {periodosDinamicos.map(p => (
+                      <option key={p.key} value={p.key}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {periodosDinamicos.length > 0 && <div className="nav-divider" />}
+              {specialViews.map(([p, label]) => (
+                <button key={p} className={`sub-tab ${periodo === p ? 'active' : ''}`} onClick={() => setPeriodo(p)}>{label}</button>
+              ))}
+            </div>
 
-      {loading && <div className="loading">Carregando dados...</div>}
-      {error && <div className="error">Erro ao carregar: {error}</div>}
-      {!loading && !error && data && (
-        <div className="page">
-          {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
-           periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-           periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
-           periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
-           periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
-           periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
-           periodoData ? <>
-             <MetricCards metricas={periodoData.metricas} />
-             <ReuniaoCards cards={periodoData.reunioes?.cards} />
-             <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
-           </> : <div className="loading">Sem dados para este período</div>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {lastSync && !syncing && <span className="last-sync">Às {lastSync}</span>}
+              <button className="sync-btn" onClick={() => fetchData.current(true)} disabled={syncing}>
+                <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 14 }}>↻</span>
+                <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+              </button>
+              <button className="theme-toggle" onClick={() => setDarkMode(d => !d)}>
+                <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
+                <span>{darkMode ? 'Claro' : 'Escuro'}</span>
+              </button>
+            </div>
+          </header>
+
+          {syncError && (
+            <div className="sync-banner">
+              <span>⚠ {syncError}</span>
+              <button onClick={() => setSyncError(null)}>×</button>
+            </div>
+          )}
+
+          {/* Hero — apenas nas abas mensais */}
+          {periodoData && periodoAtivo && (
+            <div className="hero">
+              <div className="hero-left">
+                <div className="hero-eyebrow">Visão do mês · {nomeEmpresa}</div>
+                <div className="hero-headline">
+                  {contratosPagos > 0
+                    ? <>{contratosPagos} <span className="accent">contratos pagos</span> em {periodoAtivo.label}.</>
+                    : <>{periodoAtivo.label} — <span className="accent">{nomeEmpresa}</span></>
+                  }
+                </div>
+                {leads > 0 && (
+                  <div className="hero-sub">
+                    {fmt(leads)} leads · {fmt(Number(heroMetricas.agendamentos)||0)} agendamentos · {fmt(Number(heroMetricas.realizadas)||0)} realizadas
+                  </div>
+                )}
+              </div>
+              <div className="hero-right">
+                {investimento > 0 && (
+                  <div className="hero-stat">
+                    <div className="hero-stat-label">Investido</div>
+                    <div className="hero-stat-value" style={{ color: 'var(--text-secondary)' }}>{fmtR1(investimento)}</div>
+                  </div>
+                )}
+                {nmrr > 0 && (
+                  <div className="hero-stat">
+                    <div className="hero-stat-label">MRR Pago</div>
+                    <div className="hero-stat-value" style={{ color: 'var(--accent)' }}>{fmtR1(nmrr)}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {loading && <div className="loading"><span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>↻</span> Carregando dados…</div>}
+          {error && <div className="error" style={{ margin: 24 }}>Erro ao carregar: {error}</div>}
+          {!loading && !error && data && (
+            <div className="page">
+              {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
+               periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
+               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
+               periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
+               periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
+               periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
+               periodoData ? <>
+                 <MetricCards metricas={periodoData.metricas} />
+                 <ReuniaoCards cards={periodoData.reunioes?.cards} />
+                 <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
+               </> : <div className="loading">Sem dados para este período</div>}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </>
   )
 }
