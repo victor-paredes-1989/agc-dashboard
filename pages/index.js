@@ -1945,15 +1945,13 @@ export default function Dashboard() {
               </select>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              {lastSync && !syncing && <span className="last-sync">Às {lastSync}</span>}
-              <button className="sync-btn" onClick={() => fetchData.current(true)} disabled={syncing}>
-                <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 14 }}>↻</span>
-                <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {lastSync && !syncing && <span className="last-sync" style={{ fontSize: 10 }}>Às {lastSync}</span>}
+              <button className="sidebar-action" onClick={() => fetchData.current(true)} disabled={syncing} title={syncing ? 'Sincronizando…' : 'Sincronizar'}>
+                <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 15 }}>↻</span>
               </button>
-              <button className="theme-toggle" onClick={() => setDarkMode(d => !d)}>
-                <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
-                <span>{darkMode ? 'Claro' : 'Escuro'}</span>
+              <button className="sidebar-action" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Tema claro' : 'Tema escuro'}>
+                <span style={{ fontSize: 15 }}>{darkMode ? '☀️' : '🌙'}</span>
               </button>
             </div>
           </header>
