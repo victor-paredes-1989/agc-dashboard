@@ -1424,8 +1424,8 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
               onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor })}
               onMouseLeave={() => setTooltip(null)}>
               <rect x={x} y={by} width={barW} height={bh} rx="3" fill={color} opacity={isHov ? 1 : 0.78} />
-              {bh > 22 && <text x={cx} y={by - 5} textAnchor="middle" fontSize="8" fill={color} opacity="0.9">{formatVal(d.valor)}</text>}
-              <text x={cx} y={H - 5} textAnchor="middle" fontSize="8.5" fill="#64748b">{d.mes}</text>
+              {bh > 14 && <text x={cx} y={by - 6} textAnchor="middle" fontSize="11" fill={color} opacity="0.95" fontWeight="600">{formatVal(d.valor)}</text>}
+              <text x={cx} y={H - 5} textAnchor="middle" fontSize="9.5" fill="#64748b">{d.mes}</text>
             </g>
           )
         })}
@@ -1434,6 +1434,64 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
         <div className="tooltip-box" style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)' }}>
           <div className="tooltip-label">{tooltip.label}</div>
           <div className="tooltip-value" style={{ color }}>{formatVal(tooltip.valor)}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
+  const [tooltip, setTooltip] = useState(null)
+  if (!data || !data.length || data.every(d => !(Number(d.valor) || 0))) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
+  }
+  const vals = data.map(d => Number(d.valor) || 0)
+  const max = Math.max(...vals, 1)
+  const W = 600, H = 190, padL = 8, padR = 8, padTop = 30, padBot = 38
+  const chartW = W - padL - padR, chartH = H - padTop - padBot
+  const n = data.length
+  const slotW = chartW / n
+  const barW = Math.max(6, Math.min(44, slotW * 0.62))
+  const bX = (i) => padL + i * slotW + slotW / 2 - barW / 2
+  const bH = (v) => Math.max(2, (Number(v) || 0) / max * chartH)
+  const bY = (v) => padTop + chartH - bH(v)
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
+        {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
+          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke="rgba(148,163,184,0.1)" strokeWidth="1" />
+        ))}
+        {data.map((d, i) => {
+          const x = bX(i), bh = bH(d.valor), by = bY(d.valor), cx = x + barW / 2
+          const isHov = tooltip?.i === i
+          return (
+            <g key={i} style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor, pagos: d.pagos, valorPago: d.valorPago })}
+              onMouseLeave={() => setTooltip(null)}>
+              <rect x={x} y={by} width={barW} height={bh} rx="3" fill={color} opacity={isHov ? 1 : 0.78} />
+              {bh > 14 && <text x={cx} y={by - 6} textAnchor="middle" fontSize="11" fill={color} opacity="0.95" fontWeight="600">{fmt(d.valor)}</text>}
+              <text x={cx} y={H - 5} textAnchor="middle" fontSize="9.5" fill="#64748b">{d.mes}</text>
+            </g>
+          )
+        })}
+      </svg>
+      {tooltip && (
+        <div className="tooltip-box" style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)', minWidth: 160 }}>
+          <div className="tooltip-label">{tooltip.label}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Realizadas</span>
+              <span style={{ fontSize: 12, color, fontWeight: 600 }}>{fmt(tooltip.valor)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Pagos</span>
+              <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>{fmt(tooltip.pagos)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Valor Pago</span>
+              <span style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600 }}>{fmtR1(tooltip.valorPago)}</span>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1497,25 +1555,43 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     return emp === empresaSelecionada.toUpperCase().trim() || emp === ''
   })
 
-  // Unique months present in GERAL for filtered year
+  const MES_ORDER = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO']
+  const MES_ABBR  = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
+
+  // Unique months present in GERAL for filtered year, sorted chronologically
   function geralMeses() {
     const mesSet = new Map()
     geralEmpresa.forEach(r => {
       const ano = String(r.ano || '').trim()
-      const mes = String(r.mes || '').trim()
+      const mes = String(r.mes || '').trim().toUpperCase()
       if (!ano || !mes) return
       if (anoFiltro !== 'todos' && ano !== anoFiltro) return
       const k = `${ano}-${mes}`
-      if (!mesSet.has(k)) mesSet.set(k, { key: k, mes: `${mes.slice(0,3)}/${ano.slice(-2)}`, label: `${mes} ${ano}`, ano, mesRaw: mes })
+      if (!mesSet.has(k)) {
+        const mi = MES_ORDER.indexOf(mes)
+        const abbr = mi >= 0 ? MES_ABBR[mi] : mes.slice(0,3)
+        mesSet.set(k, { key: k, mes: `${abbr}/${ano.slice(-2)}`, label: `${mes} ${ano}`, ano, mesRaw: mes, sortKey: `${ano}-${String(mi+1).padStart(2,'0')}` })
+      }
     })
-    return [...mesSet.values()].sort((a, b) => a.key.localeCompare(b.key))
+    return [...mesSet.values()].sort((a, b) => a.sortKey.localeCompare(b.sortKey))
   }
 
   function buildGeralSeries(field) {
     const mesesG = geralMeses()
-    // collect all unique values for this field
-    const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))]
+    const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))].sort()
     return { mesesG, vals }
+  }
+
+  function geralStats(mg, field, val) {
+    const rows = geralEmpresa.filter(r => {
+      const ano = String(r.ano || '').trim()
+      const mes = String(r.mes || '').trim().toUpperCase()
+      if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
+      return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === val
+    })
+    const pagos = rows.filter(r => String(r.status || '').trim().toUpperCase() === 'PAGO')
+    const valor = pagos.reduce((s, r) => s + (Number(r.valor) || 0), 0)
+    return { realizadas: rows.length, pagos: pagos.length, valor }
   }
 
   // Reset subFiltro when category changes
@@ -1529,27 +1605,21 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   const renderGeralCharts = (field, colorArr) => {
     const { mesesG, vals } = buildGeralSeries(field)
     if (!mesesG.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Sem dados em GERAL para filtros selecionados.</div>
-
-    const filtered = subFiltro === 'todos' ? vals : [subFiltro]
-    if (!filtered.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Nenhum item encontrado.</div>
+    const displayVals = subFiltro === 'todos' ? vals : [subFiltro]
+    if (!displayVals.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Nenhum item encontrado.</div>
 
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
-        {(subFiltro === 'todos' ? vals : [subFiltro]).map((val, vi) => {
+        {displayVals.map((val, vi) => {
           const color = colorArr[vi % colorArr.length]
           const chartData = mesesG.map(mg => {
-            const count = geralEmpresa.filter(r => {
-              const ano = String(r.ano || '').trim()
-              const mes = String(r.mes || '').trim()
-              if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
-              return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === val
-            }).length
-            return { mes: mg.mes, label: mg.label, valor: count }
+            const s = geralStats(mg, field, val)
+            return { mes: mg.mes, label: mg.label, valor: s.realizadas, pagos: s.pagos, valorPago: s.valor }
           })
           return (
             <div key={val} className="chart-card">
               <div className="chart-title">{val} · reuniões mês a mês</div>
-              <VerticalBarChartMonths data={chartData} color={color} formatVal={fmt} />
+              <VerticalBarChartMonthsGeral data={chartData} color={color} />
             </div>
           )
         })}
@@ -1568,7 +1638,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             <tr>
               <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
               {displayVals.map((v, vi) => (
-                <th key={v} style={{ textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
+                <th key={v} colSpan={3} style={{ textAlign: 'center', color: colorArr[vi % colorArr.length], fontWeight: 600, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
+              ))}
+            </tr>
+            <tr>
+              <th style={{ borderBottom: '1px solid var(--border)' }}></th>
+              {displayVals.map((v) => (
+                ['Realizadas','Pagos','Valor Pago'].map(h => (
+                  <th key={`${v}-${h}`} style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 10, padding: '6px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))
               ))}
             </tr>
           </thead>
@@ -1577,13 +1655,13 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
               <tr key={mg.key} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
                 {displayVals.map((v, vi) => {
-                  const count = geralEmpresa.filter(r => {
-                    const ano = String(r.ano || '').trim()
-                    const mes = String(r.mes || '').trim()
-                    if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
-                    return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === v
-                  }).length
-                  return <td key={v} style={{ padding: '9px 8px', textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 500 }}>{fmt(count)}</td>
+                  const s = geralStats(mg, field, v)
+                  const c = colorArr[vi % colorArr.length]
+                  return [
+                    <td key={`${v}-r`} style={{ padding: '9px 8px', textAlign: 'right', color: c, fontWeight: 500 }}>{fmt(s.realizadas)}</td>,
+                    <td key={`${v}-p`} style={{ padding: '9px 8px', textAlign: 'right', color: '#10b981', fontWeight: 500 }}>{fmt(s.pagos)}</td>,
+                    <td key={`${v}-v`} style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b', fontWeight: 500 }}>{fmtR1(s.valor)}</td>,
+                  ]
                 })}
               </tr>
             ))}
@@ -1777,99 +1855,160 @@ export default function Dashboard() {
 
   // True when the active period is a monthly period (not a special view)
   const isMesAtivo = periodosDinamicos.some(p => p.key === periodo)
+  const periodoAtivo = periodosDinamicos.find(p => p.key === periodo)
+  const nomeEmpresa = empresasConfig.find(e => e.codigo === empresa)?.nome || empresa
+
+  // Hero section data
+  const heroMetricas = periodoData?.metricas || {}
+  const nmrr = Number(heroMetricas.nmrr) || 0
+  const investimento = Number(heroMetricas.investimento) || 0
+  const contratosPagos = Number(heroMetricas.contratosPagos) || 0
+  const leads = Number(heroMetricas.leads) || 0
 
   return (
     <>
       <Head><title>{dashboardNome}</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
 
-      <nav className="nav">
-        <div className="nav-logo">📊 {dashboardNome}</div>
-        <div className="nav-tabs">
-          {empresasConfig.map(({codigo,nome})=>(
-            <button key={codigo} className={`nav-tab ${empresa===codigo?'active':''}`} onClick={()=>setEmpresa(codigo)}>{nome}</button>
-          ))}
-        </div>
-        {/* Sync button + last updated */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, flexShrink: 0 }}>
-          {lastSync && !syncing && (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-              Atualizado às {lastSync}
-            </span>
-          )}
-          <button
-            onClick={() => fetchData.current(true)}
-            disabled={syncing}
-            title="Sincronizar dados da planilha agora"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',
-              borderRadius: 8, border: '1px solid var(--border)', background: 'transparent',
-              color: syncing ? 'var(--text-muted)' : 'var(--text-secondary)',
-              fontSize: 12, cursor: syncing ? 'default' : 'pointer', whiteSpace: 'nowrap',
-              transition: 'color 0.2s',
-            }}
-          >
-            <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
-            <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
-          </button>
-        </div>
+      <div className="app-layout">
+        {/* ── Sidebar ── */}
+        <aside className="sidebar">
+          <div className="sidebar-logo">◆</div>
 
-        {/* Light / dark theme toggle */}
-        <button className="theme-toggle" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Mudar para tema claro' : 'Mudar para tema escuro'}>
-          <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
-          <span>{darkMode ? 'Claro' : 'Escuro'}</span>
-        </button>
-      </nav>
-
-      {/* Discrete sync error banner */}
-      {syncError && (
-        <div style={{ background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.25)', padding: '6px 24px', fontSize: 12, color: '#ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>⚠ {syncError}</span>
-          <button onClick={() => setSyncError(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
-        </div>
-      )}
-
-      <div className="sub-nav">
-        {/* Month dropdown — replaces the inline month buttons */}
-        {periodosDinamicos.length > 0 && (
-          <div className="period-select-wrapper">
-            <select
-              className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
-              value={isMesAtivo ? periodo : ''}
-              onChange={e => e.target.value && setPeriodo(e.target.value)}
+          {empresasConfig.map(({ codigo, nome }) => (
+            <button
+              key={codigo}
+              className={`sidebar-item ${empresa === codigo ? 'active' : ''}`}
+              onClick={() => setEmpresa(codigo)}
+              title={nome}
             >
-              {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
-              {periodosDinamicos.map(p => (
-                <option key={p.key} value={p.key}>{p.label}</option>
-              ))}
-            </select>
+              <span className="sidebar-icon">{codigo}</span>
+              <span className="sidebar-label">{nome.split(' ')[0]}</span>
+            </button>
+          ))}
+
+          <div className="sidebar-divider" />
+
+          <div className="sidebar-footer">
+            <button
+              className="sidebar-action"
+              onClick={() => fetchData.current(true)}
+              disabled={syncing}
+              title={syncing ? 'Sincronizando…' : 'Sincronizar'}
+            >
+              <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+            </button>
+            <button
+              className="sidebar-action"
+              onClick={() => setDarkMode(d => !d)}
+              title={darkMode ? 'Tema claro' : 'Tema escuro'}
+            >
+              {darkMode ? '☀️' : '🌙'}
+            </button>
           </div>
-        )}
+        </aside>
 
-        {periodosDinamicos.length > 0 && <div className="nav-divider" />}
+        {/* ── Main area ── */}
+        <div className="main-area">
+          {/* Top bar */}
+          <header className="top-bar">
+            <div className="top-bar-title">
+              <span>◆</span>{nomeEmpresa}
+            </div>
 
-        {/* Special view tabs */}
-        {specialViews.map(([p, label]) => (
-          <button key={p} className={`sub-tab ${periodo===p?'active':''}`} onClick={()=>setPeriodo(p)}>{label}</button>
-        ))}
-      </div>
+            <div className="sub-nav" style={{ flex: 1, height: '100%', border: 'none', background: 'transparent', padding: '0 8px' }}>
+              {periodosDinamicos.length > 0 && (
+                <div className="period-select-wrapper">
+                  <select
+                    className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
+                    value={isMesAtivo ? periodo : ''}
+                    onChange={e => e.target.value && setPeriodo(e.target.value)}
+                  >
+                    {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
+                    {periodosDinamicos.map(p => (
+                      <option key={p.key} value={p.key}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {periodosDinamicos.length > 0 && <div className="nav-divider" />}
+              {specialViews.map(([p, label]) => (
+                <button key={p} className={`sub-tab ${periodo === p ? 'active' : ''}`} onClick={() => setPeriodo(p)}>{label}</button>
+              ))}
+            </div>
 
-      {loading && <div className="loading">Carregando dados...</div>}
-      {error && <div className="error">Erro ao carregar: {error}</div>}
-      {!loading && !error && data && (
-        <div className="page">
-          {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
-           periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-           periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
-           periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
-           periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
-           periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
-           periodoData ? <>
-             <MetricCards metricas={periodoData.metricas} />
-             <ReuniaoCards cards={periodoData.reunioes?.cards} />
-             <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
-           </> : <div className="loading">Sem dados para este período</div>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {lastSync && !syncing && <span className="last-sync">Às {lastSync}</span>}
+              <button className="sync-btn" onClick={() => fetchData.current(true)} disabled={syncing}>
+                <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 14 }}>↻</span>
+                <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+              </button>
+              <button className="theme-toggle" onClick={() => setDarkMode(d => !d)}>
+                <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
+                <span>{darkMode ? 'Claro' : 'Escuro'}</span>
+              </button>
+            </div>
+          </header>
+
+          {syncError && (
+            <div className="sync-banner">
+              <span>⚠ {syncError}</span>
+              <button onClick={() => setSyncError(null)}>×</button>
+            </div>
+          )}
+
+          {/* Hero — apenas nas abas mensais */}
+          {periodoData && periodoAtivo && (
+            <div className="hero">
+              <div className="hero-left">
+                <div className="hero-eyebrow">Visão do mês · {nomeEmpresa}</div>
+                <div className="hero-headline">
+                  {contratosPagos > 0
+                    ? <>{contratosPagos} <span className="accent">contratos pagos</span> em {periodoAtivo.label}.</>
+                    : <>{periodoAtivo.label} — <span className="accent">{nomeEmpresa}</span></>
+                  }
+                </div>
+                {leads > 0 && (
+                  <div className="hero-sub">
+                    {fmt(leads)} leads · {fmt(Number(heroMetricas.agendamentos)||0)} agendamentos · {fmt(Number(heroMetricas.realizadas)||0)} realizadas
+                  </div>
+                )}
+              </div>
+              <div className="hero-right">
+                {investimento > 0 && (
+                  <div className="hero-stat">
+                    <div className="hero-stat-label">Investido</div>
+                    <div className="hero-stat-value" style={{ color: 'var(--text-secondary)' }}>{fmtR1(investimento)}</div>
+                  </div>
+                )}
+                {nmrr > 0 && (
+                  <div className="hero-stat">
+                    <div className="hero-stat-label">MRR Pago</div>
+                    <div className="hero-stat-value" style={{ color: 'var(--accent)' }}>{fmtR1(nmrr)}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {loading && <div className="loading"><span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>↻</span> Carregando dados…</div>}
+          {error && <div className="error" style={{ margin: 24 }}>Erro ao carregar: {error}</div>}
+          {!loading && !error && data && (
+            <div className="page">
+              {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
+               periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
+               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
+               periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
+               periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
+               periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
+               periodoData ? <>
+                 <MetricCards metricas={periodoData.metricas} />
+                 <ReuniaoCards cards={periodoData.reunioes?.cards} />
+                 <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
+               </> : <div className="loading">Sem dados para este período</div>}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </>
   )
 }
