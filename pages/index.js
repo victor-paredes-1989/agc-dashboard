@@ -384,9 +384,9 @@ function MetricCards({ metricas }) {
           { label: 'Agendamentos', value: fmt(metricas.agendamentos), sub: `Taxa: ${fmtPct(metricas.taxaAgendamento)}`, color: '' },
           { label: 'Realizadas', value: fmt(metricas.realizadas), sub: `Comparec.: ${fmtPct(metricas.taxaRealizadas)}`, color: '' },
           { label: 'Contratos Pagos', value: fmt(metricas.contratosPagos), sub: `Vendidos: ${fmt(metricas.contratosVendidos)}`, color: 'green' },
-          { label: 'NMRR', value: fmtR(metricas.nmrr), sub: `TKM: ${fmtR(metricas.tkm)}`, color: 'amber' },
-          { label: 'Investimento', value: fmtR(metricas.investimento), sub: `CPL: ${fmtR(metricas.cpl)}`, color: 'purple' },
-          { label: 'CAC', value: fmtR(metricas.cac), sub: `por contrato | TKM: ${fmtR(metricas.tkm)}`, color: 'teal' },
+          { label: 'NMRR', value: fmtR1(metricas.nmrr), sub: `TKM: ${fmtR1(metricas.tkm)}`, color: 'amber' },
+          { label: 'Investimento', value: fmtR1(metricas.investimento), sub: `CPL: ${fmtR1(metricas.cpl)}`, color: 'purple' },
+          { label: 'CAC', value: fmtR1(metricas.cac), sub: `por contrato | TKM: ${fmtR1(metricas.tkm)}`, color: 'teal' },
           { label: 'Gap da Meta', value: gap, sub: gapPositive ? '✓ Meta ultrapassada' : '⚠ Abaixo da meta', color: gapPositive ? 'green' : 'red' },
         ].map((c, i) => (
           <div key={i} className={`card ${c.color}`}>
@@ -408,9 +408,9 @@ function ReuniaoCards({ cards }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value">{fmt(cards.total)}</div></div>
         <div className="card green"><div className="card-label">Fechamentos (PAGO)</div><div className="card-value">{fmt(cards.pagos)}</div><div className="card-sub">Taxa: {fmtPct(cards.taxa)}</div></div>
-        <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value">{fmtR(cards.valorTotal)}</div></div>
-        <div className="card amber"><div className="card-label">NMRR (sem DSV/DSO)</div><div className="card-value">{fmtR(cards.nmrr)}</div><div className="card-sub">TKM: {fmtR(cards.tkm)}</div></div>
-        {cards.dsvTotal > 0 && <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR(cards.dsvTotal)}</div><div className="card-sub">{cards.dsvCount} contratos</div></div>}
+        <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value">{fmtR1(cards.valorTotal)}</div></div>
+        <div className="card amber"><div className="card-label">NMRR (sem DSV/DSO)</div><div className="card-value">{fmtR1(cards.nmrr)}</div><div className="card-sub">TKM: {fmtR1(cards.tkm)}</div></div>
+        {cards.dsvTotal > 0 && <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR1(cards.dsvTotal)}</div><div className="card-sub">{cards.dsvCount} contratos</div></div>}
         <div className="card blue"><div className="card-label">FUP + PM</div><div className="card-value">{fmt((cards.fup||0)+(cards.pm||0))}</div></div>
         <div className="card red"><div className="card-label">Perdidos (FORA)</div><div className="card-value">{fmt(cards.fora)}</div></div>
         <div className="card"><div className="card-label">Fugiram</div><div className="card-value">{fmt(cards.fugiu)}</div></div>
