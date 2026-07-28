@@ -1915,36 +1915,43 @@ export default function Dashboard() {
               <span>◆</span>{nomeEmpresa}
             </div>
 
-            <div className="sub-nav" style={{ flex: 1, height: '100%', border: 'none', background: 'transparent', padding: '0 8px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', overflow: 'hidden' }}>
+              {/* Seletor de mês */}
               {periodosDinamicos.length > 0 && (
-                <div className="period-select-wrapper">
-                  <select
-                    className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
-                    value={isMesAtivo ? periodo : ''}
-                    onChange={e => e.target.value && setPeriodo(e.target.value)}
-                  >
-                    {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
-                    {periodosDinamicos.map(p => (
-                      <option key={p.key} value={p.key}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
+                  value={isMesAtivo ? periodo : ''}
+                  onChange={e => e.target.value && setPeriodo(e.target.value)}
+                  style={{ flexShrink: 0 }}
+                >
+                  {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
+                  {periodosDinamicos.map(p => (
+                    <option key={p.key} value={p.key}>{p.label}</option>
+                  ))}
+                </select>
               )}
               {periodosDinamicos.length > 0 && <div className="nav-divider" />}
-              {specialViews.map(([p, label]) => (
-                <button key={p} className={`sub-tab ${periodo === p ? 'active' : ''}`} onClick={() => setPeriodo(p)}>{label}</button>
-              ))}
+              {/* Views especiais num dropdown */}
+              <select
+                className={`period-select${!isMesAtivo ? ' has-selection' : ''}`}
+                value={!isMesAtivo ? periodo : ''}
+                onChange={e => e.target.value && setPeriodo(e.target.value)}
+                style={{ flexShrink: 0, minWidth: 180 }}
+              >
+                {isMesAtivo && <option value="" disabled>Análises…</option>}
+                {specialViews.map(([p, label]) => (
+                  <option key={p} value={p}>{label}</option>
+                ))}
+              </select>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              {lastSync && !syncing && <span className="last-sync">Às {lastSync}</span>}
-              <button className="sync-btn" onClick={() => fetchData.current(true)} disabled={syncing}>
-                <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 14 }}>↻</span>
-                <span>{syncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {lastSync && !syncing && <span className="last-sync" style={{ fontSize: 10 }}>Às {lastSync}</span>}
+              <button className="sidebar-action" onClick={() => fetchData.current(true)} disabled={syncing} title={syncing ? 'Sincronizando…' : 'Sincronizar'}>
+                <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 15 }}>↻</span>
               </button>
-              <button className="theme-toggle" onClick={() => setDarkMode(d => !d)}>
-                <span className="theme-toggle-icon">{darkMode ? '☀️' : '🌙'}</span>
-                <span>{darkMode ? 'Claro' : 'Escuro'}</span>
+              <button className="sidebar-action" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Tema claro' : 'Tema escuro'}>
+                <span style={{ fontSize: 15 }}>{darkMode ? '☀️' : '🌙'}</span>
               </button>
             </div>
           </header>
