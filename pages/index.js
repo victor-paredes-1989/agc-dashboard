@@ -270,22 +270,75 @@ function MiniLineChartTooltip({ dados, metrica, color }) {
   )
 }
 
+function SemanaCard({ s, cor }) {
+  const temMeta = s.metaNmrr != null && s.metaNmrr > 0
+  const gap     = temMeta ? s.metaNmrr - s.nmrr : null
+  const pctAtng = temMeta ? (s.nmrr / s.metaNmrr) * 100 : null
+  const pctGap  = temMeta ? (gap / s.metaNmrr) * 100 : null
+  const acima   = temMeta && gap <= 0
+
+  const Row = ({ label, value, color, bold }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: bold ? 700 : 600, color: color || 'var(--text-primary)' }}>{value}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ background: 'var(--bg-card)', border: `1px solid var(--border)`, borderTop: `3px solid ${cor}`, borderRadius: 14, padding: '16px 14px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: cor, marginBottom: 2 }}>Semana</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1.2 }}>{s.semana}</div>
+      </div>
+
+      {/* Bloco Marketing */}
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '6px 0 4px' }}>Marketing</div>
+      <Row label="Leads"           value={fmt(s.leads)}                             color="#3b82f6" bold />
+      <Row label="MQL %"           value={s.mql || '-'}                             color="#8b5cf6" />
+      <Row label="Leads MQL"       value={s.leadsMql ? fmt(s.leadsMql) : '-'}       color="#8b5cf6" />
+      <Row label="CPL"             value={s.cpl ? fmtR1(s.cpl) : '-'}              color="var(--text-secondary)" />
+      <Row label="CPMQL"           value={s.cpmql != null ? fmtR1(s.cpmql) : '-'}  color="var(--text-secondary)" />
+      <Row label="Invest. Ads"     value={s.investSemanal != null ? fmtR1(s.investSemanal) : '-'} color="#f97316" />
+
+      {/* Bloco Comercial */}
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '10px 0 4px' }}>Comercial</div>
+      <Row label="Agendamentos"    value={fmt(s.agendamentos)}                      color="var(--text-primary)" bold />
+      <Row label="% Agend."        value={s.pctAgd || '-'}                          color="var(--text-secondary)" />
+      <Row label="Realizadas"      value={fmt(s.realizadas)}                        color="var(--text-primary)" bold />
+      <Row label="% Realizadas"    value={s.pctRlzd || '-'}                         color="var(--text-secondary)" />
+      <Row label="Vendas"          value={fmt(s.contratosPagos)}                    color="#10b981" bold />
+      <Row label="% Conv. Venda"   value={s.pctConv || '-'}                         color="var(--text-secondary)" />
+
+      {/* Bloco Resultado */}
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '10px 0 4px' }}>Resultado</div>
+      <Row label="Valor Vendas"    value={fmtR1(s.nmrr)}                            color="#f59e0b" bold />
+      <Row label="TKM"             value={s.tkm ? fmtR1(s.tkm) : '-'}              color="var(--text-secondary)" />
+      {temMeta && <>
+        <Row label="Meta"          value={fmtR1(s.metaNmrr)}                        color="var(--text-secondary)" />
+        <Row label="Gap"           value={gap != null ? fmtR1(Math.abs(gap)) : '-'} color={acima ? '#10b981' : '#ef4444'} />
+        <Row label="% Ating. Meta" value={pctAtng != null ? `${pctAtng.toFixed(1)}%` : '-'} color={acima ? '#10b981' : '#f59e0b'} bold />
+        <Row label="% Gap Restante"value={pctGap != null ? `${Math.abs(pctGap).toFixed(1)}%` : '-'} color={acima ? '#10b981' : '#ef4444'} />
+      </>}
+    </div>
+  )
+}
+
 function SemanasComparativo({ semanas }) {
-  const [metrica, setMetrica] = useState('contratosPagos')
-  if (!semanas || semanas.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de semanas</div>
+  if (!semanas || semanas.length === 0) return (
+    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de semanas</div>
+  )
 
   const monthMeta = {
     JAN: { label: 'Janeiro', order: 1 }, FEV: { label: 'Fevereiro', order: 2 }, MAR: { label: 'Março', order: 3 },
-    ABR: { label: 'Abril', order: 4 }, MAI: { label: 'Maio', order: 5 }, JUN: { label: 'Junho', order: 6 },
-    JUL: { label: 'Julho', order: 7 }, AGO: { label: 'Agosto', order: 8 }, SET: { label: 'Setembro', order: 9 },
-    OUT: { label: 'Outubro', order: 10 }, NOV: { label: 'Novembro', order: 11 }, DEZ: { label: 'Dezembro', order: 12 },
+    ABR: { label: 'Abril', order: 4 },   MAI: { label: 'Maio', order: 5 },     JUN: { label: 'Junho', order: 6 },
+    JUL: { label: 'Julho', order: 7 },   AGO: { label: 'Agosto', order: 8 },   SET: { label: 'Setembro', order: 9 },
+    OUT: { label: 'Outubro', order: 10 },NOV: { label: 'Novembro', order: 11 },DEZ: { label: 'Dezembro', order: 12 },
   }
-
   const getMonthKey = (semana) => {
     const txt = String(semana || '').toUpperCase()
     return Object.keys(monthMeta).find(k => txt.includes(k)) || 'OUTROS'
   }
-
   const grupos = Object.entries(semanas.reduce((acc, item) => {
     const key = getMonthKey(item.semana)
     if (!acc[key]) acc[key] = []
@@ -295,77 +348,27 @@ function SemanasComparativo({ semanas }) {
     key, dados, label: monthMeta[key]?.label || key, order: monthMeta[key]?.order || 99,
   })).sort((a, b) => a.order - b.order)
 
-  const metricaOpts = [
-    { key: 'leads', label: 'Leads' }, { key: 'agendamentos', label: 'Agendamentos' },
-    { key: 'realizadas', label: 'Realizadas' }, { key: 'contratosPagos', label: 'Contratos' },
-    { key: 'nmrr', label: 'NMRR' }, { key: 'tkm', label: 'TKM' },
-  ]
-  const chartColors = ['#8b5cf6','#14b8a6','#3b82f6','#f59e0b','#ec4899','#f97316','#6366f1']
-
-  const TableMes = ({ dados, titulo }) => (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>{titulo}</div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead>
-            <tr>
-              {['Semana','Leads','MQL','L.MQL','CPL','Agend.','%Agd','Realiz.','%Rlzd','Contratos','%Conv','NMRR','TKM'].map(h => (
-                <th key={h} style={{ textAlign: h === 'Semana' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {dados.map((s, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 8px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{s.semana}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmt(s.leads)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.mql || '-'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.leadsMql || '-'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.cpl ? fmtR(s.cpl) : '-'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmt(s.agendamentos)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.pctAgd || '-'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmt(s.realizadas)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.pctRlzd || '-'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{fmt(s.contratosPagos)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.pctConv || '-'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b' }}>{fmtR(s.nmrr)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: '#8b5cf6' }}>{fmtR(s.tkm)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
+  const mesColors = ['#8b5cf6','#14b8a6','#3b82f6','#f59e0b','#ec4899','#f97316','#6366f1','#10b981','#ef4444','#0ea5e9','#a78bfa','#34d399']
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Evolução Comparativa</div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        {metricaOpts.map(m => (
-          <button key={m.key} onClick={() => setMetrica(m.key)}
-            style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer',
-              background: metrica === m.key ? 'rgba(99,102,241,0.15)' : 'transparent',
-              borderColor: metrica === m.key ? 'rgba(99,102,241,0.4)' : 'var(--border)',
-              color: metrica === m.key ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-            {m.label}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 28 }}>
-        {grupos.map((grupo, idx) => (
-          <div key={grupo.key} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{grupo.label} — {metricaOpts.find(m => m.key === metrica)?.label}</div>
-            <MiniLineChartTooltip dados={grupo.dados} metrica={metrica} color={chartColors[idx % chartColors.length]} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-              {grupo.dados.map((d, i) => (
-                <div key={i} style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>{String(d.semana).replace(` ${grupo.key}`, '')}</div>
+      {grupos.map((grupo, gi) => {
+        const cor = mesColors[gi % mesColors.length]
+        return (
+          <div key={grupo.key} style={{ marginBottom: 40 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: cor, flexShrink: 0 }} />
+              {grupo.label}
+              <span style={{ fontWeight: 400, color: 'var(--text-muted)', opacity: 0.6 }}>· {grupo.dados.length} {grupo.dados.length === 1 ? 'semana' : 'semanas'}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+              {grupo.dados.map((s, si) => (
+                <SemanaCard key={si} s={s} cor={cor} />
               ))}
             </div>
           </div>
-        ))}
-      </div>
-      {grupos.map(grupo => <TableMes key={grupo.key} dados={grupo.dados} titulo={`${grupo.label} 2026`} />)}
+        )
+      })}
     </div>
   )
 }
