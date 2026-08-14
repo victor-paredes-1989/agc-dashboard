@@ -351,7 +351,7 @@ function SemanasComparativo({ semanas }) {
   const mesColors = ['#8b5cf6','#14b8a6','#3b82f6','#f59e0b','#ec4899','#f97316','#6366f1','#10b981','#ef4444','#0ea5e9','#a78bfa','#34d399']
 
   return (
-    <div>
+    <div style={{ width: '100%' }}>
       {grupos.map((grupo, gi) => {
         const cor = mesColors[gi % mesColors.length]
         return (
@@ -361,7 +361,7 @@ function SemanasComparativo({ semanas }) {
               {grupo.label}
               <span style={{ fontWeight: 400, color: 'var(--text-muted)', opacity: 0.6 }}>· {grupo.dados.length} {grupo.dados.length === 1 ? 'semana' : 'semanas'}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+            <div className="semanas-grid">
               {grupo.dados.map((s, si) => (
                 <SemanaCard key={si} s={s} cor={cor} />
               ))}
