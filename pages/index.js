@@ -540,7 +540,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
       </div>
 
       {/* ── Grid 3 blocos principais ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+      <div className="painel-blocos-grid">
 
         {/* Bloco Marketing */}
         <Block title="Marketing" color="#3b82f6">

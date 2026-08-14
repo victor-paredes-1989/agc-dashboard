@@ -883,6 +883,19 @@ body {
   .charts-grid { grid-template-columns: 1fr !important; }
 }
 
+/* ── Painel Geral ──────────────────────────────────────── */
+.painel-blocos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+@media (max-width: 1024px) {
+  .painel-blocos-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .painel-blocos-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 480px) {
   .page { padding: 10px; }
   .card-value { font-size: 20px; }
