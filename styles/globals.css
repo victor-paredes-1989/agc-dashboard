@@ -315,6 +315,20 @@ body {
   animation: fadeIn 0.22s ease;
 }
 
+/* ── Semanas grid ────────────────────────────────────────── */
+.semanas-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+@media (max-width: 1024px) {
+  .semanas-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .semanas-grid { grid-template-columns: 1fr; }
+}
+
 .section-title {
   font-size: 10.5px;
   font-weight: 700;
