@@ -325,9 +325,9 @@ function SemanaCard({ s, cor }) {
 }
 
 function SemanasComparativo({ semanas }) {
-  if (!semanas || semanas.length === 0) return (
-    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de semanas</div>
-  )
+  const [modo, setModo] = React.useState('mes')       // 'mes' | 'comparar'
+  const [mesSel, setMesSel] = React.useState('')      // chave de mês, ex: 'MAI'
+  const [semanaSel, setSemanaSel] = React.useState('') // 'S1'..'S5'
 
   const monthMeta = {
     JAN: { label: 'Janeiro', order: 1 }, FEV: { label: 'Fevereiro', order: 2 }, MAR: { label: 'Março', order: 3 },
@@ -335,40 +335,110 @@ function SemanasComparativo({ semanas }) {
     JUL: { label: 'Julho', order: 7 },   AGO: { label: 'Agosto', order: 8 },   SET: { label: 'Setembro', order: 9 },
     OUT: { label: 'Outubro', order: 10 },NOV: { label: 'Novembro', order: 11 },DEZ: { label: 'Dezembro', order: 12 },
   }
+  const mesColors = ['#8b5cf6','#14b8a6','#3b82f6','#f59e0b','#ec4899','#f97316','#6366f1','#10b981','#ef4444','#0ea5e9','#a78bfa','#34d399']
+
   const getMonthKey = (semana) => {
     const txt = String(semana || '').toUpperCase()
-    return Object.keys(monthMeta).find(k => txt.includes(k)) || 'OUTROS'
+    return Object.keys(monthMeta).find(k => txt.includes(k)) || null
   }
-  const grupos = Object.entries(semanas.reduce((acc, item) => {
-    const key = getMonthKey(item.semana)
-    if (!acc[key]) acc[key] = []
-    acc[key].push(item)
-    return acc
-  }, {})).map(([key, dados]) => ({
-    key, dados, label: monthMeta[key]?.label || key, order: monthMeta[key]?.order || 99,
-  })).sort((a, b) => a.order - b.order)
+  const getSemanaNum = (semana) => {
+    const m = String(semana || '').toUpperCase().match(/S(\d)/)
+    return m ? `S${m[1]}` : null
+  }
 
-  const mesColors = ['#8b5cf6','#14b8a6','#3b82f6','#f59e0b','#ec4899','#f97316','#6366f1','#10b981','#ef4444','#0ea5e9','#a78bfa','#34d399']
+  if (!semanas || semanas.length === 0) return (
+    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de semanas</div>
+  )
+
+  // meses disponíveis nos dados
+  const mesesDisp = [...new Set(semanas.map(s => getMonthKey(s.semana)).filter(Boolean))]
+    .sort((a, b) => (monthMeta[a]?.order || 99) - (monthMeta[b]?.order || 99))
+
+  // semanas S1-S5 disponíveis nos dados
+  const semanasDisp = [...new Set(semanas.map(s => getSemanaNum(s.semana)).filter(Boolean))].sort()
+
+  // inicializar seleções com último mês disponível / S1
+  const mesFinal = mesSel || mesesDisp[mesesDisp.length - 1] || ''
+  const semanaFinal = semanaSel || semanasDisp[0] || ''
+
+  // filtrar dados conforme modo
+  let grupos = []
+  if (modo === 'mes') {
+    const dados = semanas.filter(s => getMonthKey(s.semana) === mesFinal)
+    if (dados.length > 0) {
+      const gi = mesesDisp.indexOf(mesFinal)
+      grupos = [{ key: mesFinal, label: monthMeta[mesFinal]?.label || mesFinal, dados, cor: mesColors[gi % mesColors.length] }]
+    }
+  } else {
+    // comparar: uma semana por mês
+    mesesDisp.forEach((mk, gi) => {
+      const dados = semanas.filter(s => getMonthKey(s.semana) === mk && getSemanaNum(s.semana) === semanaFinal)
+      if (dados.length > 0) {
+        grupos.push({ key: mk, label: monthMeta[mk]?.label || mk, dados, cor: mesColors[gi % mesColors.length] })
+      }
+    })
+  }
+
+  const btnStyle = (ativo) => ({
+    padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border)',
+    background: ativo ? 'var(--accent)' : 'var(--bg-card)',
+    color: ativo ? '#fff' : 'var(--text-secondary)',
+    fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
+  })
+  const selStyle = {
+    padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)',
+    background: 'var(--bg-card)', color: 'var(--text-primary)',
+    fontSize: 12, cursor: 'pointer',
+  }
 
   return (
     <div style={{ width: '100%' }}>
-      {grupos.map((grupo, gi) => {
-        const cor = mesColors[gi % mesColors.length]
-        return (
+      {/* Barra de filtros */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 24,
+                    background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12,
+                    padding: '12px 16px' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', marginRight: 4 }}>Visualizar</span>
+        <button style={btnStyle(modo === 'mes')} onClick={() => setModo('mes')}>Mês selecionado</button>
+        <button style={btnStyle(modo === 'comparar')} onClick={() => setModo('comparar')}>Comparar semana</button>
+        <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+        {modo === 'mes' ? (
+          <select style={selStyle} value={mesFinal} onChange={e => setMesSel(e.target.value)}>
+            {mesesDisp.map(mk => (
+              <option key={mk} value={mk}>{monthMeta[mk]?.label || mk}</option>
+            ))}
+          </select>
+        ) : (
+          <select style={selStyle} value={semanaFinal} onChange={e => setSemanaSel(e.target.value)}>
+            {semanasDisp.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Cards */}
+      {grupos.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>
+          Sem dados para este filtro.
+        </div>
+      ) : (
+        grupos.map((grupo) => (
           <div key={grupo.key} style={{ marginBottom: 40 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: cor, flexShrink: 0 }} />
-              {grupo.label}
-              <span style={{ fontWeight: 400, color: 'var(--text-muted)', opacity: 0.6 }}>· {grupo.dados.length} {grupo.dados.length === 1 ? 'semana' : 'semanas'}</span>
-            </div>
+            {modo === 'comparar' && (
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
+                            color: 'var(--text-muted)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: grupo.cor, flexShrink: 0 }} />
+                {grupo.label}
+              </div>
+            )}
             <div className="semanas-grid">
               {grupo.dados.map((s, si) => (
-                <SemanaCard key={si} s={s} cor={cor} />
+                <SemanaCard key={si} s={s} cor={grupo.cor} />
               ))}
             </div>
           </div>
-        )
-      })}
+        ))
+      )}
     </div>
   )
 }
