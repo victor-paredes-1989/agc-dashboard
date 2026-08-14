@@ -325,9 +325,9 @@ function SemanaCard({ s, cor }) {
 }
 
 function SemanasComparativo({ semanas }) {
-  const [modo, setModo] = React.useState('mes')       // 'mes' | 'comparar'
-  const [mesSel, setMesSel] = React.useState('')      // chave de mês, ex: 'MAI'
-  const [semanaSel, setSemanaSel] = React.useState('') // 'S1'..'S5'
+  const [modo, setModo] = useState('mes')
+  const [mesSel, setMesSel] = useState('')
+  const [semanaSel, setSemanaSel] = useState('')
 
   const monthMeta = {
     JAN: { label: 'Janeiro', order: 1 }, FEV: { label: 'Fevereiro', order: 2 }, MAR: { label: 'Março', order: 3 },
