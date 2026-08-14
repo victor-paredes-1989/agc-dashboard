@@ -421,23 +421,26 @@ function SemanasComparativo({ semanas }) {
         <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>
           Sem dados para este filtro.
         </div>
-      ) : (
+      ) : modo === 'mes' ? (
+        /* Modo mês: grid amplo responsivo */
         grupos.map((grupo) => (
-          <div key={grupo.key} style={{ marginBottom: 40 }}>
-            {modo === 'comparar' && (
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
-                            color: 'var(--text-muted)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: grupo.cor, flexShrink: 0 }} />
-                {grupo.label}
-              </div>
-            )}
-            <div className="semanas-grid">
-              {grupo.dados.map((s, si) => (
-                <SemanaCard key={si} s={s} cor={grupo.cor} />
-              ))}
-            </div>
+          <div key={grupo.key} className="semanas-grid">
+            {grupo.dados.map((s, si) => (
+              <SemanaCard key={si} s={s} cor={grupo.cor} />
+            ))}
           </div>
         ))
+      ) : (
+        /* Modo comparar: todos os cards na mesma fila compacta */
+        <div>
+          <div className="semanas-grid-comparar">
+            {grupos.map((grupo) =>
+              grupo.dados.map((s, si) => (
+                <SemanaCard key={`${grupo.key}-${si}`} s={s} cor={grupo.cor} />
+              ))
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -1984,12 +1987,11 @@ export default function Dashboard() {
         <div className="main-area">
           {/* Top bar */}
           <header className="top-bar">
-            <div className="top-bar-title">
-              <span>◆</span>{nomeEmpresa}
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', overflow: 'hidden' }}>
-              {/* Seletor de mês */}
+            {/* Esquerda: nome da empresa + seletor de mês */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <div className="top-bar-title">
+                <span>◆</span>{nomeEmpresa}
+              </div>
               {periodosDinamicos.length > 0 && (
                 <select
                   className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
@@ -1997,14 +1999,16 @@ export default function Dashboard() {
                   onChange={e => e.target.value && setPeriodo(e.target.value)}
                   style={{ flexShrink: 0 }}
                 >
-                  {!isMesAtivo && <option value="" disabled>Selecionar mês…</option>}
+                  {!isMesAtivo && <option value="" disabled>Mês…</option>}
                   {periodosDinamicos.map(p => (
                     <option key={p.key} value={p.key}>{p.label}</option>
                   ))}
                 </select>
               )}
-              {periodosDinamicos.length > 0 && <div className="nav-divider" />}
-              {/* Views especiais num dropdown */}
+            </div>
+
+            {/* Centro: dropdown de análises */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px' }}>
               <select
                 className={`period-select${!isMesAtivo ? ' has-selection' : ''}`}
                 value={!isMesAtivo ? periodo : ''}
@@ -2018,6 +2022,7 @@ export default function Dashboard() {
               </select>
             </div>
 
+            {/* Direita: sync + tema */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {lastSync && !syncing && <span className="last-sync" style={{ fontSize: 10 }}>Às {lastSync}</span>}
               <button className="sidebar-action" onClick={() => fetchData.current(true)} disabled={syncing} title={syncing ? 'Sincronizando…' : 'Sincronizar'}>
