@@ -1986,9 +1986,9 @@ export default function Dashboard() {
           {/* Top bar */}
           <header className="top-bar">
             {/* Esquerda: nome da empresa + seletor de mês */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-              <div className="top-bar-title">
-                <span>◆</span>{nomeEmpresa}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--accent)' }}>◆</span>{nomeEmpresa}
               </div>
               {periodosDinamicos.length > 0 && (
                 <select
@@ -2006,7 +2006,7 @@ export default function Dashboard() {
             </div>
 
             {/* Centro: dropdown de análises */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 12px', gap: 8 }}>
               <select
                 className={`period-select${!isMesAtivo ? ' has-selection' : ''}`}
                 value={!isMesAtivo ? periodo : ''}
