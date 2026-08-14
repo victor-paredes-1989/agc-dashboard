@@ -310,20 +310,33 @@ body {
 /* ── Page & Layout ───────────────────────────────────────── */
 .page {
   padding: 28px 24px;
-  max-width: 1440px;
-  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
   animation: fadeIn 0.22s ease;
 }
 
-/* ── Semanas grid ────────────────────────────────────────── */
+/* ── Semanas grids ───────────────────────────────────────── */
+/* Modo mês: cards normais, 4-5 por linha em desktops largos */
 .semanas-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 16px;
   width: 100%;
+  margin-bottom: 32px;
 }
 @media (max-width: 640px) {
   .semanas-grid { grid-template-columns: 1fr; }
+}
+
+/* Modo comparar: cards compactos, todos na mesma fila */
+.semanas-grid-comparar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .semanas-grid-comparar { grid-template-columns: 1fr; }
 }
 
 .section-title {
