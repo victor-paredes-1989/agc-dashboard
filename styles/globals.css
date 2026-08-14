@@ -316,27 +316,31 @@ body {
 }
 
 /* ── Semanas grids ───────────────────────────────────────── */
-/* Modo mês: cards normais, 4-5 por linha em desktops largos */
+/* Modo mês: cards em grid, no máximo 4 por linha */
 .semanas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
   width: 100%;
   margin-bottom: 32px;
 }
+.semanas-grid > * { max-width: 480px; }
 @media (max-width: 640px) {
   .semanas-grid { grid-template-columns: 1fr; }
+  .semanas-grid > * { max-width: 100%; }
 }
 
-/* Modo comparar: cards compactos, todos na mesma fila */
+/* Modo comparar: cards compactos lado a lado */
 .semanas-grid-comparar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
   width: 100%;
 }
+.semanas-grid-comparar > * { max-width: 380px; }
 @media (max-width: 640px) {
   .semanas-grid-comparar { grid-template-columns: 1fr; }
+  .semanas-grid-comparar > * { max-width: 100%; }
 }
 
 .section-title {

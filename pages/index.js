@@ -431,15 +431,13 @@ function SemanasComparativo({ semanas }) {
           </div>
         ))
       ) : (
-        /* Modo comparar: todos os cards na mesma fila compacta */
-        <div>
-          <div className="semanas-grid-comparar">
-            {grupos.map((grupo) =>
-              grupo.dados.map((s, si) => (
-                <SemanaCard key={`${grupo.key}-${si}`} s={s} cor={grupo.cor} />
-              ))
-            )}
-          </div>
+        /* Modo comparar: cards compactos lado a lado */
+        <div className="semanas-grid-comparar">
+          {grupos.map((grupo) =>
+            grupo.dados.map((s, si) => (
+              <SemanaCard key={`${grupo.key}-${si}`} s={s} cor={grupo.cor} />
+            ))
+          )}
         </div>
       )}
     </div>
