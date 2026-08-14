@@ -444,6 +444,228 @@ function SemanasComparativo({ semanas }) {
   )
 }
 
+// ── Painel Geral ───────────────────────────────────────────
+function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
+  if (!periodoData) return (
+    <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '48px 0', textAlign: 'center' }}>
+      Selecione um mês para ver o Painel Geral.
+    </div>
+  )
+
+  const m  = periodoData.metricas || {}
+  const c  = periodoData.reunioes?.cards || {}
+  const gf = periodoData.reunioes?.graficos || {}
+  const mesLabel = periodoAtivo ? `${periodoAtivo.label}` : ''
+
+  // helpers
+  const v  = (n) => (n == null || n === '' || Number(n) === 0 && !n) ? '-' : n
+  const r1 = (n) => { const x = Number(n); return isNaN(x) || x === 0 ? '-' : fmtR1(x) }
+  const f0 = (n) => { const x = Number(n); return isNaN(x) || x === 0 ? '-' : fmt(x) }
+  const pct = (n) => { const x = Number(n); return isNaN(x) ? '-' : `${x.toFixed(1)}%` }
+
+  // origem com mais reuniões e mais NMRR
+  const origemReunioes = (gf.reunioesPorOrigem || []).slice().sort((a,b) => (b.qtd||0)-(a.qtd||0))[0]
+  const origemNmrr     = (gf.valorPagoPorOrigem || []).slice().sort((a,b) => (b.valor||0)-(a.valor||0))[0]
+  const melhorCloserV  = (gf.valorPorCloser || []).slice().sort((a,b) => (b.valor||0)-(a.valor||0))[0]
+  const melhorSdr      = (gf.contratosPorSdr || []).slice().sort((a,b) => (b.pagos||0)-(a.pagos||0))[0]
+
+  // forecast resumido
+  const fc = forecast || {}
+  const fcMrrPago     = fc.mrrPago != null ? fmtR1(fc.mrrPago) : null
+  const fcMeta        = fc.meta   != null ? fmtR1(fc.meta)    : null
+  const fcGap         = (fc.mrrPago != null && fc.meta != null) ? fmtR1(fc.meta - fc.mrrPago) : null
+  const fcProjetado   = fc.mrrProjetado != null ? fmtR1(fc.mrrProjetado) : null
+
+  const Stat = ({ label, value, color, big }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{label}</span>
+      <span style={{ fontSize: big ? 22 : 15, fontWeight: 700, color: color || 'var(--text-primary)', lineHeight: 1.1 }}>{value}</span>
+    </div>
+  )
+
+  const Block = ({ title, color, children }) => (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16,
+                  padding: '20px 22px', boxShadow: 'var(--shadow-card)' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
+                    color: color || 'var(--accent)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ display: 'inline-block', width: 3, height: 14, borderRadius: 2, background: color || 'var(--accent)' }} />
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+
+  const Row2 = ({ items }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '12px 24px' }}>
+      {items.map((it, i) => <Stat key={i} {...it} />)}
+    </div>
+  )
+
+  const Divider = () => <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
+
+  // tabela de origem
+  const origemRows = (gf.valorPagoPorOrigem || [])
+    .map(o => {
+      const reus = (gf.reunioesPorOrigem || []).find(r => r.label === o.label)
+      const pagos = (gf.qtdPagosPorOrigem || []).find(r => r.label === o.label)
+      return { origem: o.label, reunioes: reus?.qtd || 0, pagos: pagos?.qtd || 0, nmrr: o.valor || 0 }
+    })
+    .sort((a, b) => b.nmrr - a.nmrr)
+  const totalNmrrOrigem = origemRows.reduce((s, r) => s + r.nmrr, 0)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* ── Cabeçalho executivo ── */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16,
+                    padding: '22px 26px', boxShadow: 'var(--shadow-card)' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
+                      color: 'var(--text-muted)', marginBottom: 6 }}>
+          {nomeEmpresa} · {mesLabel}
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 8 }}>
+          {r1(m.nmrr)} em {f0(m.contratosPagos)} contratos pagos
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 24px' }}>
+          {[
+            c.total     && `${fmt(c.total)} reuniões`,
+            m.taxaRealizadas && `${pct(m.taxaRealizadas)} comparecimento`,
+            c.taxa      && `${pct(c.taxa)} conversão`,
+            m.tkm       && `TKM ${r1(m.tkm)}`,
+            m.cpl       && `CPL ${r1(m.cpl)}`,
+          ].filter(Boolean).map((t, i) => (
+            <span key={i} style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{t}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Grid 3 blocos principais ── */}
+      <div className="painel-blocos-grid">
+
+        {/* Bloco Marketing */}
+        <Block title="Marketing" color="#3b82f6">
+          <Row2 items={[
+            { label: 'Leads',       value: f0(m.leads),       color: '#3b82f6', big: true },
+            { label: 'MQL %',       value: pct(m.mql),        color: '#8b5cf6' },
+          ]} />
+          <Divider />
+          <Row2 items={[
+            { label: 'Leads MQL',   value: f0(m.leadsMql)     },
+            { label: 'CPL',         value: r1(m.cpl)          },
+          ]} />
+          <Divider />
+          <Row2 items={[
+            { label: 'Investimento', value: r1(m.investimento), color: '#f97316' },
+            { label: 'CAC',          value: r1(m.cac)                            },
+          ]} />
+          {(origemReunioes || origemNmrr) && <><Divider />
+          <Row2 items={[
+            origemReunioes ? { label: 'Top Origem Reuniões', value: origemReunioes.label } : { label: '', value: '' },
+            origemNmrr     ? { label: 'Top Origem NMRR',     value: origemNmrr.label }     : { label: '', value: '' },
+          ]} /></>}
+        </Block>
+
+        {/* Bloco Comercial */}
+        <Block title="Comercial" color="#10b981">
+          <Row2 items={[
+            { label: 'Reuniões',    value: f0(c.total),    big: true },
+            { label: 'Pagos',       value: f0(c.pagos),    color: '#10b981', big: true },
+          ]} />
+          <Divider />
+          <Row2 items={[
+            { label: 'Conversão',   value: pct(c.taxa),    color: '#10b981' },
+            { label: 'Agendamentos',value: f0(m.agendamentos)               },
+          ]} />
+          <Divider />
+          <Row2 items={[
+            { label: 'FUP + PM',    value: f0((c.fup||0)+(c.pm||0))         },
+            { label: 'Perdidos',    value: f0(c.fora),     color: '#ef4444' },
+          ]} />
+          <Row2 items={[
+            { label: 'Fugiram',     value: f0(c.fugiu)                      },
+            { label: 'DSV / DSO',   value: c.dsvTotal > 0 ? r1(c.dsvTotal) : '-' },
+          ]} />
+          {(melhorCloserV || melhorSdr) && <><Divider />
+          <Row2 items={[
+            melhorCloserV ? { label: 'Top Closer (NMRR)',   value: melhorCloserV.label } : { label: '', value: '' },
+            melhorSdr     ? { label: 'Top SDR (Contratos)', value: melhorSdr.label }     : { label: '', value: '' },
+          ]} /></>}
+        </Block>
+
+        {/* Bloco Resultado */}
+        <Block title="Resultado" color="#f59e0b">
+          <Row2 items={[
+            { label: 'NMRR',       value: r1(m.nmrr),         color: '#f59e0b', big: true },
+            { label: 'Valor Total', value: r1(c.valorTotal)                                },
+          ]} />
+          <Divider />
+          <Row2 items={[
+            { label: 'TKM',        value: r1(m.tkm) },
+            { label: 'Contratos Pagos', value: f0(m.contratosPagos) },
+          ]} />
+          {c.dsvTotal > 0 && <><Divider />
+          <Row2 items={[
+            { label: 'DSV/DSO',    value: r1(c.dsvTotal) },
+            { label: 'Qtd DSV',    value: f0(c.dsvCount) },
+          ]} /></>}
+          {m.gap !== undefined && <><Divider />
+          <Stat label="Gap da Meta" value={v(m.gap)}
+            color={parseDisplayNumber(m.gap||'') < 0 ? '#10b981' : '#ef4444'} /></>}
+          {(fcMrrPago || fcProjetado) && <><Divider />
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Forecast</div>
+          <Row2 items={[
+            fcMrrPago   ? { label: 'MRR Pago',    value: fcMrrPago   } : { label: '', value: '' },
+            fcMeta      ? { label: 'Meta',         value: fcMeta      } : { label: '', value: '' },
+          ]} />
+          {fcGap && <div style={{ marginTop: 8 }}><Stat label="Gap Forecast" value={fcGap} color="#ef4444" /></div>}
+          </>}
+        </Block>
+      </div>
+
+      {/* ── Bloco Origem / Alavancas ── */}
+      {origemRows.length > 0 && (
+        <Block title="Performance por Origem" color="#8b5cf6">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {['Origem','Reuniões','Pagos','NMRR','% do Total'].map(h => (
+                    <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Origem' ? 'left' : 'right',
+                                         fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
+                                         textTransform: 'uppercase', color: 'var(--text-muted)',
+                                         borderBottom: '1px solid var(--border)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {origemRows.map((row, i) => {
+                  const pctNmrr = totalNmrrOrigem > 0 ? (row.nmrr / totalNmrrOrigem * 100).toFixed(1) : '0.0'
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>{row.origem}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(row.reunioes)}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{fmt(row.pagos)}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#f59e0b', fontWeight: 700 }}>{fmtR1(row.nmrr)}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                          <div style={{ width: 60, height: 5, background: 'var(--bar-track)', borderRadius: 9 }}>
+                            <div style={{ width: `${Math.min(Number(pctNmrr), 100)}%`, height: '100%', borderRadius: 9, background: '#8b5cf6' }} />
+                          </div>
+                          <span style={{ color: 'var(--text-secondary)', minWidth: 38, textAlign: 'right' }}>{pctNmrr}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Block>
+      )}
+    </div>
+  )
+}
+
 function MetricCards({ metricas }) {
   if (!metricas || metricas.leads === undefined) return null
   const gap = metricas.gap || ''
@@ -1919,6 +2141,7 @@ export default function Dashboard() {
   const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO'].includes(periodo) ? currentData[periodo] : null
 
   const specialViews = [
+    ['PAINEL', 'Painel Geral'],
     ['SEMANAS', 'Por Semana'],
     ['FORECAST', 'Forecast'],
     ['EVOLUCAO', 'Evolução Mensal'],
@@ -2077,7 +2300,8 @@ export default function Dashboard() {
           {error && <div className="error" style={{ margin: 24 }}>Erro ao carregar: {error}</div>}
           {!loading && !error && data && (
             <div className="page">
-              {periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
+              {periodo==='PAINEL' ? <PainelGeralView periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
+               periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
