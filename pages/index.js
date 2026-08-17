@@ -455,27 +455,61 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const m  = periodoData.metricas || {}
   const c  = periodoData.reunioes?.cards || {}
   const gf = periodoData.reunioes?.graficos || {}
-  const mesLabel = periodoAtivo ? `${periodoAtivo.label}` : ''
+  const mesLabel = periodoAtivo?.label || ''
 
   // helpers
-  const v  = (n) => (n == null || n === '' || Number(n) === 0 && !n) ? '-' : n
-  const r1 = (n) => { const x = Number(n); return isNaN(x) || x === 0 ? '-' : fmtR1(x) }
-  const f0 = (n) => { const x = Number(n); return isNaN(x) || x === 0 ? '-' : fmt(x) }
+  const v   = (n) => (n == null || n === '') ? '-' : n
+  const r1  = (n) => { const x = Number(n); return isNaN(x) || x === 0 ? '-' : fmtR1(x) }
+  const f0  = (n) => { const x = Number(n); return isNaN(x) || x === 0 ? '-' : fmt(x) }
   const pct = (n) => { const x = Number(n); return isNaN(x) ? '-' : `${x.toFixed(1)}%` }
 
-  // origem com mais reuniões e mais NMRR
-  const origemReunioes = (gf.reunioesPorOrigem || []).slice().sort((a,b) => (b.qtd||0)-(a.qtd||0))[0]
-  const origemNmrr     = (gf.valorPagoPorOrigem || []).slice().sort((a,b) => (b.valor||0)-(a.valor||0))[0]
-  const melhorCloserV  = (gf.valorPorCloser || []).slice().sort((a,b) => (b.valor||0)-(a.valor||0))[0]
-  const melhorSdr      = (gf.contratosPorSdr || []).slice().sort((a,b) => (b.pagos||0)-(a.pagos||0))[0]
+  // ── Tops — corrigido: campo é .nome, não .label ──
+  const origemReunioes = (gf.reunioesPorOrigem  || []).filter(o => o.nome).sort((a,b) => (b.qtd||0)-(a.qtd||0))[0]
+  const origemNmrr     = (gf.valorPagoPorOrigem || []).filter(o => o.nome).sort((a,b) => (b.valor||0)-(a.valor||0))[0]
+  const melhorCloserV  = (gf.valorPorCloser     || []).filter(o => o.nome).sort((a,b) => (b.valor||0)-(a.valor||0))[0]
+  const melhorSdr      = (gf.contratosPorSdr    || []).filter(o => o.nome).sort((a,b) => (b.pagos||0)-(a.pagos||0))[0]
 
-  // forecast resumido
-  const fc = forecast || {}
-  const fcMrrPago     = fc.mrrPago != null ? fmtR1(fc.mrrPago) : null
-  const fcMeta        = fc.meta   != null ? fmtR1(fc.meta)    : null
-  const fcGap         = (fc.mrrPago != null && fc.meta != null) ? fmtR1(fc.meta - fc.mrrPago) : null
-  const fcProjetado   = fc.mrrProjetado != null ? fmtR1(fc.mrrProjetado) : null
+  // ── Métricas calculadas no front ──
+  const mqlFrac  = m.mql != null ? (m.mql > 1 ? m.mql / 100 : m.mql) : 0
+  const leadsMql = m.leads && mqlFrac > 0 ? Math.round(m.leads * mqlFrac) : 0
+  const cpmql    = m.investimento && leadsMql > 0 ? m.investimento / leadsMql : null
+  const cpr      = m.investimento && m.realizadas ? m.investimento / m.realizadas : null
 
+  // Valor na Mesa: pipeline PM + FECHOU + CONTRATO + ASSINADO
+  const valorNaMesa = (gf.pipeline || [])
+    .filter(p => ['PM','FECHOU','CONTRATO','ASSINADO'].includes(String(p.nome||'').toUpperCase()))
+    .reduce((s, p) => s + (p.valor || 0), 0)
+
+  // ── Forecast: array por mês — encontra o mês correto ──
+  const fcEntries = Array.isArray(forecast) ? forecast : []
+  const mesPrefixo = String(periodoAtivo?.mesNome || '').toUpperCase().slice(0, 3)
+  const fcEntry = fcEntries.find(e =>
+    String(e.mes || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0, 3) === mesPrefixo
+  ) || {}
+  const metaMrr    = fcEntry.meta || 0
+  const pctMeta    = m.nmrr && metaMrr ? (m.nmrr / metaMrr) * 100 : null
+  const projetado  = fcEntry.projecaoVendido || null
+
+  // Pace Diário
+  const pace = {
+    mrrDia:     fcEntry.metaDiaPago      || null,
+    agdDia:     fcEntry.metaAgdDia       || null,
+    rlzdDia:    fcEntry.metaRlzdDia      || null,
+    contPagoDia:fcEntry.metaContPagoDia  || null,
+  }
+  const temPace = Object.values(pace).some(Boolean)
+
+  // ── Performance por Origem — corrigido: .nome em vez de .label ──
+  const origemRows = (gf.valorPagoPorOrigem || [])
+    .filter(o => o.nome && o.nome !== 'SEM ORIGEM')
+    .map(o => {
+      const reus = (gf.reunioesPorOrigem || []).find(r => r.nome === o.nome)
+      return { origem: o.nome, reunioes: reus?.qtd || 0, pagos: o.qtd || 0, nmrr: o.valor || 0 }
+    })
+    .sort((a, b) => b.nmrr - a.nmrr)
+  const totalNmrrOrigem = origemRows.reduce((s, r) => s + r.nmrr, 0)
+
+  // ── Componentes internos ──
   const Stat = ({ label, value, color, big }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{label}</span>
@@ -503,16 +537,6 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
 
   const Divider = () => <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
 
-  // tabela de origem
-  const origemRows = (gf.valorPagoPorOrigem || [])
-    .map(o => {
-      const reus = (gf.reunioesPorOrigem || []).find(r => r.label === o.label)
-      const pagos = (gf.qtdPagosPorOrigem || []).find(r => r.label === o.label)
-      return { origem: o.label, reunioes: reus?.qtd || 0, pagos: pagos?.qtd || 0, nmrr: o.valor || 0 }
-    })
-    .sort((a, b) => b.nmrr - a.nmrr)
-  const totalNmrrOrigem = origemRows.reduce((s, r) => s + r.nmrr, 0)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -528,11 +552,11 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 24px' }}>
           {[
-            c.total     && `${fmt(c.total)} reuniões`,
-            m.taxaRealizadas && `${pct(m.taxaRealizadas)} comparecimento`,
-            c.taxa      && `${pct(c.taxa)} conversão`,
-            m.tkm       && `TKM ${r1(m.tkm)}`,
-            m.cpl       && `CPL ${r1(m.cpl)}`,
+            c.total            && `${fmt(c.total)} reuniões`,
+            m.taxaRealizadas   && `${pct(m.taxaRealizadas)} comparecimento`,
+            c.taxa             && `${pct(c.taxa)} conversão`,
+            m.tkm              && `TKM ${r1(m.tkm)}`,
+            m.cpl              && `CPL ${r1(m.cpl)}`,
           ].filter(Boolean).map((t, i) => (
             <span key={i} style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{t}</span>
           ))}
@@ -542,87 +566,99 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
       {/* ── Grid 3 blocos principais ── */}
       <div className="painel-blocos-grid">
 
-        {/* Bloco Marketing */}
+        {/* Marketing */}
         <Block title="Marketing" color="#3b82f6">
           <Row2 items={[
-            { label: 'Leads',       value: f0(m.leads),       color: '#3b82f6', big: true },
-            { label: 'MQL %',       value: pct(m.mql),        color: '#8b5cf6' },
+            { label: 'Investimento', value: r1(m.investimento), color: '#f97316', big: true },
+            { label: 'CPL',          value: r1(m.cpl) },
           ]} />
           <Divider />
           <Row2 items={[
-            { label: 'Leads MQL',   value: f0(m.leadsMql)     },
-            { label: 'CPL',         value: r1(m.cpl)          },
+            { label: 'Leads',   value: f0(m.leads),  color: '#3b82f6' },
+            { label: 'MQL %',   value: pct(m.mql),   color: '#8b5cf6' },
           ]} />
           <Divider />
           <Row2 items={[
-            { label: 'Investimento', value: r1(m.investimento), color: '#f97316' },
-            { label: 'CAC',          value: r1(m.cac)                            },
+            { label: 'Leads MQL', value: leadsMql > 0 ? f0(leadsMql) : '-' },
+            { label: 'CPMQL',     value: cpmql ? r1(cpmql) : '-' },
           ]} />
           {(origemReunioes || origemNmrr) && <><Divider />
           <Row2 items={[
-            origemReunioes ? { label: 'Top Origem Reuniões', value: origemReunioes.label } : { label: '', value: '' },
-            origemNmrr     ? { label: 'Top Origem NMRR',     value: origemNmrr.label }     : { label: '', value: '' },
+            origemReunioes
+              ? { label: 'Top Origem Reuniões', value: `${origemReunioes.nome} (${f0(origemReunioes.qtd)})` }
+              : { label: '', value: '' },
+            origemNmrr
+              ? { label: 'Top Origem NMRR', value: `${origemNmrr.nome} · ${r1(origemNmrr.valor)}` }
+              : { label: '', value: '' },
           ]} /></>}
         </Block>
 
-        {/* Bloco Comercial */}
+        {/* Comercial */}
         <Block title="Comercial" color="#10b981">
           <Row2 items={[
-            { label: 'Reuniões',    value: f0(c.total),    big: true },
-            { label: 'Pagos',       value: f0(c.pagos),    color: '#10b981', big: true },
+            { label: `Agendamentos${m.taxaAgendamento ? ` (${pct(m.taxaAgendamento)})` : ''}`, value: f0(m.agendamentos), big: true },
+            { label: `Realizadas${m.taxaRealizadas ? ` (${pct(m.taxaRealizadas)})` : ''}`,     value: f0(m.realizadas) },
           ]} />
           <Divider />
           <Row2 items={[
-            { label: 'Conversão',   value: pct(c.taxa),    color: '#10b981' },
-            { label: 'Agendamentos',value: f0(m.agendamentos)               },
+            { label: `Pagos${c.taxa ? ` (${pct(c.taxa)} conv.)` : ''}`, value: f0(c.pagos), color: '#10b981', big: true },
+            { label: 'Valor na Mesa', value: valorNaMesa > 0 ? r1(valorNaMesa) : '-' },
           ]} />
           <Divider />
           <Row2 items={[
-            { label: 'FUP + PM',    value: f0((c.fup||0)+(c.pm||0))         },
-            { label: 'Perdidos',    value: f0(c.fora),     color: '#ef4444' },
-          ]} />
-          <Row2 items={[
-            { label: 'Fugiram',     value: f0(c.fugiu)                      },
-            { label: 'DSV / DSO',   value: c.dsvTotal > 0 ? r1(c.dsvTotal) : '-' },
+            { label: 'CPR',      value: cpr ? r1(cpr) : '-' },
+            { label: 'Perdidos', value: f0(c.fora), color: '#ef4444' },
           ]} />
           {(melhorCloserV || melhorSdr) && <><Divider />
           <Row2 items={[
-            melhorCloserV ? { label: 'Top Closer (NMRR)',   value: melhorCloserV.label } : { label: '', value: '' },
-            melhorSdr     ? { label: 'Top SDR (Contratos)', value: melhorSdr.label }     : { label: '', value: '' },
+            melhorCloserV
+              ? { label: 'Top Closer', value: `${melhorCloserV.nome} · ${r1(melhorCloserV.valor)}` }
+              : { label: '', value: '' },
+            melhorSdr
+              ? { label: 'Top SDR', value: `${melhorSdr.nome} · ${f0(melhorSdr.pagos)} pagos` }
+              : { label: '', value: '' },
           ]} /></>}
         </Block>
 
-        {/* Bloco Resultado */}
+        {/* Resultado */}
         <Block title="Resultado" color="#f59e0b">
           <Row2 items={[
-            { label: 'NMRR',       value: r1(m.nmrr),         color: '#f59e0b', big: true },
-            { label: 'Valor Total', value: r1(c.valorTotal)                                },
+            { label: 'NMRR', value: r1(m.nmrr), color: '#f59e0b', big: true },
+            { label: 'TKM',  value: r1(m.tkm) },
           ]} />
           <Divider />
           <Row2 items={[
-            { label: 'TKM',        value: r1(m.tkm) },
             { label: 'Contratos Pagos', value: f0(m.contratosPagos) },
+            {
+              label: '% da Meta',
+              value: pctMeta != null ? `${pctMeta.toFixed(1)}%` : '-',
+              color: pctMeta != null ? (pctMeta >= 100 ? '#10b981' : '#f59e0b') : undefined,
+            },
           ]} />
-          {c.dsvTotal > 0 && <><Divider />
-          <Row2 items={[
-            { label: 'DSV/DSO',    value: r1(c.dsvTotal) },
-            { label: 'Qtd DSV',    value: f0(c.dsvCount) },
-          ]} /></>}
-          {m.gap !== undefined && <><Divider />
+          {m.gap !== undefined && m.gap !== '' && <><Divider />
           <Stat label="Gap da Meta" value={v(m.gap)}
-            color={parseDisplayNumber(m.gap||'') < 0 ? '#10b981' : '#ef4444'} /></>}
-          {(fcMrrPago || fcProjetado) && <><Divider />
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Forecast</div>
+            color={parseDisplayNumber(m.gap||'') <= 0 ? '#10b981' : '#ef4444'} /></>}
+          {projetado && <><Divider />
           <Row2 items={[
-            fcMrrPago   ? { label: 'MRR Pago',    value: fcMrrPago   } : { label: '', value: '' },
-            fcMeta      ? { label: 'Meta',         value: fcMeta      } : { label: '', value: '' },
-          ]} />
-          {fcGap && <div style={{ marginTop: 8 }}><Stat label="Gap Forecast" value={fcGap} color="#ef4444" /></div>}
-          </>}
+            { label: 'Projeção NMRR', value: r1(projetado) },
+            metaMrr ? { label: 'Meta', value: r1(metaMrr) } : { label: '', value: '' },
+          ]} /></>}
         </Block>
       </div>
 
-      {/* ── Bloco Origem / Alavancas ── */}
+      {/* ── Pace Diário ── */}
+      {temPace && (
+        <Block title="Pace Diário" color="#14b8a6">
+          <Row2 items={[
+            { label: 'MRR / dia',          value: pace.mrrDia      ? r1(pace.mrrDia)      : '-' },
+            { label: 'Agendamentos / dia',  value: pace.agdDia      ? f0(pace.agdDia)      : '-' },
+            { label: 'Realizadas / dia',    value: pace.rlzdDia     ? f0(pace.rlzdDia)     : '-' },
+            { label: 'Pagos / dia',         value: pace.contPagoDia ? f0(pace.contPagoDia) : '-' },
+          ]} />
+        </Block>
+      )}
+
+      {/* ── Performance por Origem ── */}
       {origemRows.length > 0 && (
         <Block title="Performance por Origem" color="#8b5cf6">
           <div style={{ overflowX: 'auto' }}>
@@ -2146,13 +2182,14 @@ export default function Dashboard() {
   const currentData = data ? data[empresa] : null
   const periodosDinamicos = data?.PERIODOS || []
   const specialViews = [
-    ['PAINEL', 'Painel Geral'],
-    ['SEMANAS', 'Por Semana'],
-    ['FORECAST', 'Forecast'],
-    ['EVOLUCAO', 'Evolução Mensal'],
+    ['MES',         'Visão do Mês'],
+    ['PAINEL',      'Painel Geral'],
+    ['SEMANAS',     'Por Semana'],
+    ['FORECAST',    'Forecast'],
+    ['EVOLUCAO',    'Evolução Mensal'],
     ['COMPARATIVO', 'Comparativo Mensal'],
-    ['DADOS', 'Dados Específicos'],
-    ['METAS_ORIGEM', 'Metas por Origem'],
+    ['DADOS',       'Dados Específicos'],
+    ['METAS_ORIGEM','Metas por Origem'],
   ]
 
   // isSpecialView: true quando a aba ativa é uma análise especial (não a visão mensal padrão)
@@ -2250,7 +2287,14 @@ export default function Dashboard() {
               <select
                 className={`period-select${isSpecialView ? ' has-selection' : ''}`}
                 value={isSpecialView ? periodo : ''}
-                onChange={e => e.target.value && setPeriodo(e.target.value)}
+                onChange={e => {
+                  if (!e.target.value) return
+                  if (e.target.value === 'MES') {
+                    setPeriodo(mesSelAtivo || periodosDinamicos[0]?.key || 'DADOS')
+                  } else {
+                    setPeriodo(e.target.value)
+                  }
+                }}
                 style={{ flexShrink: 0, minWidth: 180 }}
               >
                 {!isSpecialView && <option value="" disabled>Análises…</option>}
