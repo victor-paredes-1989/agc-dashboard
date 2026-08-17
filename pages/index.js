@@ -2074,6 +2074,7 @@ export default function Dashboard() {
   const [lastSync, setLastSync] = useState(null)
   const [empresa, setEmpresa] = useState('AI')
   const [periodo, setPeriodo] = useState(null)
+  const [mesSelAtivo, setMesSelAtivo] = useState('')
   const [darkMode, setDarkMode] = useState(true)
 
   // Load saved theme from localStorage
@@ -2121,16 +2122,22 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    if (data && !periodo) {
-      const primeiroPeriodo = data?.PERIODOS?.[0]?.key
-      setPeriodo(primeiroPeriodo || 'DADOS')
-    }
-  }, [data, periodo])
-
-  useEffect(() => {
+    if (!data) return
+    const periodos = data?.PERIODOS || []
+    const empData = data[empresa] || {}
+    // Valida empresa configurada
     const empresas = data?.CONFIG?.empresas || []
     if (empresas.length && !empresas.some(e => e.codigo === empresa)) {
       setEmpresa(empresas[0].codigo)
+      return
+    }
+    // Seleciona período inicial se nenhum ativo
+    const maisRecente = periodos[0]?.key
+    if (!periodo) setPeriodo(maisRecente || 'DADOS')
+    // Auto-seleciona ou corrige mesSelAtivo para a empresa atual
+    if (!mesSelAtivo || !empData[mesSelAtivo]) {
+      const disponivel = periodos.find(p => empData[p.key])
+      if (disponivel) setMesSelAtivo(disponivel.key)
     }
   }, [data, empresa])
 
@@ -2138,8 +2145,6 @@ export default function Dashboard() {
   const dashboardNome = data?.CONFIG?.dashboardNome || 'AGC Dashboard'
   const currentData = data ? data[empresa] : null
   const periodosDinamicos = data?.PERIODOS || []
-  const periodoData = currentData && periodo && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO'].includes(periodo) ? currentData[periodo] : null
-
   const specialViews = [
     ['PAINEL', 'Painel Geral'],
     ['SEMANAS', 'Por Semana'],
@@ -2150,9 +2155,17 @@ export default function Dashboard() {
     ['METAS_ORIGEM', 'Metas por Origem'],
   ]
 
-  // True when the active period is a monthly period (not a special view)
-  const isMesAtivo = periodosDinamicos.some(p => p.key === periodo)
-  const periodoAtivo = periodosDinamicos.find(p => p.key === periodo)
+  // isSpecialView: true quando a aba ativa é uma análise especial (não a visão mensal padrão)
+  const isSpecialView = specialViews.some(([k]) => k === periodo)
+  // activeMesKey: chave do mês para buscar dados — independe da aba ativa
+  const activeMesKey = isSpecialView ? mesSelAtivo : periodo
+  const periodoData = currentData && activeMesKey && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO'].includes(periodo)
+    ? (currentData[activeMesKey] ?? null)
+    : null
+
+  // isMesAtivo: true apenas na visão mensal padrão (não em análises especiais)
+  const isMesAtivo = !isSpecialView && periodosDinamicos.some(p => p.key === periodo)
+  const periodoAtivo = periodosDinamicos.find(p => p.key === activeMesKey)
   const nomeEmpresa = empresasConfig.find(e => e.codigo === empresa)?.nome || empresa
 
   // Hero section data
@@ -2215,12 +2228,16 @@ export default function Dashboard() {
               </div>
               {periodosDinamicos.length > 0 && (
                 <select
-                  className={`period-select${isMesAtivo ? ' has-selection' : ''}`}
-                  value={isMesAtivo ? periodo : ''}
-                  onChange={e => e.target.value && setPeriodo(e.target.value)}
+                  className={`period-select${mesSelAtivo ? ' has-selection' : ''}`}
+                  value={mesSelAtivo || ''}
+                  onChange={e => {
+                    if (!e.target.value) return
+                    setMesSelAtivo(e.target.value)
+                    if (!isSpecialView) setPeriodo(e.target.value)
+                  }}
                   style={{ flexShrink: 0 }}
                 >
-                  {!isMesAtivo && <option value="" disabled>Mês…</option>}
+                  {!mesSelAtivo && <option value="" disabled>Mês…</option>}
                   {periodosDinamicos.map(p => (
                     <option key={p.key} value={p.key}>{p.label}</option>
                   ))}
@@ -2231,12 +2248,12 @@ export default function Dashboard() {
             {/* Centro: dropdown de análises */}
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 12px', gap: 8 }}>
               <select
-                className={`period-select${!isMesAtivo ? ' has-selection' : ''}`}
-                value={!isMesAtivo ? periodo : ''}
+                className={`period-select${isSpecialView ? ' has-selection' : ''}`}
+                value={isSpecialView ? periodo : ''}
                 onChange={e => e.target.value && setPeriodo(e.target.value)}
                 style={{ flexShrink: 0, minWidth: 180 }}
               >
-                {isMesAtivo && <option value="" disabled>Análises…</option>}
+                {!isSpecialView && <option value="" disabled>Análises…</option>}
                 {specialViews.map(([p, label]) => (
                   <option key={p} value={p}>{label}</option>
                 ))}
@@ -2263,7 +2280,7 @@ export default function Dashboard() {
           )}
 
           {/* Hero — apenas nas abas mensais */}
-          {periodoData && periodoAtivo && (
+          {periodoData && periodoAtivo && periodo !== 'PAINEL' && (
             <div className="hero">
               <div className="hero-left">
                 <div className="hero-eyebrow">Visão do mês · {nomeEmpresa}</div>
