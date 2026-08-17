@@ -475,9 +475,9 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const cpmql    = m.investimento && leadsMql > 0 ? m.investimento / leadsMql : null
   const cpr      = m.investimento && m.realizadas ? m.investimento / m.realizadas : null
 
-  // Valor na Mesa: pipeline PM + FECHOU + CONTRATO + ASSINADO
+  // Valor na Mesa: pipeline PM + FECHOU + R2 + RECALL + CONTRATO + ASSINADO
   const valorNaMesa = (gf.pipeline || [])
-    .filter(p => ['PM','FECHOU','CONTRATO','ASSINADO'].includes(String(p.nome||'').toUpperCase()))
+    .filter(p => ['PM','FECHOU','R2','RECALL','CONTRATO','ASSINADO'].includes(String(p.nome||'').toUpperCase()))
     .reduce((s, p) => s + (p.valor || 0), 0)
 
   // ── Forecast: array por mês — encontra o mês correto ──
