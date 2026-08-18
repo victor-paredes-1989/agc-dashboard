@@ -488,7 +488,11 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   ) || {}
   const metaMrr    = fcEntry.meta || 0
   const pctMeta    = m.nmrr && metaMrr ? (m.nmrr / metaMrr) * 100 : null
-  const projetado  = fcEntry.projecaoVendido || null
+  // projecaoVendido é o campo esperado; mrrPago é o campo de projeção equivalente já existente
+  // no objeto de forecast (mesma fonte, usado com sucesso na aba Forecast) usado como fallback.
+  const projetado    = fcEntry.projecaoVendido || fcEntry.mrrPago || null
+  const pctForecast  = projetado && metaMrr ? (projetado / metaMrr) * 100 : null
+  const forecastDisplay = projetado != null ? `${r1(projetado)}${pctForecast != null ? ` — ${pctForecast.toFixed(0)}%` : ''}` : '-'
 
   // Pace Diário
   const pace = {
@@ -638,11 +642,9 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
           {m.gap !== undefined && m.gap !== '' && <><Divider />
           <Stat label="Gap da Meta" value={v(m.gap)}
             color={parseDisplayNumber(m.gap||'') <= 0 ? '#10b981' : '#ef4444'} /></>}
-          {projetado && <><Divider />
-          <Row2 items={[
-            { label: 'Projeção NMRR', value: r1(projetado) },
-            metaMrr ? { label: 'Meta', value: r1(metaMrr) } : { label: '', value: '' },
-          ]} /></>}
+          <Divider />
+          <Stat label="Forecast da Meta / Projeção NMRR" value={forecastDisplay}
+            color={pctForecast != null ? (pctForecast >= 100 ? '#10b981' : '#f59e0b') : undefined} />
         </Block>
       </div>
 
