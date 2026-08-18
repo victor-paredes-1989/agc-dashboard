@@ -1015,13 +1015,15 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
     return v
   }
 
+  // Comparação exata (após normalizar acentos/maiúsculas e aplicar canonical()) — não usa
+  // includes/substring, para SDR/Closer/Origem/Status/Serviço/Empresa/Mês não vazarem
+  // registros de nomes/valores parecidos (ex.: filtrar "Ana" não deve trazer "Ana Paula").
   const matchFiltro = (key, rowValue, filtroValue, allValues = ['TODOS']) => {
     if (allValues.includes(filtroValue)) return true
     const r = canonical(key, rowValue)
     const f = canonical(key, filtroValue)
     if (!f) return true
-    if (!r) return false
-    return r === f || r.includes(f) || f.includes(r)
+    return r === f
   }
   const unique = (key) => [...new Set(rows.map(r => String(r[key] || '').trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'pt-BR'))
