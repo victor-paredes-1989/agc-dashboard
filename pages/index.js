@@ -1984,6 +1984,16 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   const [subFiltro, setSubFiltro] = useState('todos')
   const [metrica, setMetrica] = useState('agendamentos')
 
+  // Normalização defensiva de percentuais — protege gráfico, label da barra e tabela
+  // (todos os três leem o mesmo valor daqui) contra dupla multiplicação por 100, caso
+  // algum valor já chegue em escala percentual. Mesma regra já usada em parsePercentMeta
+  // (lib/sheets.js): fração (|v|<=1) vira v*100; o que já é percentual passa direto.
+  const normalizarPercentual = (v) => {
+    const n = Number(v) || 0
+    if (!n) return 0
+    return Math.abs(n) <= 1 ? n * 100 : n
+  }
+
   // Months from periodos (oldest first) filtered by year
   const mesesBase = [...periodos].reverse()
   const anosDisp = [...new Set(mesesBase.map(p => p.ano))].sort()
@@ -2000,8 +2010,8 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       contratosPagos: Number(m.contratosPagos) || 0,
       nmrr: Number(m.nmrr) || 0,
       tkm: Number(m.tkm) || 0,
-      taxaAgendamento: Number(m.taxaAgendamento) || 0,
-      taxaRealizadas: Number(m.taxaRealizadas) || 0,
+      taxaAgendamento: normalizarPercentual(m.taxaAgendamento),
+      taxaRealizadas: normalizarPercentual(m.taxaRealizadas),
       // m.gap chega como texto livre da planilha (pode vir com "R$", vírgula decimal ou
       // parênteses para negativo) — parseDisplayNumber já é usada para esse mesmo campo
       // em outras views do dashboard (Painel Geral, MetricCards).
@@ -2009,7 +2019,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       investimento: Number(m.investimento) || 0,
       cpl: Number(m.cpl) || 0,
       cac: Number(m.cac) || 0,
-      mql: Number(m.mql) || 0,
+      mql: normalizarPercentual(m.mql),
       leads: Number(m.leads) || 0,
     }
   })
