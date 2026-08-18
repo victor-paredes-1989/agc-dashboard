@@ -1082,21 +1082,17 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
 
   const isPago = r => norm(r.status) === 'PAGO'
   const isDsvDso = r => ['DSV', 'DSO'].includes(norm(r.servico))
-  // Usada só pelo gráfico "Pipeline por Status" — não alterada, para não mudar o gráfico.
-  const pipelineStatuses = ['FECHOU', 'PM', 'RECALL', 'CONTRATO', 'ASSINADO', 'FUP']
+  // Fonte única de status de pipeline — usada tanto pelo card "Valor Pipeline" quanto pelo
+  // gráfico "Pipeline por Status", para as duas visões nunca divergirem. Mesma definição de
+  // "Valor na Mesa" do Painel Geral. FUP fica de fora: não há regra que o inclua no pipeline.
+  const pipelineStatuses = ['PM', 'FECHOU', 'RECALL', 'R2', 'CONTRATO', 'ASSINADO']
   const isPipeline = r => pipelineStatuses.includes(norm(r.status))
-  // Card "Valor Pipeline": PM, FECHOU, RECALL, R2, CONTRATO, ASSINADO — mesma definição
-  // usada em "Valor na Mesa" do Painel Geral. Lista própria (não a do gráfico acima) para
-  // incluir R2 sem alterar o gráfico "Pipeline por Status".
-  const valorPipelineStatuses = ['PM', 'FECHOU', 'RECALL', 'R2', 'CONTRATO', 'ASSINADO']
-  const isValorPipeline = r => valorPipelineStatuses.includes(norm(r.status))
   const sum = (arr, key = 'valor') => arr.reduce((acc, r) => acc + (Number(r[key]) || 0), 0)
 
   const pagos = filtrados.filter(isPago)
   const pagosNmrr = pagos.filter(r => !isDsvDso(r))
   const dsvDso = pagos.filter(isDsvDso)
   const pipelineRows = filtrados.filter(isPipeline)
-  const valorPipelineRows = filtrados.filter(isValorPipeline)
   const total = filtrados.length
   const nmrr = sum(pagosNmrr)
   const tkm = pagosNmrr.length ? nmrr / pagosNmrr.length : 0
@@ -1229,7 +1225,7 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
         <div className="card amber"><div className="card-label">NMRR</div><div className="card-value">{fmtR(nmrr)}</div><div className="card-sub">TKM: {fmtR(tkm)}</div></div>
         <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR(sum(dsvDso))}</div><div className="card-sub">{fmt(dsvDso.length)} contratos</div></div>
         <div className="card blue"><div className="card-label">FUP + PM</div><div className="card-value">{fmt(filtrados.filter(r => ['FUP','PM'].includes(norm(r.status))).length)}</div></div>
-        <div className="card purple"><div className="card-label">Valor Pipeline</div><div className="card-value">{fmtR(sum(valorPipelineRows))}</div><div className="card-sub">{fmt(valorPipelineRows.length)} oportunidades</div></div>
+        <div className="card purple"><div className="card-label">Valor Pipeline</div><div className="card-value">{fmtR(sum(pipelineRows))}</div><div className="card-sub">{fmt(pipelineRows.length)} oportunidades</div></div>
         <div className="card red"><div className="card-label">Perdidos/Fugiram</div><div className="card-value">{fmt(filtrados.filter(r => ['FORA','FUGIU'].includes(norm(r.status))).length)}</div></div>
       </div>
 
