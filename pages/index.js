@@ -1945,21 +1945,29 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'sdr',       label: 'SDR' },
   ]
 
+  // Indicadores prontos em d.metricas (parseDashRow) — sem cálculo no front, sem tocar parser.
   const COMERCIAL = [
-    { key: 'agendamentos', label: 'Agendamentos',  color: '#6366f1', fmt: fmt },
-    { key: 'realizadas',   label: 'Comparecimento',color: '#14b8a6', fmt: fmt },
-    { key: 'contratosPagos',label:'Pagos',         color: '#10b981', fmt: fmt },
-    { key: 'nmrr',         label: 'NMRR',          color: '#f59e0b', fmt: fmtR1 },
+    { key: 'agendamentos',    label: 'Agendamentos',            color: '#6366f1', fmt: fmt },
+    { key: 'realizadas',      label: 'Realizadas',              color: '#14b8a6', fmt: fmt },
+    { key: 'contratosPagos',  label: 'Contratos Pagos',         color: '#10b981', fmt: fmt },
+    { key: 'nmrr',            label: 'NMRR',                    color: '#f59e0b', fmt: fmtR1 },
+    { key: 'tkm',             label: 'TKM',                     color: '#8b5cf6', fmt: fmtR1 },
+    { key: 'taxaAgendamento', label: 'Taxa de Agendamento',     color: '#3b82f6', fmt: fmtPct },
+    { key: 'taxaRealizadas',  label: 'Taxa de Comparecimento',  color: '#14b8a6', fmt: fmtPct },
+    { key: 'gap',             label: 'Gap',                     color: '#ef4444', fmt: fmtR1 },
   ]
   const MARKETING = [
-    { key: 'investimento', label: 'Invest. Anúncios', color: '#f97316', fmt: fmtR1 },
-    { key: 'cpl',          label: 'CPL',              color: '#ec4899', fmt: fmtR1 },
-    { key: 'leads',        label: 'Leads',            color: '#3b82f6', fmt: fmt },
+    { key: 'investimento', label: 'Investimento', color: '#f97316', fmt: fmtR1 },
+    { key: 'leads',        label: 'Leads',        color: '#3b82f6', fmt: fmt },
+    { key: 'cpl',          label: 'CPL',          color: '#ec4899', fmt: fmtR1 },
+    { key: 'cac',          label: 'CAC',          color: '#14b8a6', fmt: fmtR1 },
+    { key: 'mql',          label: 'MQL %',        color: '#8b5cf6', fmt: fmtPct },
   ]
 
   const [categoria, setCategoria] = useState('comercial')
   const [anoFiltro, setAnoFiltro] = useState('todos')
   const [subFiltro, setSubFiltro] = useState('todos')
+  const [metrica, setMetrica] = useState('agendamentos')
 
   // Months from periodos (oldest first) filtered by year
   const mesesBase = [...periodos].reverse()
@@ -1976,8 +1984,17 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       realizadas: Number(m.realizadas) || 0,
       contratosPagos: Number(m.contratosPagos) || 0,
       nmrr: Number(m.nmrr) || 0,
+      tkm: Number(m.tkm) || 0,
+      taxaAgendamento: Number(m.taxaAgendamento) || 0,
+      taxaRealizadas: Number(m.taxaRealizadas) || 0,
+      // m.gap chega como texto livre da planilha (pode vir com "R$", vírgula decimal ou
+      // parênteses para negativo) — parseDisplayNumber já é usada para esse mesmo campo
+      // em outras views do dashboard (Painel Geral, MetricCards).
+      gap: parseDisplayNumber(m.gap || ''),
       investimento: Number(m.investimento) || 0,
       cpl: Number(m.cpl) || 0,
+      cac: Number(m.cac) || 0,
+      mql: Number(m.mql) || 0,
       leads: Number(m.leads) || 0,
     }
   })
@@ -2027,10 +2044,12 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     return { realizadas: rows.length, pagos: pagos.length, valor }
   }
 
-  // Reset subFiltro when category changes
+  // Reset subFiltro/metrica when category changes
   function changeCategoria(cat) {
     setCategoria(cat)
     setSubFiltro('todos')
+    const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : null
+    if (lista) setMetrica(lista[0].key)
   }
 
   const dropdownStyle = { ...SEL_STYLE, minWidth: 160 }
@@ -2117,6 +2136,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
 
   const currentMetrics = categoria === 'comercial' ? COMERCIAL : MARKETING
+  const metricaAtiva = currentMetrics.find(m => m.key === metrica) || currentMetrics[0]
 
   return (
     <div>
@@ -2146,6 +2166,14 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             </select>
           </div>
         )}
+        {!isGeral && (
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Métrica</label>
+            <select style={dropdownStyle} value={metrica} onChange={e => setMetrica(e.target.value)}>
+              {currentMetrics.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+          </div>
+        )}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', alignSelf: 'flex-end', paddingBottom: 2 }}>
           {empresaSelecionada} &nbsp;·&nbsp; {isGeral ? `${geralEmpresa.filter(r => anoFiltro === 'todos' || String(r.ano||'').trim() === anoFiltro).length} reuniões` : `${meses.length} ${meses.length === 1 ? 'mês' : 'meses'}`}
         </div>
@@ -2154,37 +2182,29 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       {/* Charts */}
       {!isGeral ? (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
-            {currentMetrics.map(m => (
-              <div key={m.key} className="chart-card">
-                <div className="chart-title">{m.label} — {empresaSelecionada} · mês a mês</div>
-                <VerticalBarChartMonths
-                  data={meses.map(mes => ({ mes: mes.mes, label: mes.label, valor: mes[m.key] }))}
-                  color={m.color} formatVal={m.fmt}
-                />
-              </div>
-            ))}
+          <div className="chart-card" style={{ marginBottom: 32 }}>
+            <div className="chart-title">{metricaAtiva.label} — {empresaSelecionada} · mês a mês</div>
+            <VerticalBarChartMonths
+              data={meses.map(mes => ({ mes: mes.mes, label: mes.label, valor: mes[metricaAtiva.key] }))}
+              color={metricaAtiva.color} formatVal={metricaAtiva.fmt}
+            />
           </div>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
-            Tabela resumo — {empresaSelecionada}
+            Tabela resumo — {metricaAtiva.label} · {empresaSelecionada}
           </div>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
-                  {currentMetrics.map(m => (
-                    <th key={m.key} style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{m.label}</th>
-                  ))}
+                  <th style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{metricaAtiva.label}</th>
                 </tr>
               </thead>
               <tbody>
                 {[...meses].reverse().map(mes => (
                   <tr key={mes.key} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mes.label}</td>
-                    {currentMetrics.map(m => (
-                      <td key={m.key} style={{ padding: '9px 8px', textAlign: 'right', color: m.color, fontWeight: 500 }}>{m.fmt(mes[m.key])}</td>
-                    ))}
+                    <td style={{ padding: '9px 8px', textAlign: 'right', color: metricaAtiva.color, fontWeight: 500 }}>{metricaAtiva.fmt(mes[metricaAtiva.key])}</td>
                   </tr>
                 ))}
               </tbody>
