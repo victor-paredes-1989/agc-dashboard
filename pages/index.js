@@ -999,6 +999,16 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
   const [pagina, setPagina] = useState(1)
   useEffect(() => { setPagina(1) }, [filtros])
 
+  // Ordenação da tabela por coluna. Ao trocar de filtro, a ordenação escolhida
+  // é preservada de propósito (não volta ao padrão) — é uma preferência de
+  // visualização do usuário, independente de quais registros estão na lista.
+  const [sortKey, setSortKey] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
   const norm = (v) => String(v || '')
     .trim()
     .toUpperCase()
@@ -1141,13 +1151,34 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
     )
   }
 
+  // Ordenação da tabela — aplicada sobre TODOS os `filtrados` (não só a página
+  // atual), antes da paginação fatiar o resultado. Data usa data real (parseDate,
+  // a mesma função já usada pelo filtro de data), Valor usa número (r.valor já
+  // vem numérico do parser), os demais campos ordenam por texto (localeCompare
+  // pt-BR, igual ao padrão já usado em unique()). `filtrados` (cards/gráficos)
+  // não é alterado — só a cópia ordenada usada pela tabela.
+  const SORT_TYPE = { data: 'date', valor: 'number' }
+  const filtradosOrdenados = !sortKey ? filtrados : [...filtrados].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    const tipo = SORT_TYPE[sortKey] || 'text'
+    if (tipo === 'date') {
+      const va = parseDate(a.data)?.getTime() ?? -Infinity
+      const vb = parseDate(b.data)?.getTime() ?? -Infinity
+      return dir * (va - vb)
+    }
+    if (tipo === 'number') {
+      return dir * ((Number(a.valor) || 0) - (Number(b.valor) || 0))
+    }
+    return dir * String(a[sortKey] || '').localeCompare(String(b[sortKey] || ''), 'pt-BR')
+  })
+
   // Paginação da tabela — não afeta cards/gráficos, que continuam usando `filtrados` inteiro.
   const totalRegistros = filtrados.length
   const totalPaginas = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE))
   const paginaAtual = Math.min(Math.max(1, pagina), totalPaginas)
   const inicioRegistro = totalRegistros === 0 ? 0 : (paginaAtual - 1) * PAGE_SIZE + 1
   const fimRegistro = Math.min(paginaAtual * PAGE_SIZE, totalRegistros)
-  const paginaRows = filtrados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
+  const paginaRows = filtradosOrdenados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
 
   const PagBtn = ({ onClick, disabled, children }) => (
     <button onClick={onClick} disabled={disabled} className="field-input"
@@ -1213,8 +1244,17 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
-              {['Empresa','Mês','Ano','Origem','SDR','Closer','Data','Serviço','Cliente','Nota','Valor','Status','Data FUP'].map(h => (
-                <th key={h} style={{ textAlign: h === 'Cliente' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+              {[
+                { label: 'Empresa', key: 'empresa' }, { label: 'Mês', key: 'mes' }, { label: 'Ano', key: null },
+                { label: 'Origem', key: 'origem' }, { label: 'SDR', key: 'sdr' }, { label: 'Closer', key: 'closer' },
+                { label: 'Data', key: 'data' }, { label: 'Serviço', key: null }, { label: 'Cliente', key: 'cliente' },
+                { label: 'Nota', key: null }, { label: 'Valor', key: 'valor' }, { label: 'Status', key: 'status' },
+                { label: 'Data FUP', key: null },
+              ].map(({ label, key }) => (
+                <th key={label} onClick={key ? () => handleSort(key) : undefined}
+                  style={{ textAlign: label === 'Cliente' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', cursor: key ? 'pointer' : 'default', userSelect: 'none' }}>
+                  {label}{key && sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                </th>
               ))}
             </tr>
           </thead>
