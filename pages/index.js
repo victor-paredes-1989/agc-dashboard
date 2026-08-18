@@ -488,10 +488,12 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   ) || {}
   const metaMrr    = fcEntry.meta || 0
   const pctMeta    = m.nmrr && metaMrr ? (m.nmrr / metaMrr) * 100 : null
-  // projecaoVendido é o campo esperado; mrrPago é o campo de projeção equivalente já existente
-  // no objeto de forecast (mesma fonte, usado com sucesso na aba Forecast) usado como fallback.
-  const projetado    = fcEntry.projecaoVendido || fcEntry.mrrPago || null
-  const pctForecast  = projetado && metaMrr ? (projetado / metaMrr) * 100 : null
+  // Forecast da Meta / Projeção NMRR — vem de PROJEÇÃO VENDIDO (coluna F) e
+  // % VENDIDO PROJETADO (coluna G). Nunca usa mrrPago (MRR Pago Projetado, coluna C).
+  const projetado    = fcEntry.projecaoVendido || null
+  const pctForecast  = projetado
+    ? (fcEntry.pctVendidoProjetado || (metaMrr ? (projetado / metaMrr) * 100 : null))
+    : null
   const forecastDisplay = projetado != null ? `${r1(projetado)}${pctForecast != null ? ` — ${pctForecast.toFixed(0)}%` : ''}` : '-'
 
   // Pace Diário
