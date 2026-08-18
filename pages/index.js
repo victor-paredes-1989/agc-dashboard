@@ -968,11 +968,27 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
   )
 }
 
-function DadosEspecificosView({ registros }) {
+function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
+  // Estado inicial já sincronizado com a empresa/mês selecionados no topo do dashboard
+  // (evita abrir a aba com todo o histórico acumulado — ver Etapa "sync com topo").
   const [filtros, setFiltros] = useState({
-    empresa: 'TODAS', mes: 'TODOS', ano: 'TODOS', sdr: 'TODOS', closer: 'TODOS',
+    empresa: empresaAtiva || 'TODAS', mes: periodoAtivo?.mesNome || 'TODOS', ano: periodoAtivo?.ano || 'TODOS',
+    sdr: 'TODOS', closer: 'TODOS',
     origem: 'TODAS', status: 'TODOS', servico: 'TODOS', dataIni: '', dataFim: '', busca: ''
   })
+
+  // Se o usuário trocar empresa/mês no topo enquanto está nesta aba, os 3 filtros
+  // principais acompanham. Depende só de valores primitivos (não do objeto periodoAtivo
+  // inteiro, que é recriado a cada render do pai) para não disparar em loop nem sobrescrever
+  // os demais filtros/edições manuais do usuário a cada refresh de dados.
+  useEffect(() => {
+    setFiltros(prev => ({
+      ...prev,
+      empresa: empresaAtiva || 'TODAS',
+      mes: periodoAtivo?.mesNome || 'TODOS',
+      ano: periodoAtivo?.ano || 'TODOS',
+    }))
+  }, [empresaAtiva, periodoAtivo?.key])
 
   const rows = registros || []
   const setFiltro = (key, value) => setFiltros(prev => ({ ...prev, [key]: value }))
@@ -2369,7 +2385,7 @@ export default function Dashboard() {
                periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
-               periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} /> :
+               periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodoData ? <>
