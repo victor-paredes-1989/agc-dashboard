@@ -993,6 +993,12 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
   const rows = registros || []
   const setFiltro = (key, value) => setFiltros(prev => ({ ...prev, [key]: value }))
 
+  // Paginação da tabela de registros filtrados — volta para a página 1 sempre
+  // que qualquer filtro mudar (inclui a sincronização automática com o topo).
+  const PAGE_SIZE = 50
+  const [pagina, setPagina] = useState(1)
+  useEffect(() => { setPagina(1) }, [filtros])
+
   const norm = (v) => String(v || '')
     .trim()
     .toUpperCase()
@@ -1135,6 +1141,21 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
     )
   }
 
+  // Paginação da tabela — não afeta cards/gráficos, que continuam usando `filtrados` inteiro.
+  const totalRegistros = filtrados.length
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE))
+  const paginaAtual = Math.min(Math.max(1, pagina), totalPaginas)
+  const inicioRegistro = totalRegistros === 0 ? 0 : (paginaAtual - 1) * PAGE_SIZE + 1
+  const fimRegistro = Math.min(paginaAtual * PAGE_SIZE, totalRegistros)
+  const paginaRows = filtrados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
+
+  const PagBtn = ({ onClick, disabled, children }) => (
+    <button onClick={onClick} disabled={disabled} className="field-input"
+      style={{ padding: '5px 10px', fontSize: 12, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1 }}>
+      {children}
+    </button>
+  )
+
   if (!rows.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados na aba REUNIOES_GERAL</div>
 
   return (
@@ -1198,7 +1219,7 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
             </tr>
           </thead>
           <tbody>
-            {filtrados.slice(0, 200).map((r, i) => (
+            {paginaRows.map((r, i) => (
               <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-secondary)' }}>{r.empresa}</td>
                 <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.mes}</td>
@@ -1218,7 +1239,22 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
           </tbody>
         </table>
       </div>
-      {filtrados.length > 200 && <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 12 }}>Mostrando os primeiros 200 registros de {fmt(filtrados.length)} filtrados.</div>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+          {totalRegistros > 0
+            ? <>Mostrando {fmt(inicioRegistro)}–{fmt(fimRegistro)} de {fmt(totalRegistros)} registros</>
+            : 'Nenhum registro para os filtros atuais.'}
+        </div>
+        {totalPaginas > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <PagBtn onClick={() => setPagina(1)} disabled={paginaAtual <= 1}>« Primeira</PagBtn>
+            <PagBtn onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={paginaAtual <= 1}>‹ Anterior</PagBtn>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 12, padding: '0 4px' }}>Página {paginaAtual} de {totalPaginas}</span>
+            <PagBtn onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={paginaAtual >= totalPaginas}>Próxima ›</PagBtn>
+            <PagBtn onClick={() => setPagina(totalPaginas)} disabled={paginaAtual >= totalPaginas}>Última »</PagBtn>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
