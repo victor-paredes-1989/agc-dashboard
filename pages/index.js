@@ -999,6 +999,23 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
   const [pagina, setPagina] = useState(1)
   useEffect(() => { setPagina(1) }, [filtros])
 
+  const [sortCol, setSortCol] = useState('')
+  const [sortDir, setSortDir] = useState('asc')
+
+  const SORT_FIELDS = { 'Empresa': 'empresa', 'Mês': 'mes', 'Origem': 'origem', 'SDR': 'sdr', 'Closer': 'closer', 'Data': 'data', 'Cliente': 'cliente', 'Valor': 'valor', 'Status': 'status' }
+
+  const handleSort = (header) => {
+    const field = SORT_FIELDS[header]
+    if (!field) return
+    if (sortCol === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(field)
+      setSortDir('asc')
+    }
+    setPagina(1)
+  }
+
   const norm = (v) => String(v || '')
     .trim()
     .toUpperCase()
@@ -1141,13 +1158,32 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
     )
   }
 
+  // Ordenação da tabela — aplicada sobre filtrados inteiro, antes da paginação.
+  const sortedFiltrados = sortCol ? [...filtrados].sort((a, b) => {
+    let va, vb
+    if (sortCol === 'data') {
+      va = parseDate(a.data); vb = parseDate(b.data)
+      if (!va && !vb) return 0
+      if (!va) return 1
+      if (!vb) return -1
+      return sortDir === 'asc' ? va - vb : vb - va
+    }
+    if (sortCol === 'valor') {
+      va = Number(a.valor) || 0; vb = Number(b.valor) || 0
+      return sortDir === 'asc' ? va - vb : vb - va
+    }
+    va = String(a[sortCol] || ''); vb = String(b[sortCol] || '')
+    const cmp = va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' })
+    return sortDir === 'asc' ? cmp : -cmp
+  }) : filtrados
+
   // Paginação da tabela — não afeta cards/gráficos, que continuam usando `filtrados` inteiro.
   const totalRegistros = filtrados.length
   const totalPaginas = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE))
   const paginaAtual = Math.min(Math.max(1, pagina), totalPaginas)
   const inicioRegistro = totalRegistros === 0 ? 0 : (paginaAtual - 1) * PAGE_SIZE + 1
   const fimRegistro = Math.min(paginaAtual * PAGE_SIZE, totalRegistros)
-  const paginaRows = filtrados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
+  const paginaRows = sortedFiltrados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
 
   const PagBtn = ({ onClick, disabled, children }) => (
     <button onClick={onClick} disabled={disabled} className="field-input"
@@ -1213,9 +1249,17 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
-              {['Empresa','Mês','Ano','Origem','SDR','Closer','Data','Serviço','Cliente','Nota','Valor','Status','Data FUP'].map(h => (
-                <th key={h} style={{ textAlign: h === 'Cliente' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
+              {['Empresa','Mês','Ano','Origem','SDR','Closer','Data','Serviço','Cliente','Nota','Valor','Status','Data FUP'].map(h => {
+                const field = SORT_FIELDS[h]
+                const isActive = field && sortCol === field
+                const indicator = isActive ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                return (
+                  <th key={h} onClick={field ? () => handleSort(h) : undefined}
+                    style={{ textAlign: h === 'Cliente' ? 'left' : 'right', color: isActive ? 'var(--accent)' : 'var(--text-muted)', fontWeight: isActive ? 600 : 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', cursor: field ? 'pointer' : 'default', userSelect: 'none' }}>
+                    {h}{indicator}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
