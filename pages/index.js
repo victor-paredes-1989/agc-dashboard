@@ -1831,6 +1831,18 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 
 
 // ── Evolução Mensal — gráfico de barras verticais simples ──────
+// Geometria única compartilhada por todos os gráficos de barra mensal da aba Evolução
+// (VerticalBarChartMonths e VerticalBarChartMonthsGeral) — muda aqui, muda em todos.
+// W bem maior que a largura "de papel" (900 em vez de 600): com preserveAspectRatio="none"
+// (necessário para width:100% real sem sobrar espaço vazio nas laterais em cards largos),
+// o viewBox é esticado horizontalmente até a largura real do card — quanto mais próximo W
+// estiver dessa largura real, menor a distorção de barras e texto.
+const EVOLUCAO_BAR_CHART = {
+  W: 900, H: 220, padL: 20, padR: 20, padTop: 34, padBot: 40,
+  barWMax: 32, barWFrac: 0.5, gridOpacity: 0.08,
+  valFontSize: 10, valDy: 8, xFontSize: 9, xDy: 8, rectRx: 4,
+}
+
 function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String }) {
   const [tooltip, setTooltip] = useState(null)
   if (!data || !data.length || data.every(d => !(Number(d.valor) || 0))) {
@@ -1838,15 +1850,11 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
   }
   const vals = data.map(d => Number(d.valor) || 0)
   const max = Math.max(...vals, 1)
-  // W bem maior que antes (600->900): com preserveAspectRatio="none" (necessário para
-  // width:100% real sem sobrar espaço vazio nas laterais em cards largos), o viewBox é
-  // esticado horizontalmente até a largura real do card — quanto mais próximo W estiver
-  // dessa largura real, menor a distorção de barras e texto.
-  const W = 900, H = 220, padL = 20, padR = 20, padTop = 34, padBot = 40
+  const { W, H, padL, padR, padTop, padBot, barWMax, barWFrac, gridOpacity, valFontSize, valDy, xFontSize, xDy, rectRx } = EVOLUCAO_BAR_CHART
   const chartW = W - padL - padR, chartH = H - padTop - padBot
   const n = data.length
   const slotW = chartW / n
-  const barW = Math.max(6, Math.min(32, slotW * 0.5))
+  const barW = Math.max(6, Math.min(barWMax, slotW * barWFrac))
   const bX = (i) => padL + i * slotW + slotW / 2 - barW / 2
   const bH = (v) => Math.max(2, (Number(v) || 0) / max * chartH)
   const bY = (v) => padTop + chartH - bH(v)
@@ -1854,7 +1862,7 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
         {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
-          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke="rgba(148,163,184,0.08)" strokeWidth="1" />
+          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke={`rgba(148,163,184,${gridOpacity})`} strokeWidth="1" />
         ))}
         {data.map((d, i) => {
           const x = bX(i), bh = bH(d.valor), by = bY(d.valor), cx = x + barW / 2
@@ -1863,9 +1871,9 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
             <g key={i} style={{ cursor: 'pointer' }}
               onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor })}
               onMouseLeave={() => setTooltip(null)}>
-              <rect x={x} y={by} width={barW} height={bh} rx="4" fill={color} opacity={isHov ? 1 : 0.78} />
-              {bh > 16 && <text x={cx} y={by - 8} textAnchor="middle" fontSize="10" fill={color} opacity="0.95" fontWeight="600">{formatVal(d.valor)}</text>}
-              <text x={cx} y={H - 8} textAnchor="middle" fontSize="9" fill="#64748b">{d.mes}</text>
+              <rect x={x} y={by} width={barW} height={bh} rx={rectRx} fill={color} opacity={isHov ? 1 : 0.78} />
+              {bh > 16 && <text x={cx} y={by - valDy} textAnchor="middle" fontSize={valFontSize} fill={color} opacity="0.95" fontWeight="600">{formatVal(d.valor)}</text>}
+              <text x={cx} y={H - xDy} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{d.mes}</text>
             </g>
           )
         })}
@@ -1887,11 +1895,11 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
   }
   const vals = data.map(d => Number(d.valor) || 0)
   const max = Math.max(...vals, 1)
-  const W = 600, H = 190, padL = 8, padR = 8, padTop = 30, padBot = 38
+  const { W, H, padL, padR, padTop, padBot, barWMax, barWFrac, gridOpacity, valFontSize, valDy, xFontSize, xDy, rectRx } = EVOLUCAO_BAR_CHART
   const chartW = W - padL - padR, chartH = H - padTop - padBot
   const n = data.length
   const slotW = chartW / n
-  const barW = Math.max(6, Math.min(44, slotW * 0.62))
+  const barW = Math.max(6, Math.min(barWMax, slotW * barWFrac))
   const bX = (i) => padL + i * slotW + slotW / 2 - barW / 2
   const bH = (v) => Math.max(2, (Number(v) || 0) / max * chartH)
   const bY = (v) => padTop + chartH - bH(v)
@@ -1899,7 +1907,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
         {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
-          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke="rgba(148,163,184,0.1)" strokeWidth="1" />
+          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke={`rgba(148,163,184,${gridOpacity})`} strokeWidth="1" />
         ))}
         {data.map((d, i) => {
           const x = bX(i), bh = bH(d.valor), by = bY(d.valor), cx = x + barW / 2
@@ -1908,9 +1916,9 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
             <g key={i} style={{ cursor: 'pointer' }}
               onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor, pagos: d.pagos, valorPago: d.valorPago })}
               onMouseLeave={() => setTooltip(null)}>
-              <rect x={x} y={by} width={barW} height={bh} rx="3" fill={color} opacity={isHov ? 1 : 0.78} />
-              {bh > 14 && <text x={cx} y={by - 6} textAnchor="middle" fontSize="11" fill={color} opacity="0.95" fontWeight="600">{fmt(d.valor)}</text>}
-              <text x={cx} y={H - 5} textAnchor="middle" fontSize="9.5" fill="#64748b">{d.mes}</text>
+              <rect x={x} y={by} width={barW} height={bh} rx={rectRx} fill={color} opacity={isHov ? 1 : 0.78} />
+              {bh > 16 && <text x={cx} y={by - valDy} textAnchor="middle" fontSize={valFontSize} fill={color} opacity="0.95" fontWeight="600">{fmt(d.valor)}</text>}
+              <text x={cx} y={H - xDy} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{d.mes}</text>
             </g>
           )
         })}
