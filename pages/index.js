@@ -18,9 +18,12 @@ const parseDisplayNumber = (value) => {
   }
 
   s = s.replace(/−/g, '-')
-  if (s.startsWith('-')) {
+  // O sinal de negativo pode vir em qualquer posição, não só no início da string
+  // (ex.: "R$ -1.234,56", onde o prefixo "R$ " vem antes do "-") — por isso verifica
+  // a presença do "-" em qualquer lugar, em vez de só startsWith.
+  if (s.includes('-')) {
     negative = true
-    s = s.slice(1)
+    s = s.replace(/-/g, '')
   }
 
   s = s
