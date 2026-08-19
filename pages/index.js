@@ -2339,7 +2339,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             </select>
           </div>
         )}
-        {(categoria === 'closer' || categoria === 'sdr') && (
+        {isGeral && (
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Métrica</label>
             <select style={dropdownStyle} value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
@@ -2396,8 +2396,8 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
         </>
       ) : (
         <>
-          {renderGeralCharts(geralField, geralColors, categoria !== 'origem' ? metricaGeral : null)}
-          {renderGeralTable(geralField, geralColors, categoria !== 'origem' ? metricaGeral : null)}
+          {renderGeralCharts(geralField, geralColors, metricaGeral)}
+          {renderGeralTable(geralField, geralColors, metricaGeral)}
         </>
       )}
     </div>
