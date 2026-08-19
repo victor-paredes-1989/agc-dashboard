@@ -1736,6 +1736,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
   const [mesSel, setMesSel] = useState(null)
   const [tipoVisao, setTipoVisao] = useState('GERAL')
   const [nomeSel, setNomeSel] = useState('')
+  const [origemSel, setOrigemSel] = useState('')
 
   const forecastList = Array.isArray(forecast) ? forecast : []
   const equipeList = Array.isArray(forecastEquipe) ? forecastEquipe : []
@@ -1761,9 +1762,29 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
     <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de forecast</div>
   )
 
+  // Origens disponíveis para o mês ativo — ordenadas conforme FORECAST_ORIGEM_ORDER
+  const registrosMesEmpresa = (registros || []).filter(r =>
+    String(r.empresa || '').toUpperCase() === String(empresaSelecionada || '').toUpperCase() &&
+    String(r.mes || '').toUpperCase() === mesAtivo &&
+    String(r.ano || '') === anoAtivo
+  )
+  const origensNoMes = new Set(registrosMesEmpresa.map(r => normalizarOrigemForecast(r.origemRaw || r.origem)))
+  const origensOrdenadas = [
+    ...FORECAST_ORIGEM_ORDER.filter(o => origensNoMes.has(o)),
+    ...[...origensNoMes].filter(o => !FORECAST_ORIGEM_ORDER.includes(o)),
+  ]
+  const origemAtiva = origensOrdenadas.includes(origemSel) ? origemSel : ''
+
+  // Filtra registros por origem quando uma origem específica está selecionada
+  const registrosFiltradosOrigem = origemAtiva
+    ? (registros || []).filter(r => normalizarOrigemForecast(r.origemRaw || r.origem) === origemAtiva)
+    : registros
+
   const metaGrafico = tipoVisao === 'GERAL' ? Number(forecastMes.meta || 0) : Number(metaPessoa.meta || 0)
   const supermetaGrafico = tipoVisao === 'GERAL' ? 0 : Number(metaPessoa.supermeta || 0)
-  const dadosGrafico = buildDailyForecast({ registros, empresa: empresaSelecionada, mes: mesAtivo, ano: anoAtivo, tipo: tipoVisao, nome: nomeAtivo, meta: metaGrafico, supermeta: supermetaGrafico, projecaoVendido: tipoVisao === 'GERAL' ? forecastMes.projecaoVendido : null })
+  // projecaoVendido é nível empresa — não se aplica quando filtrando por origem específica
+  const projecaoParaGrafico = tipoVisao === 'GERAL' && !origemAtiva ? forecastMes.projecaoVendido : null
+  const dadosGrafico = buildDailyForecast({ registros: registrosFiltradosOrigem, empresa: empresaSelecionada, mes: mesAtivo, ano: anoAtivo, tipo: tipoVisao, nome: nomeAtivo, meta: metaGrafico, supermeta: supermetaGrafico, projecaoVendido: projecaoParaGrafico })
 
   const unidade = tipoVisao === 'SDR' ? 'reuniões' : 'NMRR pago'
   const valorFmt = tipoVisao === 'SDR' ? fmtNum1 : fmtR1
@@ -1799,6 +1820,12 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
         <FilterButton value="GERAL" label="Forecast mensal" />
         <FilterButton value="CLOSER" label="Por Closer" />
         <FilterButton value="SDR" label="Por SDR" />
+        {tipoVisao === 'GERAL' && origensOrdenadas.length > 0 && (
+          <select value={origemAtiva} onChange={e => setOrigemSel(e.target.value)} className="field-input" style={{ minWidth: 160 }}>
+            <option value="">Todas as origens</option>
+            {origensOrdenadas.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
         {tipoVisao !== 'GERAL' && (
           <select value={nomeAtivo} onChange={e => setNomeSel(e.target.value)} className="field-input" style={{ minWidth: 180 }}>
             {nomes.length === 0 && <option value="">Sem pessoas cadastradas</option>}
