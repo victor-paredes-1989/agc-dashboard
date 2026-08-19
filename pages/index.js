@@ -1969,6 +1969,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'tkm',             label: 'TKM',                     color: '#8b5cf6', fmt: fmtR1 },
     { key: 'taxaAgendamento', label: 'Taxa de Agendamento',     color: '#3b82f6', fmt: fmtPct },
     { key: 'taxaRealizadas',  label: 'Taxa de Comparecimento',  color: '#14b8a6', fmt: fmtPct },
+    { key: 'taxaConversao',   label: 'Taxa de Conversão',       color: '#10b981', fmt: fmtPct },
+    { key: 'valorPago',       label: 'Valor Pago',              color: '#f59e0b', fmt: fmtR1 },
+    { key: 'valorPipeline',   label: 'Valor Pipeline',          color: '#8b5cf6', fmt: fmtR1 },
     { key: 'gap',             label: 'Gap',                     color: '#ef4444', fmt: fmtR1 },
   ]
   const MARKETING = [
@@ -1977,6 +1980,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'cpl',          label: 'CPL',          color: '#ec4899', fmt: fmtR1 },
     { key: 'cac',          label: 'CAC',          color: '#14b8a6', fmt: fmtR1 },
     { key: 'mql',          label: 'MQL %',        color: '#8b5cf6', fmt: fmtPct },
+    { key: 'leadsMql',     label: 'Leads MQL',    color: '#06b6d4', fmt: fmt },
+    { key: 'cpmql',        label: 'CPMQL',        color: '#f97316', fmt: fmtR1 },
+    { key: 'cpr',          label: 'CPR',          color: '#ec4899', fmt: fmtR1 },
   ]
 
   const [categoria, setCategoria] = useState('comercial')
@@ -2000,14 +2006,36 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   const mesesFiltrados = anoFiltro === 'todos' ? mesesBase : mesesBase.filter(p => p.ano === anoFiltro)
 
+  // Status considerados "pipeline" para o Valor Pipeline — mesma definição já usada em
+  // "Valor na Mesa" do Painel Geral e no card "Valor Pipeline" de Dados Específicos.
+  const VALOR_PIPELINE_STATUSES = ['PM', 'FECHOU', 'RECALL', 'R2', 'CONTRATO', 'ASSINADO']
+
   const meses = mesesFiltrados.map(p => {
     const d = getData(empresaSelecionada, p.key)
     const m = d?.metricas || {}, c = d?.reunioes?.cards || {}
+    const pipelineArr = d?.reunioes?.graficos?.pipeline || []
+
+    const leads = Number(m.leads) || 0
+    const investimento = Number(m.investimento) || 0
+    const realizadas = Number(m.realizadas) || 0
+    const contratosPagos = Number(m.contratosPagos) || 0
+    const mqlPct = normalizarPercentual(m.mql)
+
+    // Leads MQL / CPMQL / CPR — mesmas fórmulas já usadas e aprovadas no Painel Geral.
+    const mqlFrac = mqlPct / 100
+    const leadsMql = leads && mqlFrac > 0 ? Math.round(leads * mqlFrac) : 0
+    const cpmql = investimento && leadsMql > 0 ? investimento / leadsMql : 0
+    const cpr = investimento && realizadas ? investimento / realizadas : 0
+    const taxaConversao = realizadas ? (contratosPagos / realizadas) * 100 : 0
+    const valorPipeline = pipelineArr
+      .filter(pp => VALOR_PIPELINE_STATUSES.includes(String(pp.nome || '').toUpperCase()))
+      .reduce((s, pp) => s + (Number(pp.valor) || 0), 0)
+
     return {
       key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
       agendamentos: Number(m.agendamentos) || 0,
-      realizadas: Number(m.realizadas) || 0,
-      contratosPagos: Number(m.contratosPagos) || 0,
+      realizadas,
+      contratosPagos,
       nmrr: Number(m.nmrr) || 0,
       tkm: Number(m.tkm) || 0,
       taxaAgendamento: normalizarPercentual(m.taxaAgendamento),
@@ -2016,11 +2044,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       // parênteses para negativo) — parseDisplayNumber já é usada para esse mesmo campo
       // em outras views do dashboard (Painel Geral, MetricCards).
       gap: parseDisplayNumber(m.gap || ''),
-      investimento: Number(m.investimento) || 0,
+      investimento,
       cpl: Number(m.cpl) || 0,
       cac: Number(m.cac) || 0,
-      mql: normalizarPercentual(m.mql),
-      leads: Number(m.leads) || 0,
+      mql: mqlPct,
+      leads,
+      // Métricas calculadas no front (Etapa: métricas calculadas da Evolução 2.0)
+      leadsMql, cpmql, cpr, taxaConversao,
+      valorPago: Number(m.nmrr) || 0, // Valor Pago = NMRR, por definição de negócio (sem DSV/DSO)
+      valorPipeline,
     }
   })
 
