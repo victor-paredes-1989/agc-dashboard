@@ -1902,7 +1902,7 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
   )
 }
 
-function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
+function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt, tooltipLabel = 'Realizadas' }) {
   const [tooltip, setTooltip] = useState(null)
   if (!data || !data.length || data.every(d => !(Number(d.valor) || 0))) {
     return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
@@ -1931,7 +1931,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
               onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor, pagos: d.pagos, valorPago: d.valorPago })}
               onMouseLeave={() => setTooltip(null)}>
               <rect x={x} y={by} width={barW} height={bh} rx={rectRx} fill={color} opacity={isHov ? 1 : 0.78} />
-              {bh > 16 && <text x={cx} y={by - valDy} textAnchor="middle" fontSize={valFontSize} fill={color} opacity="0.95" fontWeight="600">{fmt(d.valor)}</text>}
+              {bh > 16 && <text x={cx} y={by - valDy} textAnchor="middle" fontSize={valFontSize} fill={color} opacity="0.95" fontWeight="600">{formatVal(d.valor)}</text>}
               <text x={cx} y={H - xDy} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{d.mes}</text>
             </g>
           )
@@ -1942,8 +1942,8 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6' }) {
           <div className="tooltip-label">{tooltip.label}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Realizadas</span>
-              <span style={{ fontSize: 12, color, fontWeight: 600 }}>{fmt(tooltip.valor)}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tooltipLabel}</span>
+              <span style={{ fontSize: 12, color, fontWeight: 600 }}>{formatVal(tooltip.valor)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Pagos</span>
@@ -2019,10 +2019,19 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1 },
   ]
 
+  const METRICAS_GERAL = [
+    { key: 'realizadas',    label: 'Reuniões realizadas', color: '#6366f1', fmt: fmt    },
+    { key: 'pagos',         label: 'Contratos pagos',     color: '#10b981', fmt: fmt    },
+    { key: 'valorPago',     label: 'Valor pago',          color: '#f59e0b', fmt: fmtR1  },
+    { key: 'taxaConversao', label: 'Taxa de conversão',   color: '#3b82f6', fmt: fmtPct },
+    { key: 'tkm',           label: 'TKM',                 color: '#ec4899', fmt: fmtR1  },
+  ]
+
   const [categoria, setCategoria] = useState('comercial')
   const [anoFiltro, setAnoFiltro] = useState('todos')
   const [subFiltro, setSubFiltro] = useState('todos')
   const [metrica, setMetrica] = useState('agendamentos')
+  const [metricaGeral, setMetricaGeral] = useState('realizadas')
 
   // Normalização defensiva de percentuais — protege gráfico, label da barra e tabela
   // (todos os três leem o mesmo valor daqui) contra dupla multiplicação por 100, caso
@@ -2160,30 +2169,43 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   function changeCategoria(cat) {
     setCategoria(cat)
     setSubFiltro('todos')
+    setMetricaGeral('realizadas')
     const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : cat === 'calculadas' ? CALCULADAS : cat === 'forecast' ? FORECAST_METRICS : null
     if (lista) setMetrica(lista[0].key)
   }
 
   const dropdownStyle = { ...SEL_STYLE, minWidth: 160 }
 
-  const renderGeralCharts = (field, colorArr) => {
+  function geralMetricVal(s, key) {
+    if (key === 'realizadas') return s.realizadas
+    if (key === 'pagos') return s.pagos
+    if (key === 'valorPago') return s.valor
+    if (key === 'taxaConversao') return s.realizadas > 0 ? (s.pagos / s.realizadas) * 100 : 0
+    if (key === 'tkm') return s.pagos > 0 ? s.valor / s.pagos : 0
+    return 0
+  }
+
+  const renderGeralCharts = (field, colorArr, metricaKey = null) => {
     const { mesesG, vals } = buildGeralSeries(field)
     if (!mesesG.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Sem dados em GERAL para filtros selecionados.</div>
     const displayVals = subFiltro === 'todos' ? vals : [subFiltro]
     if (!displayVals.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Nenhum item encontrado.</div>
+    const metrAtiva = metricaKey ? (METRICAS_GERAL.find(m => m.key === metricaKey) || METRICAS_GERAL[0]) : null
 
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 32 }}>
         {displayVals.map((val, vi) => {
-          const color = colorArr[vi % colorArr.length]
+          const color = metrAtiva ? metrAtiva.color : colorArr[vi % colorArr.length]
           const chartData = mesesG.map(mg => {
             const s = geralStats(mg, field, val)
-            return { mes: mg.mes, label: mg.label, valor: s.realizadas, pagos: s.pagos, valorPago: s.valor }
+            const valor = metrAtiva ? geralMetricVal(s, metrAtiva.key) : s.realizadas
+            return { mes: mg.mes, label: mg.label, valor, pagos: s.pagos, valorPago: s.valor }
           })
+          const titulo = metrAtiva ? `${val} · ${metrAtiva.label} mês a mês` : `${val} · reuniões mês a mês`
           return (
             <div key={val} className="chart-card">
-              <div className="chart-title">{val} · reuniões mês a mês</div>
-              <VerticalBarChartMonthsGeral data={chartData} color={color} />
+              <div className="chart-title">{titulo}</div>
+              <VerticalBarChartMonthsGeral data={chartData} color={color} formatVal={metrAtiva ? metrAtiva.fmt : fmt} tooltipLabel={metrAtiva ? metrAtiva.label : 'Realizadas'} />
             </div>
           )
         })}
@@ -2191,10 +2213,47 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     )
   }
 
-  const renderGeralTable = (field, colorArr) => {
+  const renderGeralTable = (field, colorArr, metricaKey = null) => {
     const { mesesG, vals } = buildGeralSeries(field)
     const displayVals = subFiltro === 'todos' ? vals : [subFiltro]
     if (!mesesG.length || !displayVals.length) return null
+    const metrAtiva = metricaKey ? (METRICAS_GERAL.find(m => m.key === metricaKey) || METRICAS_GERAL[0]) : null
+
+    if (metrAtiva) {
+      return (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 24 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
+                {displayVals.map((v, vi) => (
+                  <th key={v} style={{ textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 600, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
+                ))}
+              </tr>
+              <tr>
+                <th style={{ borderBottom: '1px solid var(--border)', padding: '6px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 10 }}>{metrAtiva.label}</th>
+                {displayVals.map(v => (
+                  <th key={v} style={{ textAlign: 'right', color: metrAtiva.color, fontWeight: 500, fontSize: 10, padding: '6px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>—</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...mesesG].reverse().map(mg => (
+                <tr key={mg.key} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
+                  {displayVals.map(v => {
+                    const s = geralStats(mg, field, v)
+                    const val = geralMetricVal(s, metrAtiva.key)
+                    return <td key={v} style={{ padding: '9px 8px', textAlign: 'right', color: metrAtiva.color, fontWeight: 500 }}>{metrAtiva.fmt(val)}</td>
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+
     return (
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 24 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -2280,6 +2339,14 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             </select>
           </div>
         )}
+        {(categoria === 'closer' || categoria === 'sdr') && (
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Métrica</label>
+            <select style={dropdownStyle} value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
+              {METRICAS_GERAL.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+          </div>
+        )}
         {!isGeral && (
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Métrica</label>
@@ -2329,8 +2396,8 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
         </>
       ) : (
         <>
-          {renderGeralCharts(geralField, geralColors)}
-          {renderGeralTable(geralField, geralColors)}
+          {renderGeralCharts(geralField, geralColors, categoria !== 'origem' ? metricaGeral : null)}
+          {renderGeralTable(geralField, geralColors, categoria !== 'origem' ? metricaGeral : null)}
         </>
       )}
     </div>
