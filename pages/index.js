@@ -1714,6 +1714,23 @@ function ForecastCurveChart({ dados, tipo }) {
   )
 }
 
+// ── Normalização de origem específica do Forecast mensal ──────
+// Difere da normalização global (normalizeOrigem em lib/sheets.js):
+// MQL e FMQL aparecem separados (não agrupados como IB).
+// MÊS PAS aparece separado de RECUPERAÇÃO.
+// Usa r.origemRaw (campo bruto antes da normalização global).
+function normalizarOrigemForecast(v) {
+  const s = String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  if (!s) return 'SEM ORIGEM'
+  if (s === 'MQL') return 'MQL'
+  if (['FMQL', 'F/MQL', 'F MQL'].includes(s)) return 'FMQL'
+  if (['RECUP', 'RECUPERACAO', 'REC. BASE'].includes(s)) return 'RECUPERAÇÃO'
+  if (['MES PAS', 'MES PASSADO'].includes(s)) return 'MÊS PAS'
+  if (['INDIC', 'INDICACAO'].includes(s)) return 'INDICAÇÃO'
+  return s || 'SEM ORIGEM'
+}
+const FORECAST_ORIGEM_ORDER = ['MQL','FMQL','RECUPERAÇÃO','MÊS PAS','SS','INDICAÇÃO','LIVE','API','CHURN','MIP','TROCA','SEM ORIGEM']
+
 // ── Forecast view with month dropdown ─────────────────────────
 function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSelecionada = 'AI' }) {
   const [mesSel, setMesSel] = useState(null)
@@ -1839,6 +1856,64 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
           </div>
         </div>
       )}
+
+      {(() => {
+        const regMes = (registros || []).filter(r =>
+          String(r.empresa || '').toUpperCase() === String(empresaSelecionada || '').toUpperCase() &&
+          String(r.mes || '').toUpperCase() === mesAtivo &&
+          String(r.ano || '') === anoAtivo
+        )
+        if (!regMes.length) return null
+        const stats = {}
+        regMes.forEach(r => {
+          const orig = normalizarOrigemForecast(r.origemRaw || r.origem)
+          if (!stats[orig]) stats[orig] = { realizadas: 0, pagos: 0, valor: 0 }
+          stats[orig].realizadas += 1
+          if (String(r.status || '').toUpperCase().trim() === 'PAGO') {
+            stats[orig].pagos += 1
+            stats[orig].valor += Number(r.valor) || 0
+          }
+        })
+        const ordered = [
+          ...FORECAST_ORIGEM_ORDER.filter(o => stats[o]),
+          ...Object.keys(stats).filter(o => !FORECAST_ORIGEM_ORDER.includes(o)),
+        ].map(o => ({ origem: o, ...stats[o] }))
+        if (!ordered.length) return null
+        return (
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
+              Por Origem — {mesAtivo} {anoAtivo}
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    {['Origem','Reuniões','Pagos','NMRR Pago','Tx Conv.','TKM'].map(h => (
+                      <th key={h} style={{ textAlign: h === 'Origem' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ordered.map(o => {
+                    const tx = o.realizadas > 0 ? (o.pagos / o.realizadas) * 100 : 0
+                    const tkm = o.pagos > 0 ? o.valor / o.pagos : 0
+                    return (
+                      <tr key={o.origem} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{o.origem}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#6366f1', fontWeight: 500 }}>{fmt(o.realizadas)}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#10b981', fontWeight: 500 }}>{fmt(o.pagos)}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#f59e0b', fontWeight: 500 }}>{fmtR1(o.valor)}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#3b82f6', fontWeight: 500 }}>{fmtPct(tx)}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#ec4899', fontWeight: 500 }}>{o.pagos > 0 ? fmtR1(tkm) : '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
