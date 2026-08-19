@@ -1953,11 +1953,12 @@ const SEL_STYLE = {
 
 function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }) {
   const CATEGORIAS = [
-    { key: 'comercial', label: 'Dados Comerciais' },
-    { key: 'marketing', label: 'Dados Marketing' },
-    { key: 'origem',    label: 'Origem' },
-    { key: 'closer',    label: 'Closer' },
-    { key: 'sdr',       label: 'SDR' },
+    { key: 'comercial',   label: 'Dados Comerciais' },
+    { key: 'marketing',   label: 'Dados Marketing' },
+    { key: 'calculadas',  label: 'Métricas Calculadas' },
+    { key: 'origem',      label: 'Origem' },
+    { key: 'closer',      label: 'Closer' },
+    { key: 'sdr',         label: 'SDR' },
   ]
 
   // Indicadores prontos em d.metricas (parseDashRow) — sem cálculo no front, sem tocar parser.
@@ -1977,6 +1978,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'cpl',          label: 'CPL',          color: '#ec4899', fmt: fmtR1 },
     { key: 'cac',          label: 'CAC',          color: '#14b8a6', fmt: fmtR1 },
     { key: 'mql',          label: 'MQL %',        color: '#8b5cf6', fmt: fmtPct },
+  ]
+  // Métricas derivadas calculadas no front — CPM excluído por falta de fonte confiável.
+  const CALCULADAS = [
+    { key: 'cpr',           label: 'CPR',              color: '#f97316', fmt: fmtR1 },
+    { key: 'leadsMql',      label: 'Leads MQL',        color: '#3b82f6', fmt: fmt },
+    { key: 'cpmql',         label: 'CPMQL',            color: '#ec4899', fmt: fmtR1 },
+    { key: 'taxaConversao', label: 'Taxa de Conversão', color: '#10b981', fmt: fmtPct },
+    { key: 'valorPago',     label: 'Valor Pago',       color: '#f59e0b', fmt: fmtR1 },
+    { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1 },
   ]
 
   const [categoria, setCategoria] = useState('comercial')
@@ -2000,27 +2010,44 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   const mesesFiltrados = anoFiltro === 'todos' ? mesesBase : mesesBase.filter(p => p.ano === anoFiltro)
 
+  const PIPELINE_STATUSES_CALC = ['PM','FECHOU','RECALL','R2','CONTRATO','ASSINADO']
+
   const meses = mesesFiltrados.map(p => {
     const d = getData(empresaSelecionada, p.key)
     const m = d?.metricas || {}, c = d?.reunioes?.cards || {}
+    const investimento = Number(m.investimento) || 0
+    const realizadas   = Number(m.realizadas)   || 0
+    const contratosPagos = Number(m.contratosPagos) || 0
+    const nmrr         = Number(m.nmrr)         || 0
+    const leads        = Number(m.leads)         || 0
+    const mqlRaw       = normalizarPercentual(m.mql)
+    const mqlFrac      = mqlRaw > 0 ? mqlRaw / 100 : 0
+    const leadsMql     = leads && mqlFrac > 0 ? Math.round(leads * mqlFrac) : 0
+    const valorPipeline = (d?.reunioes?.graficos?.pipeline || [])
+      .filter(p2 => PIPELINE_STATUSES_CALC.includes(String(p2.nome || '').toUpperCase()))
+      .reduce((s, p2) => s + (p2.valor || 0), 0)
     return {
       key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
       agendamentos: Number(m.agendamentos) || 0,
-      realizadas: Number(m.realizadas) || 0,
-      contratosPagos: Number(m.contratosPagos) || 0,
-      nmrr: Number(m.nmrr) || 0,
+      realizadas,
+      contratosPagos,
+      nmrr,
       tkm: Number(m.tkm) || 0,
       taxaAgendamento: normalizarPercentual(m.taxaAgendamento),
       taxaRealizadas: normalizarPercentual(m.taxaRealizadas),
-      // m.gap chega como texto livre da planilha (pode vir com "R$", vírgula decimal ou
-      // parênteses para negativo) — parseDisplayNumber já é usada para esse mesmo campo
-      // em outras views do dashboard (Painel Geral, MetricCards).
       gap: parseDisplayNumber(m.gap || ''),
-      investimento: Number(m.investimento) || 0,
+      investimento,
       cpl: Number(m.cpl) || 0,
       cac: Number(m.cac) || 0,
-      mql: normalizarPercentual(m.mql),
-      leads: Number(m.leads) || 0,
+      mql: mqlRaw,
+      leads,
+      // Métricas calculadas
+      cpr:           investimento && realizadas   ? investimento / realizadas   : 0,
+      leadsMql,
+      cpmql:         investimento && leadsMql > 0 ? investimento / leadsMql     : 0,
+      taxaConversao: realizadas ? (contratosPagos / realizadas) * 100 : 0,
+      valorPago:     nmrr,
+      valorPipeline,
     }
   })
 
@@ -2073,7 +2100,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   function changeCategoria(cat) {
     setCategoria(cat)
     setSubFiltro('todos')
-    const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : null
+    const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : cat === 'calculadas' ? CALCULADAS : null
     if (lista) setMetrica(lista[0].key)
   }
 
@@ -2160,7 +2187,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
 
-  const currentMetrics = categoria === 'comercial' ? COMERCIAL : MARKETING
+  const currentMetrics = categoria === 'comercial' ? COMERCIAL : categoria === 'marketing' ? MARKETING : CALCULADAS
   const metricaAtiva = currentMetrics.find(m => m.key === metrica) || currentMetrics[0]
 
   return (
