@@ -739,7 +739,11 @@ function MetricCards({ metricas }) {
   )
 }
 
-function ReuniaoCards({ cards }) {
+function ReuniaoCards({ cards, graficos }) {
+  const PIPELINE_STATUSES = ['PM','FECHOU','RECALL','R2','CONTRATO','ASSINADO']
+  const valorPipelineAtivo = (graficos?.pipeline || [])
+    .filter(p => PIPELINE_STATUSES.includes(String(p.nome||'').toUpperCase()))
+    .reduce((s, p) => s + (p.valor || 0), 0)
   if (!cards || !cards.total) return null
   return (
     <div>
@@ -752,7 +756,7 @@ function ReuniaoCards({ cards }) {
         {cards.dsvTotal > 0 && <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR1(cards.dsvTotal)}</div><div className="card-sub">{cards.dsvCount} contratos</div></div>}
         <div className="card blue"><div className="card-label">FUP + PM</div><div className="card-value">{fmt((cards.fup||0)+(cards.pm||0))}</div></div>
         <div className="card red"><div className="card-label">Perdidos (FORA)</div><div className="card-value">{fmt(cards.fora)}</div></div>
-        <div className="card"><div className="card-label">Fugiram</div><div className="card-value">{fmt(cards.fugiu)}</div></div>
+        <div className="card amber"><div className="card-label">Pipeline Ativo</div><div className="card-value">{fmtR1(valorPipelineAtivo)}</div></div>
       </div>
     </div>
   )
@@ -2766,7 +2770,7 @@ export default function Dashboard() {
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodoData ? <>
                  <MetricCards metricas={periodoData.metricas} />
-                 <ReuniaoCards cards={periodoData.reunioes?.cards} />
+                 <ReuniaoCards cards={periodoData.reunioes?.cards} graficos={periodoData.reunioes?.graficos} />
                  <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
                </> : <div className="loading">Sem dados para este período</div>}
             </div>
