@@ -2090,7 +2090,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'leadsMql',      label: 'Leads MQL',        color: '#3b82f6', fmt: fmt,    desc: 'Estimativa de leads qualificados. Fórmula: leads × MQL%.' },
     { key: 'cpmql',         label: 'CPMQL',            color: '#ec4899', fmt: fmtR1,  desc: 'Custo por lead MQL. Fórmula: investimento / leads MQL.' },
     { key: 'taxaConversao', label: 'Taxa de Conversão', color: '#10b981', fmt: fmtPct, desc: 'Contratos pagos / reuniões realizadas.' },
-    { key: 'valorPago',     label: 'Valor Pago',       color: '#f59e0b', fmt: fmtR1,  desc: 'Mesmo valor de NMRR nesta visão.' },
     { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1,  desc: 'Soma dos valores em status de pipeline: PM, FECHOU, RECALL, R2, CONTRATO e ASSINADO.' },
   ]
 
