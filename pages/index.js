@@ -2224,6 +2224,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   function buildGeralSeries(field) {
     const mesesG = geralMeses()
+    if (field === 'origem') {
+      // Origem usa origemRaw + normalização específica (MQL/FMQL separados, não agrupados como IB)
+      const uniqueVals = [...new Set(geralEmpresa.map(r => normalizarOrigemForecast(r.origemRaw || r.origem)).filter(Boolean))]
+      const vals = [
+        ...FORECAST_ORIGEM_ORDER.filter(o => uniqueVals.includes(o)),
+        ...uniqueVals.filter(o => !FORECAST_ORIGEM_ORDER.includes(o)),
+      ]
+      return { mesesG, vals }
+    }
     const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))].sort()
     return { mesesG, vals }
   }
@@ -2233,7 +2242,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       const ano = String(r.ano || '').trim()
       const mes = String(r.mes || '').trim().toUpperCase()
       if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
-      return `${ano}-${mes}` === mg.key && String(r[field] || '').trim() === val
+      if (`${ano}-${mes}` !== mg.key) return false
+      if (field === 'origem') return normalizarOrigemForecast(r.origemRaw || r.origem) === val
+      return String(r[field] || '').trim() === val
     })
     const pagos = rows.filter(r => String(r.status || '').trim().toUpperCase() === 'PAGO')
     const valor = pagos.reduce((s, r) => s + (Number(r.valor) || 0), 0)
