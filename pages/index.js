@@ -1523,7 +1523,7 @@ function isCurrentSelectedMonth(ano, mes) {
   return Number(ano) === today.getFullYear() && monthNumberFromName(mes) === today.getMonth() + 1
 }
 
-function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, supermeta }) {
+function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, supermeta, projecaoVendido }) {
   const totalDias = daysInMonth(ano, mes)
   const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
   const porDia = Object.fromEntries(dias.map(d => [d, 0]))
@@ -1583,10 +1583,27 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
     : 0
 
   const mediaDia = diasOperacionaisDecorridos > 0 ? realizado / diasOperacionaisDecorridos : 0
-  const previsaoFinal = mesAtual ? realizado + (mediaDia * diasOperacionaisRestantes) : realizado
+
+  // Se a planilha já fornece projecaoVendido (col F), usá-la como valor terminal da
+  // linha de previsão — não recalcular por extrapolação linear, pois a planilha tem
+  // lógica própria (ex: sazonalidade, pipeline). Apenas meses em andamento têm linha futura.
+  const projecaoNum = Number(projecaoVendido) || 0
+  const previsaoFinal = projecaoNum > 0 && mesAtual
+    ? projecaoNum
+    : (mesAtual ? realizado + (mediaDia * diasOperacionaisRestantes) : realizado)
 
   const operationalCountUntil = (dia) => countOperationalDays({ ano, mes, start: 1, end: dia })
   const operationalCountBetween = (start, end) => countOperationalDays({ ano, mes, start, end })
+
+  // Linha de previsão: parte do realizado no cutoff e sobe linearmente até projecaoFinal no último dia
+  const gapFuturo = previsaoFinal - realizado
+  const diasFuturosOp = diasOperacionaisRestantes
+  const previsaoLine = dias.map(d => {
+    if (d <= cutoffDia) return { dia: d, valor: real[d - 1]?.valor || 0 }
+    if (!mesAtual) return { dia: d, valor: realizado }
+    const opAte = operationalCountBetween(cutoffDia + 1, d)
+    return { dia: d, valor: realizado + (diasFuturosOp > 0 ? (gapFuturo / diasFuturosOp) * opAte : 0) }
+  })
 
   return {
     dias, totalDias, realizado, meta: metaNum, supermeta: superNum,
@@ -1596,10 +1613,7 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
     real,
     metaLine: dias.map(d => ({ dia: d, valor: diasOperacionaisMes > 0 ? (metaNum / diasOperacionaisMes) * operationalCountUntil(d) : 0 })),
     superLine: dias.map(d => ({ dia: d, valor: diasOperacionaisMes > 0 ? (superNum / diasOperacionaisMes) * operationalCountUntil(d) : 0 })),
-    previsaoLine: dias.map(d => {
-      if (d <= cutoffDia) return { dia: d, valor: real[d - 1]?.valor || 0 }
-      return { dia: d, valor: realizado + (mediaDia * operationalCountBetween(cutoffDia + 1, d)) }
-    }),
+    previsaoLine,
   }
 }
 
@@ -1732,7 +1746,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 
   const metaGrafico = tipoVisao === 'GERAL' ? Number(forecastMes.meta || 0) : Number(metaPessoa.meta || 0)
   const supermetaGrafico = tipoVisao === 'GERAL' ? 0 : Number(metaPessoa.supermeta || 0)
-  const dadosGrafico = buildDailyForecast({ registros, empresa: empresaSelecionada, mes: mesAtivo, ano: anoAtivo, tipo: tipoVisao, nome: nomeAtivo, meta: metaGrafico, supermeta: supermetaGrafico })
+  const dadosGrafico = buildDailyForecast({ registros, empresa: empresaSelecionada, mes: mesAtivo, ano: anoAtivo, tipo: tipoVisao, nome: nomeAtivo, meta: metaGrafico, supermeta: supermetaGrafico, projecaoVendido: tipoVisao === 'GERAL' ? forecastMes.projecaoVendido : null })
 
   const unidade = tipoVisao === 'SDR' ? 'reuniões' : 'NMRR pago'
   const valorFmt = tipoVisao === 'SDR' ? fmtNum1 : fmtR1
