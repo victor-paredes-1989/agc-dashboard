@@ -2070,23 +2070,30 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   // Forecast — match mês do período com entrada do array FORECAST pelo prefixo de 3 letras
   // (mesma lógica validada no Painel Geral para evitar usar mrrPago como projeção).
   const normMes3 = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3)
+  // Tenta casar pelo mesNome (ex: "AGOSTO"), pelo mesAbbr (ex: "AGO") e pelo label (ex: "Agosto 2026")
   const fcEntries = Array.isArray(getData(empresaSelecionada, 'FORECAST')) ? getData(empresaSelecionada, 'FORECAST') : []
 
   const mesesForecast = mesesFiltrados.map(p => {
-    const fcEntry = fcEntries.find(e => normMes3(e.mes) === normMes3(p.mesNome || p.label)) || {}
-    const pct = fcEntry.pctVendidoProjetado != null
-      ? normalizarPercentual(fcEntry.pctVendidoProjetado)
-      : (fcEntry.projecaoVendido && fcEntry.meta ? (fcEntry.projecaoVendido / fcEntry.meta) * 100 : null)
+    const pNorm = normMes3(p.mesNome || p.mesAbbr || p.label)
+    const fcEntry = fcEntries.find(e => normMes3(e.mes) === pNorm) || {}
+    // parseNum retorna 0 para células vazias/fórmulas — tratar 0 como ausente (|| null)
+    const projecao = fcEntry.projecaoVendido || null
+    const meta     = fcEntry.meta            || null
+    const rawPct   = fcEntry.pctVendidoProjetado || null
+    // % Vendido Projetado: usa valor pronto da col G; fallback: projecao/meta*100
+    const pct = rawPct
+      ? normalizarPercentual(rawPct)
+      : (projecao && meta ? (projecao / meta) * 100 : null)
     return {
       key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
-      fc_meta:               fcEntry.meta               ?? null,
-      fc_projecaoVendido:    fcEntry.projecaoVendido     ?? null,
+      fc_meta:                meta,
+      fc_projecaoVendido:     projecao,
       fc_pctVendidoProjetado: pct,
-      fc_gapNmrr:            fcEntry.gapNmrr             ?? null,
-      fc_metaDiaPago:        fcEntry.metaDiaPago         ?? null,
-      fc_metaAgdDia:         fcEntry.metaAgdDia          ?? null,
-      fc_metaRlzdDia:        fcEntry.metaRlzdDia         ?? null,
-      fc_metaContPagoDia:    fcEntry.metaContPagoDia     ?? null,
+      fc_gapNmrr:             fcEntry.gapNmrr        || null,
+      fc_metaDiaPago:         fcEntry.metaDiaPago     || null,
+      fc_metaAgdDia:          fcEntry.metaAgdDia      || null,
+      fc_metaRlzdDia:         fcEntry.metaRlzdDia     || null,
+      fc_metaContPagoDia:     fcEntry.metaContPagoDia || null,
     }
   })
 
