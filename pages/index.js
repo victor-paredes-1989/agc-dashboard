@@ -2053,53 +2053,53 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   // Indicadores prontos em d.metricas (parseDashRow) — sem cálculo no front, sem tocar parser.
   const COMERCIAL = [
-    { key: 'agendamentos',    label: 'Agendamentos',            color: '#6366f1', fmt: fmt },
-    { key: 'realizadas',      label: 'Realizadas',              color: '#14b8a6', fmt: fmt },
-    { key: 'contratosPagos',  label: 'Contratos Pagos',         color: '#10b981', fmt: fmt },
-    { key: 'nmrr',            label: 'NMRR',                    color: '#f59e0b', fmt: fmtR1 },
-    { key: 'tkm',             label: 'TKM',                     color: '#8b5cf6', fmt: fmtR1 },
-    { key: 'taxaAgendamento', label: 'Taxa de Agendamento',     color: '#3b82f6', fmt: fmtPct },
-    { key: 'taxaRealizadas',  label: 'Taxa de Comparecimento',  color: '#14b8a6', fmt: fmtPct },
-    { key: 'gap',             label: 'Gap',                     color: '#ef4444', fmt: fmtR1 },
+    { key: 'agendamentos',    label: 'Agendamentos',            color: '#6366f1', fmt: fmt,    desc: 'Total de reuniões agendadas no mês.' },
+    { key: 'realizadas',      label: 'Realizadas',              color: '#14b8a6', fmt: fmt,    desc: 'Total de reuniões realizadas no mês.' },
+    { key: 'contratosPagos',  label: 'Contratos Pagos',         color: '#10b981', fmt: fmt,    desc: 'Total de contratos com status pago no mês.' },
+    { key: 'nmrr',            label: 'NMRR',                    color: '#f59e0b', fmt: fmtR1,  desc: 'Receita recorrente nova gerada no mês.' },
+    { key: 'tkm',             label: 'TKM',                     color: '#8b5cf6', fmt: fmtR1,  desc: 'Ticket médio dos contratos pagos.' },
+    { key: 'taxaAgendamento', label: 'Taxa de Agendamento',     color: '#3b82f6', fmt: fmtPct, desc: 'Percentual de leads que viraram agendamento.' },
+    { key: 'taxaRealizadas',  label: 'Taxa de Comparecimento',  color: '#14b8a6', fmt: fmtPct, desc: 'Percentual de agendamentos que foram realizados.' },
+    { key: 'gap',             label: 'Gap',                     color: '#ef4444', fmt: fmtR1,  desc: 'Diferença em relação à meta do mês.' },
   ]
   const MARKETING = [
-    { key: 'investimento', label: 'Investimento', color: '#f97316', fmt: fmtR1 },
-    { key: 'leads',        label: 'Leads',        color: '#3b82f6', fmt: fmt },
-    { key: 'cpl',          label: 'CPL',          color: '#ec4899', fmt: fmtR1 },
-    { key: 'cac',          label: 'CAC',          color: '#14b8a6', fmt: fmtR1 },
-    { key: 'mql',          label: 'MQL %',        color: '#8b5cf6', fmt: fmtPct },
+    { key: 'investimento', label: 'Investimento', color: '#f97316', fmt: fmtR1,  desc: 'Valor investido em mídia paga no mês.' },
+    { key: 'leads',        label: 'Leads',        color: '#3b82f6', fmt: fmt,    desc: 'Total de leads gerados no mês.' },
+    { key: 'cpl',          label: 'CPL',          color: '#ec4899', fmt: fmtR1,  desc: 'Custo por lead.' },
+    { key: 'cac',          label: 'CAC',          color: '#14b8a6', fmt: fmtR1,  desc: 'Custo de aquisição de cliente.' },
+    { key: 'mql',          label: 'MQL %',        color: '#8b5cf6', fmt: fmtPct, desc: 'Percentual de leads qualificados como MQL.' },
   ]
   // Métricas de Forecast — fonte: FORECAST_AI / FORECAST_MO via getData(emp, 'FORECAST')
   // Campos: projecaoVendido (col F), pctVendidoProjetado (col G), gapNmrr (col H),
   //         meta (col B), metaDiaPago (col L), metaAgdDia (col M), metaRlzdDia (col N), metaContPagoDia (col O)
   // mrrPago NÃO é usado aqui — não representa Forecast.
   const FORECAST_METRICS = [
-    { key: 'fc_meta',              label: 'Meta',                    color: '#6366f1', fmt: fmtR1 },
-    { key: 'fc_projecaoVendido',   label: 'Projeção Vendido',        color: '#f59e0b', fmt: fmtR1 },
-    { key: 'fc_pctVendidoProjetado', label: '% Vendido Projetado',   color: '#10b981', fmt: fmtPct },
-    { key: 'fc_gapNmrr',           label: 'Gap NMRR',               color: '#ef4444', fmt: fmtR1 },
-    { key: 'fc_metaDiaPago',       label: 'Meta Dia Pago',           color: '#3b82f6', fmt: fmtR1 },
-    { key: 'fc_metaAgdDia',        label: 'Meta Agendamentos/Dia',   color: '#8b5cf6', fmt: v => v != null ? Number(v).toFixed(1) : '-' },
-    { key: 'fc_metaRlzdDia',       label: 'Meta Realizadas/Dia',     color: '#14b8a6', fmt: v => v != null ? Number(v).toFixed(1) : '-' },
-    { key: 'fc_metaContPagoDia',   label: 'Meta Contratos Pagos/Dia',color: '#ec4899', fmt: v => v != null ? Number(v).toFixed(1) : '-' },
+    { key: 'fc_meta',              label: 'Meta',                    color: '#6366f1', fmt: fmtR1,  desc: 'Meta de NMRR do mês.' },
+    { key: 'fc_projecaoVendido',   label: 'Projeção Vendido',        color: '#f59e0b', fmt: fmtR1,  desc: 'Projeção de valor vendido vinda da aba FORECAST.' },
+    { key: 'fc_pctVendidoProjetado', label: '% Vendido Projetado',   color: '#10b981', fmt: fmtPct, desc: 'Percentual projetado da meta.' },
+    { key: 'fc_gapNmrr',           label: 'Gap NMRR',               color: '#ef4444', fmt: fmtR1,  desc: 'Diferença projetada em relação à meta de NMRR.' },
+    { key: 'fc_metaDiaPago',       label: 'Meta Dia Pago',           color: '#3b82f6', fmt: fmtR1,  desc: 'Meta diária necessária de valor pago.' },
+    { key: 'fc_metaAgdDia',        label: 'Meta Agendamentos/Dia',   color: '#8b5cf6', fmt: v => v != null ? Number(v).toFixed(1) : '-', desc: 'Quantidade média necessária de agendamentos por dia.' },
+    { key: 'fc_metaRlzdDia',       label: 'Meta Realizadas/Dia',     color: '#14b8a6', fmt: v => v != null ? Number(v).toFixed(1) : '-', desc: 'Quantidade média necessária de reuniões realizadas por dia.' },
+    { key: 'fc_metaContPagoDia',   label: 'Meta Contratos Pagos/Dia',color: '#ec4899', fmt: v => v != null ? Number(v).toFixed(1) : '-', desc: 'Quantidade média necessária de contratos pagos por dia.' },
   ]
 
   // Métricas derivadas calculadas no front — CPM excluído por falta de fonte confiável.
   const CALCULADAS = [
-    { key: 'cpr',           label: 'CPR',              color: '#f97316', fmt: fmtR1 },
-    { key: 'leadsMql',      label: 'Leads MQL',        color: '#3b82f6', fmt: fmt },
-    { key: 'cpmql',         label: 'CPMQL',            color: '#ec4899', fmt: fmtR1 },
-    { key: 'taxaConversao', label: 'Taxa de Conversão', color: '#10b981', fmt: fmtPct },
-    { key: 'valorPago',     label: 'Valor Pago',       color: '#f59e0b', fmt: fmtR1 },
-    { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1 },
+    { key: 'cpr',           label: 'CPR',              color: '#f97316', fmt: fmtR1,  desc: 'Custo por reunião realizada. Fórmula: investimento / realizadas.' },
+    { key: 'leadsMql',      label: 'Leads MQL',        color: '#3b82f6', fmt: fmt,    desc: 'Estimativa de leads qualificados. Fórmula: leads × MQL%.' },
+    { key: 'cpmql',         label: 'CPMQL',            color: '#ec4899', fmt: fmtR1,  desc: 'Custo por lead MQL. Fórmula: investimento / leads MQL.' },
+    { key: 'taxaConversao', label: 'Taxa de Conversão', color: '#10b981', fmt: fmtPct, desc: 'Contratos pagos / reuniões realizadas.' },
+    { key: 'valorPago',     label: 'Valor Pago',       color: '#f59e0b', fmt: fmtR1,  desc: 'Mesmo valor de NMRR nesta visão.' },
+    { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1,  desc: 'Soma dos valores em status de pipeline: PM, FECHOU, RECALL, R2, CONTRATO e ASSINADO.' },
   ]
 
   const METRICAS_GERAL = [
-    { key: 'realizadas',    label: 'Reuniões realizadas', color: '#6366f1', fmt: fmt    },
-    { key: 'pagos',         label: 'Contratos pagos',     color: '#10b981', fmt: fmt    },
-    { key: 'valorPago',     label: 'Valor pago',          color: '#f59e0b', fmt: fmtR1  },
-    { key: 'taxaConversao', label: 'Taxa de conversão',   color: '#3b82f6', fmt: fmtPct },
-    { key: 'tkm',           label: 'TKM',                 color: '#ec4899', fmt: fmtR1  },
+    { key: 'realizadas',    label: 'Reuniões realizadas', color: '#6366f1', fmt: fmt,    desc: 'Total de reuniões registradas no REUNIOES_GERAL.' },
+    { key: 'pagos',         label: 'Contratos pagos',     color: '#10b981', fmt: fmt,    desc: 'Total de reuniões com status PAGO.' },
+    { key: 'valorPago',     label: 'Valor pago',          color: '#f59e0b', fmt: fmtR1,  desc: 'Soma dos valores das reuniões com status PAGO.' },
+    { key: 'taxaConversao', label: 'Taxa de conversão',   color: '#3b82f6', fmt: fmtPct, desc: 'Contratos pagos / reuniões realizadas.' },
+    { key: 'tkm',           label: 'TKM',                 color: '#ec4899', fmt: fmtR1,  desc: 'Valor pago / contratos pagos.' },
   ]
 
   const [categoria, setCategoria] = useState('comercial')
@@ -2431,6 +2431,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             <select style={dropdownStyle} value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
               {METRICAS_GERAL.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
+            {METRICAS_GERAL.find(m => m.key === metricaGeral)?.desc && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, maxWidth: 260, lineHeight: 1.4 }}>{METRICAS_GERAL.find(m => m.key === metricaGeral).desc}</div>
+            )}
           </div>
         )}
         {!isGeral && (
@@ -2439,6 +2442,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             <select style={dropdownStyle} value={metrica} onChange={e => setMetrica(e.target.value)}>
               {currentMetrics.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
+            {metricaAtiva?.desc && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, maxWidth: 260, lineHeight: 1.4 }}>{metricaAtiva.desc}</div>
+            )}
           </div>
         )}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', alignSelf: 'flex-end', paddingBottom: 2 }}>
