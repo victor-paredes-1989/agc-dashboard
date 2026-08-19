@@ -2399,8 +2399,8 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   return (
     <div>
-      {/* Dropdowns row */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 24 }}>
+      {/* Dropdowns row — alignItems: flex-start mantém labels alinhados pelo topo */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 8 }}>
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Categoria</label>
           <select style={dropdownStyle} value={categoria} onChange={e => changeCategoria(e.target.value)}>
@@ -2431,9 +2431,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             <select style={dropdownStyle} value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
               {METRICAS_GERAL.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
-            {METRICAS_GERAL.find(m => m.key === metricaGeral)?.desc && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, maxWidth: 260, lineHeight: 1.4 }}>{METRICAS_GERAL.find(m => m.key === metricaGeral).desc}</div>
-            )}
           </div>
         )}
         {!isGeral && (
@@ -2442,15 +2439,19 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             <select style={dropdownStyle} value={metrica} onChange={e => setMetrica(e.target.value)}>
               {currentMetrics.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
-            {metricaAtiva?.desc && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, maxWidth: 260, lineHeight: 1.4 }}>{metricaAtiva.desc}</div>
-            )}
           </div>
         )}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', alignSelf: 'flex-end', paddingBottom: 2 }}>
           {empresaSelecionada} &nbsp;·&nbsp; {isGeral ? `${geralEmpresa.filter(r => anoFiltro === 'todos' || String(r.ano||'').trim() === anoFiltro).length} reuniões` : `${currentMeses.length} ${currentMeses.length === 1 ? 'mês' : 'meses'}`}
         </div>
       </div>
+      {/* Descrição da métrica selecionada — fora do flex row para não desalinhar os dropdowns */}
+      {isGeral && METRICAS_GERAL.find(m => m.key === metricaGeral)?.desc && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.4 }}>{METRICAS_GERAL.find(m => m.key === metricaGeral).desc}</div>
+      )}
+      {!isGeral && metricaAtiva?.desc && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.4 }}>{metricaAtiva.desc}</div>
+      )}
 
       {/* Charts */}
       {!isGeral ? (
