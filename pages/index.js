@@ -1956,6 +1956,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'comercial',   label: 'Dados Comerciais' },
     { key: 'marketing',   label: 'Dados Marketing' },
     { key: 'calculadas',  label: 'Métricas Calculadas' },
+    { key: 'forecast',    label: 'Forecast' },
     { key: 'origem',      label: 'Origem' },
     { key: 'closer',      label: 'Closer' },
     { key: 'sdr',         label: 'SDR' },
@@ -1979,6 +1980,21 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'cac',          label: 'CAC',          color: '#14b8a6', fmt: fmtR1 },
     { key: 'mql',          label: 'MQL %',        color: '#8b5cf6', fmt: fmtPct },
   ]
+  // Métricas de Forecast — fonte: FORECAST_AI / FORECAST_MO via getData(emp, 'FORECAST')
+  // Campos: projecaoVendido (col F), pctVendidoProjetado (col G), gapNmrr (col H),
+  //         meta (col B), metaDiaPago (col L), metaAgdDia (col M), metaRlzdDia (col N), metaContPagoDia (col O)
+  // mrrPago NÃO é usado aqui — não representa Forecast.
+  const FORECAST_METRICS = [
+    { key: 'fc_meta',              label: 'Meta',                    color: '#6366f1', fmt: fmtR1 },
+    { key: 'fc_projecaoVendido',   label: 'Projeção Vendido',        color: '#f59e0b', fmt: fmtR1 },
+    { key: 'fc_pctVendidoProjetado', label: '% Vendido Projetado',   color: '#10b981', fmt: fmtPct },
+    { key: 'fc_gapNmrr',           label: 'Gap NMRR',               color: '#ef4444', fmt: fmtR1 },
+    { key: 'fc_metaDiaPago',       label: 'Meta Dia Pago',           color: '#3b82f6', fmt: fmtR1 },
+    { key: 'fc_metaAgdDia',        label: 'Meta Agendamentos/Dia',   color: '#8b5cf6', fmt: v => v != null ? Number(v).toFixed(1) : '-' },
+    { key: 'fc_metaRlzdDia',       label: 'Meta Realizadas/Dia',     color: '#14b8a6', fmt: v => v != null ? Number(v).toFixed(1) : '-' },
+    { key: 'fc_metaContPagoDia',   label: 'Meta Contratos Pagos/Dia',color: '#ec4899', fmt: v => v != null ? Number(v).toFixed(1) : '-' },
+  ]
+
   // Métricas derivadas calculadas no front — CPM excluído por falta de fonte confiável.
   const CALCULADAS = [
     { key: 'cpr',           label: 'CPR',              color: '#f97316', fmt: fmtR1 },
@@ -2051,6 +2067,29 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     }
   })
 
+  // Forecast — match mês do período com entrada do array FORECAST pelo prefixo de 3 letras
+  // (mesma lógica validada no Painel Geral para evitar usar mrrPago como projeção).
+  const normMes3 = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3)
+  const fcEntries = Array.isArray(getData(empresaSelecionada, 'FORECAST')) ? getData(empresaSelecionada, 'FORECAST') : []
+
+  const mesesForecast = mesesFiltrados.map(p => {
+    const fcEntry = fcEntries.find(e => normMes3(e.mes) === normMes3(p.mesNome || p.label)) || {}
+    const pct = fcEntry.pctVendidoProjetado != null
+      ? normalizarPercentual(fcEntry.pctVendidoProjetado)
+      : (fcEntry.projecaoVendido && fcEntry.meta ? (fcEntry.projecaoVendido / fcEntry.meta) * 100 : null)
+    return {
+      key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
+      fc_meta:               fcEntry.meta               ?? null,
+      fc_projecaoVendido:    fcEntry.projecaoVendido     ?? null,
+      fc_pctVendidoProjetado: pct,
+      fc_gapNmrr:            fcEntry.gapNmrr             ?? null,
+      fc_metaDiaPago:        fcEntry.metaDiaPago         ?? null,
+      fc_metaAgdDia:         fcEntry.metaAgdDia          ?? null,
+      fc_metaRlzdDia:        fcEntry.metaRlzdDia         ?? null,
+      fc_metaContPagoDia:    fcEntry.metaContPagoDia     ?? null,
+    }
+  })
+
   // For GERAL-based categories (origem/closer/sdr), aggregate month-over-month
   const geralEmpresa = (geralData || []).filter(r => {
     const emp = String(r.empresa || '').toUpperCase().trim()
@@ -2100,7 +2139,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   function changeCategoria(cat) {
     setCategoria(cat)
     setSubFiltro('todos')
-    const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : cat === 'calculadas' ? CALCULADAS : null
+    const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : cat === 'calculadas' ? CALCULADAS : cat === 'forecast' ? FORECAST_METRICS : null
     if (lista) setMetrica(lista[0].key)
   }
 
@@ -2182,13 +2221,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   )
 
   const isGeral = ['origem', 'closer', 'sdr'].includes(categoria)
+  const isForecast = categoria === 'forecast'
   const geralField = categoria === 'origem' ? 'origem' : categoria === 'closer' ? 'closer' : 'sdr'
   const geralColors = categoria === 'closer' ? CLOSER_COLORS : SDR_COLORS
 
   const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
 
-  const currentMetrics = categoria === 'comercial' ? COMERCIAL : categoria === 'marketing' ? MARKETING : CALCULADAS
+  const currentMetrics = categoria === 'comercial' ? COMERCIAL : categoria === 'marketing' ? MARKETING : categoria === 'calculadas' ? CALCULADAS : FORECAST_METRICS
   const metricaAtiva = currentMetrics.find(m => m.key === metrica) || currentMetrics[0]
+  const currentMeses = isForecast ? mesesForecast : meses
 
   return (
     <div>
@@ -2227,7 +2268,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
           </div>
         )}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', alignSelf: 'flex-end', paddingBottom: 2 }}>
-          {empresaSelecionada} &nbsp;·&nbsp; {isGeral ? `${geralEmpresa.filter(r => anoFiltro === 'todos' || String(r.ano||'').trim() === anoFiltro).length} reuniões` : `${meses.length} ${meses.length === 1 ? 'mês' : 'meses'}`}
+          {empresaSelecionada} &nbsp;·&nbsp; {isGeral ? `${geralEmpresa.filter(r => anoFiltro === 'todos' || String(r.ano||'').trim() === anoFiltro).length} reuniões` : `${currentMeses.length} ${currentMeses.length === 1 ? 'mês' : 'meses'}`}
         </div>
       </div>
 
@@ -2237,7 +2278,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
           <div className="chart-card" style={{ marginBottom: 32 }}>
             <div className="chart-title">{metricaAtiva.label} — {empresaSelecionada} · mês a mês</div>
             <VerticalBarChartMonths
-              data={meses.map(mes => ({ mes: mes.mes, label: mes.label, valor: mes[metricaAtiva.key] }))}
+              data={currentMeses.map(mes => ({ mes: mes.mes, label: mes.label, valor: mes[metricaAtiva.key] ?? 0 }))}
               color={metricaAtiva.color} formatVal={metricaAtiva.fmt}
             />
           </div>
@@ -2253,10 +2294,12 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
                 </tr>
               </thead>
               <tbody>
-                {[...meses].reverse().map(mes => (
+                {[...currentMeses].reverse().map(mes => (
                   <tr key={mes.key} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mes.label}</td>
-                    <td style={{ padding: '9px 8px', textAlign: 'right', color: metricaAtiva.color, fontWeight: 500 }}>{metricaAtiva.fmt(mes[metricaAtiva.key])}</td>
+                    <td style={{ padding: '9px 8px', textAlign: 'right', color: metricaAtiva.color, fontWeight: 500 }}>
+                      {mes[metricaAtiva.key] == null ? '-' : metricaAtiva.fmt(mes[metricaAtiva.key])}
+                    </td>
                   </tr>
                 ))}
               </tbody>
