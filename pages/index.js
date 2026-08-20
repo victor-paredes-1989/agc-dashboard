@@ -755,10 +755,10 @@ function ReuniaoCards({ cards, empresa, graficos }) {
         <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value">{fmt(cards.total)}</div></div>
         <div className="card green"><div className="card-label">Fechamentos (PAGO)</div><div className="card-value">{fmt(cards.pagos)}</div><div className="card-sub">Taxa: {fmtPct(cards.taxa)}</div></div>
         <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value">{fmtR1(cards.valorTotal)}</div></div>
+        <div className="card amber"><div className="card-label">Pipeline Ativo</div><div className="card-value">{valorPipelineAtivo > 0 ? fmtR1(valorPipelineAtivo) : '-'}</div></div>
         <div className="card blue"><div className="card-label">{dsoLabel}</div><div className="card-value">{dsoValor > 0 ? fmtR1(dsoValor) : '-'}</div></div>
         <div className="card"><div className="card-label">Fugiram</div><div className="card-value">{fmt(cards.fugiu)}</div></div>
         <div className="card red"><div className="card-label">Perdidos (FORA)</div><div className="card-value">{fmt(cards.fora)}</div></div>
-        <div className="card amber"><div className="card-label">Pipeline Ativo</div><div className="card-value">{valorPipelineAtivo > 0 ? fmtR1(valorPipelineAtivo) : '-'}</div></div>
       </div>
     </div>
   )
