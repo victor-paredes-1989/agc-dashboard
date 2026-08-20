@@ -1,12 +1,15 @@
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from './auth/[...nextauth]'
 import { getAllDashData } from '../../lib/sheets'
 
 export default async function handler(req, res) {
+  const session = await getServerSession(req, res, authOptions)
+  if (!session) return res.status(401).json({ error: 'Não autenticado' })
+
   try {
     const force = req.query.force === '1'
     const data = await getAllDashData({ force })
 
-    // Cache 25 min no CDN, servir stale durante revalidação.
-    // Com ?force=1, sem cache para forçar nova busca imediata.
     if (force) {
       res.setHeader('Cache-Control', 'no-store, max-age=0')
     } else {
