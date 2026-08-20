@@ -611,7 +611,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
           <Divider />
           <Row2 items={[
             { label: `Pagos${c.taxa ? ` (${pct(c.taxa)} conv.)` : ''}`, value: f0(c.pagos), color: '#10b981', big: true },
-            { label: 'Valor na Mesa', value: valorNaMesa > 0 ? r1(valorNaMesa) : '-' },
+            { label: 'Pipeline Ativo', value: valorNaMesa > 0 ? r1(valorNaMesa) : '-' },
           ]} />
           <Divider />
           <Row2 items={[
