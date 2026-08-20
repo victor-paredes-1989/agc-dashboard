@@ -739,12 +739,11 @@ function MetricCards({ metricas }) {
   )
 }
 
-function ReuniaoCards({ cards, graficos }) {
-  const PIPELINE_STATUSES = ['PM','FECHOU','RECALL','R2','CONTRATO','ASSINADO']
-  const valorPipelineAtivo = (graficos?.pipeline || [])
-    .filter(p => PIPELINE_STATUSES.includes(String(p.nome||'').toUpperCase()))
-    .reduce((s, p) => s + (p.valor || 0), 0)
+function ReuniaoCards({ cards, empresa }) {
   if (!cards || !cards.total) return null
+  const isMO = String(empresa||'').toUpperCase() === 'MO'
+  const dsoLabel = isMO ? 'DSO Vendido' : 'DSV Vendido'
+  const dsoValor = isMO ? (cards.dsoTotal || 0) : (cards.dsvOnlyTotal || 0)
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12, marginTop: 28 }}>Resumo das Reuniões</div>
@@ -752,11 +751,10 @@ function ReuniaoCards({ cards, graficos }) {
         <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value">{fmt(cards.total)}</div></div>
         <div className="card green"><div className="card-label">Fechamentos (PAGO)</div><div className="card-value">{fmt(cards.pagos)}</div><div className="card-sub">Taxa: {fmtPct(cards.taxa)}</div></div>
         <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value">{fmtR1(cards.valorTotal)}</div></div>
-        <div className="card amber"><div className="card-label">NMRR (sem DSV/DSO)</div><div className="card-value">{fmtR1(cards.nmrr)}</div><div className="card-sub">TKM: {fmtR1(cards.tkm)}</div></div>
-        {cards.dsvTotal > 0 && <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR1(cards.dsvTotal)}</div><div className="card-sub">{cards.dsvCount} contratos</div></div>}
-        <div className="card blue"><div className="card-label">FUP + PM</div><div className="card-value">{fmt((cards.fup||0)+(cards.pm||0))}</div></div>
+        <div className="card blue"><div className="card-label">{dsoLabel}</div><div className="card-value">{dsoValor > 0 ? fmtR1(dsoValor) : '-'}</div></div>
+        <div className="card"><div className="card-label">Fugiram</div><div className="card-value">{fmt(cards.fugiu)}</div></div>
         <div className="card red"><div className="card-label">Perdidos (FORA)</div><div className="card-value">{fmt(cards.fora)}</div></div>
-        <div className="card amber"><div className="card-label">Pipeline Ativo</div><div className="card-value">{fmtR1(valorPipelineAtivo)}</div></div>
+        <div className="card blue"><div className="card-label">FUP + PM</div><div className="card-value">{fmt((cards.fup||0)+(cards.pm||0))}</div></div>
       </div>
     </div>
   )
@@ -2770,7 +2768,7 @@ export default function Dashboard() {
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodoData ? <>
                  <MetricCards metricas={periodoData.metricas} />
-                 <ReuniaoCards cards={periodoData.reunioes?.cards} graficos={periodoData.reunioes?.graficos} />
+                 <ReuniaoCards cards={periodoData.reunioes?.cards} empresa={empresa} />
                  <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
                </> : <div className="loading">Sem dados para este período</div>}
             </div>
