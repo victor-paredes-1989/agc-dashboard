@@ -1,10 +1,10 @@
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from './auth/[...nextauth]'
 import { getDebugInfo } from '../../lib/sheets'
+import { requireActiveUser } from '../../lib/auth-guard'
 
 export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions)
-  if (!session) return res.status(401).json({ error: 'Não autenticado' })
+  // Validação ao vivo do STATUS atual em USUARIOS_ACESSO — não confia no valor do JWT.
+  const user = await requireActiveUser(req, res)
+  if (!user) return
 
   try {
     const info = await getDebugInfo()
