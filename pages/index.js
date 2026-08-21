@@ -2528,8 +2528,16 @@ export default function Dashboard() {
   }, [darkMode])
 
   const fetchData = useRef(null)
+  // Guarda contra chamadas simultâneas: cobre tanto duas automáticas se sobrepondo quanto
+  // um clique manual durante um poll automático (ou outro clique) já em andamento. Nesses
+  // casos o clique/tick extra é simplesmente ignorado (sem fila) — a próxima chamada
+  // automática ou manual segue funcionando normalmente assim que a atual terminar.
+  const fetchInFlight = useRef(false)
   fetchData.current = async (force = false) => {
-    if (force) { setSyncing(true); setSyncError(null) }
+    if (fetchInFlight.current) return
+    fetchInFlight.current = true
+    setSyncing(true)
+    if (force) setSyncError(null)
     try {
       const url = force ? '/api/data?force=1' : '/api/data'
       const res = await fetch(url)
@@ -2544,18 +2552,24 @@ export default function Dashboard() {
       // Avisar se os dados vieram do cache stale (erro na última atualização)
       if (d.error || d._stale) setSyncError(`Dados em cache — última leitura falhou: ${d.error || 'erro desconhecido'}`)
     } catch (e) {
+      // Falha de refresh (automático ou manual) nunca apaga dados já carregados — só
+      // mostra aviso e mantém o que já estava na tela.
       if (!data) setError(e.message)
       else setSyncError('Falha ao sincronizar — usando dados anteriores')
     } finally {
       setLoading(false)
       setSyncing(false)
+      fetchInFlight.current = false
     }
   }
 
-  // Initial load + auto-refresh every 30 minutes
+  // Initial load + auto-refresh every 5 minutes — coordenado com o cache do servidor
+  // (CACHE_TTL em lib/sheets.js e s-maxage em pages/api/data.js, ambos também 5 min) e com
+  // o trigger automático da Master Dashboard (Apps Script, a cada 10 min): o próximo poll
+  // daqui encontra o cache do servidor já expirado, então já traz o dado novo da planilha.
   useEffect(() => {
     fetchData.current(false)
-    const interval = setInterval(() => fetchData.current(false), 30 * 60 * 1000)
+    const interval = setInterval(() => fetchData.current(false), 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
