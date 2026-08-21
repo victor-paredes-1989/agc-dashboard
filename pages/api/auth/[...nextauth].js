@@ -1,11 +1,17 @@
 import NextAuth from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
-import { resolveAccess, normalizeEmail } from '../../../lib/sheets-users'
+import { resolveAccess, normalizeEmail, isSuperAdmin } from '../../../lib/sheets-users'
+import { insertPendingUser } from '../../../lib/sheets-write'
 
 // Fase 1 da gestão dinâmica de acessos: a autorização de login deixou de depender de
 // ALLOWED_EMAILS (allowlist estática) e passa a consultar a aba USUARIOS_ACESSO, com
 // SUPER_ADMIN_EMAILS funcionando exclusivamente como fallback de emergência (break-glass)
 // para falha técnica da planilha — ver lib/sheets-users.js:resolveAccess().
+//
+// Fase 2: e-mail do Google autenticado que não existe em USUARIOS_ACESSO é registrado
+// automaticamente como PENDENTE (nunca ADMIN/ATIVO) via lib/sheets-write.js, e redirecionado
+// para /aguardando em vez do erro genérico de acesso negado. SUPER_ADMIN_EMAILS nunca passa
+// por esse caminho — continua seguindo exatamente a regra de break-glass da Fase 1.
 //
 // ALLOWED_EMAILS permanece definida no Vercel (não removida) apenas para permitir rollback
 // rápido: revertendo este arquivo para a versão anterior, ela volta a funcionar imediatamente.
@@ -25,6 +31,31 @@ export const authOptions = {
 
       const decision = await resolveAccess(email)
       if (decision.allowed) return true
+
+      // PENDENTE (já cadastrado assim, ou recém-registrado logo abaixo) nunca entra no
+      // dashboard, mas tem uma tela própria em vez do erro genérico de acesso negado.
+      if (decision.status === 'PENDENTE') {
+        return '/aguardando'
+      }
+
+      // E-mail ainda não cadastrado: tenta registrar como PENDENTE automaticamente.
+      // SUPER_ADMIN_EMAILS nunca passa por aqui — continua caindo no bloqueio padrão
+      // abaixo, exatamente como na Fase 1 (não vira PENDENTE por engano).
+      if (decision.reason === 'user_not_found' && !isSuperAdmin(email)) {
+        try {
+          // email/name vêm do perfil OAuth do Google já autenticado, nunca de input do
+          // cliente. insertPendingUser fixa STATUS=PENDENTE/PERFIL=USUARIO internamente —
+          // nenhum valor aqui pode elevar o novo registro a ATIVO/ADMIN.
+          const result = await insertPendingUser({ email, name: user?.name })
+          if (result.inserted || result.reason === 'already_exists') {
+            return '/aguardando'
+          }
+          // Writer indisponível, schema inválido ou falha técnica: não registrou — cai no
+          // bloqueio padrão abaixo. Falha de escrita nunca libera acesso (fail-closed).
+        } catch (err) {
+          console.error('[nextauth] insertPendingUser falhou:', err.message)
+        }
+      }
 
       // Redireciona para a tela de login existente com o motivo identificável na URL.
       // pages/login.js não foi alterado nesta fase — o parâmetro extra `reason` é
