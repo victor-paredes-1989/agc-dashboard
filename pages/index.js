@@ -2528,16 +2528,32 @@ export default function Dashboard() {
   }, [darkMode])
 
   const fetchData = useRef(null)
-  // Guarda contra chamadas simultâneas: cobre tanto duas automáticas se sobrepondo quanto
-  // um clique manual durante um poll automático (ou outro clique) já em andamento. Nesses
-  // casos o clique/tick extra é simplesmente ignorado (sem fila) — a próxima chamada
-  // automática ou manual segue funcionando normalmente assim que a atual terminar.
+  // fetchInFlight: guarda TÉCNICA interna contra duas chamadas de rede simultâneas —
+  // cobre automática×automática, manual×automática e manual×manual.
+  // pendingForceRefresh: quando um clique manual (force=true) chega enquanto já existe uma
+  // chamada em andamento, o clique NUNCA é descartado — fica marcado aqui e dispara
+  // exatamente UM force refresh assim que a chamada atual terminar. Não é uma fila: vários
+  // cliques nesse meio tempo só mantêm a mesma flag em true (um único refresh ao final).
+  // Uma automática que chega com outra chamada em andamento continua sendo simplesmente
+  // ignorada (nunca vira pendente — só cliques manuais precisam dessa garantia).
   const fetchInFlight = useRef(false)
+  const pendingForceRefresh = useRef(false)
   fetchData.current = async (force = false) => {
-    if (fetchInFlight.current) return
+    if (fetchInFlight.current) {
+      if (force) {
+        pendingForceRefresh.current = true
+        // Feedback imediato do clique: liga o indicador visual já aqui, sem esperar a
+        // chamada atual terminar para o usuário perceber que o clique foi recebido.
+        setSyncing(true)
+        setSyncError(null)
+      }
+      return
+    }
+
     fetchInFlight.current = true
-    setSyncing(true)
-    if (force) setSyncError(null)
+    // syncing é só o indicador VISUAL do botão manual — refresh automático roda em
+    // silêncio (sem animar/desabilitar o botão); só liga para force=true.
+    if (force) { setSyncing(true); setSyncError(null) }
     try {
       const url = force ? '/api/data?force=1' : '/api/data'
       const res = await fetch(url)
@@ -2553,13 +2569,24 @@ export default function Dashboard() {
       if (d.error || d._stale) setSyncError(`Dados em cache — última leitura falhou: ${d.error || 'erro desconhecido'}`)
     } catch (e) {
       // Falha de refresh (automático ou manual) nunca apaga dados já carregados — só
-      // mostra aviso e mantém o que já estava na tela.
+      // mostra aviso e mantém o que já estava na tela. Também nunca impede atualizações
+      // futuras: fetchInFlight é sempre liberado abaixo, sucesso ou falha.
       if (!data) setError(e.message)
       else setSyncError('Falha ao sincronizar — usando dados anteriores')
     } finally {
       setLoading(false)
-      setSyncing(false)
       fetchInFlight.current = false
+      if (pendingForceRefresh.current) {
+        // Havia um clique manual pendente registrado durante esta chamada: dispara agora,
+        // exatamente uma vez. Chamada assíncrona nova e independente (não recursão
+        // síncrona) — fetchInFlight já está false, então segue o fluxo normal do guard.
+        // Mantém `syncing` ligado (não desliga abaixo) para não piscar o indicador entre
+        // o fim desta chamada e o início do force pendente.
+        pendingForceRefresh.current = false
+        fetchData.current(true)
+      } else if (force) {
+        setSyncing(false)
+      }
     }
   }
 
