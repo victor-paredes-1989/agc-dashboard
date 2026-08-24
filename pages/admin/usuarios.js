@@ -364,7 +364,6 @@ export default function AdminUsuarios() {
         <AddUserModal
           onClose={() => setModalOpen(false)}
           onCreated={(msg) => { setModalOpen(false); showNotice(msg); loadUsers() }}
-          onError={(msg) => setActionError(msg)}
         />
       )}
 
@@ -436,10 +435,11 @@ export default function AdminUsuarios() {
   )
 }
 
-function AddUserModal({ onClose, onCreated, onError }) {
+function AddUserModal({ onClose, onCreated }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [modalError, setModalError] = useState('')
   const submittingRef = useRef(false)
 
   const handleSubmit = async (e) => {
@@ -447,6 +447,7 @@ function AddUserModal({ onClose, onCreated, onError }) {
     if (submittingRef.current) return // guarda contra duplo-clique/duplo-submit
     submittingRef.current = true
     setSubmitting(true)
+    setModalError('')
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
@@ -455,12 +456,12 @@ function AddUserModal({ onClose, onCreated, onError }) {
       })
       const body = await res.json().catch(() => null)
       if (!res.ok || !body?.ok) {
-        onError(translateError(body?.error))
+        setModalError(translateError(body?.error))
         return
       }
       onCreated(`${name.trim() || body.email} cadastrado com sucesso.`)
     } catch (err) {
-      onError(translateError())
+      setModalError(translateError())
     } finally {
       submittingRef.current = false
       setSubmitting(false)
@@ -477,6 +478,9 @@ function AddUserModal({ onClose, onCreated, onError }) {
           <input className="field-input m-input" value={name} onChange={(e) => setName(e.target.value)} required disabled={submitting} autoFocus />
           <label className="m-label">Email</label>
           <input className="field-input m-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={submitting} />
+          {modalError && (
+            <div className="m-error" role="alert">{modalError}</div>
+          )}
           <div className="m-buttons">
             <button type="button" className="u-btn u-btn-ghost" onClick={onClose} disabled={submitting}>Cancelar</button>
             <button type="submit" className="u-btn u-btn-primary" disabled={submitting}>{submitting ? 'Cadastrando…' : 'Cadastrar'}</button>
@@ -497,6 +501,7 @@ function AddUserModal({ onClose, onCreated, onError }) {
         .m-sub { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 18px; }
         .m-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
         .m-input { width: 100%; margin-bottom: 14px; box-sizing: border-box; }
+        .m-error { background: var(--red-bg); color: var(--red); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 12px; }
         .m-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
       `}</style>
     </div>
