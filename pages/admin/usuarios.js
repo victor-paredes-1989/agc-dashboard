@@ -36,6 +36,7 @@ const ERROR_MESSAGES = {
   writer_unavailable: 'Não foi possível atualizar os usuários agora. Tente novamente.',
   sheet_error: 'Não foi possível atualizar os usuários agora. Tente novamente.',
   invalid_schema: 'Não foi possível atualizar os usuários agora. Tente novamente.',
+  invalid_name: 'Informe um nome válido.',
   invalid_email: 'E-mail inválido.',
   invalid_action: 'Ação inválida.',
   invalid_perfil: 'Perfil inválido.',
@@ -81,6 +82,8 @@ export default function AdminUsuarios() {
   const [notice, setNotice] = useState(null)
   const [busyMap, setBusyMap] = useState({})
   const [modalOpen, setModalOpen] = useState(false)
+  // editName: { email } — qual célula de nome está em modo edição (um por vez)
+  const [editName, setEditName] = useState(null)
 
   const busyRef = useRef({})
   const noticeTimer = useRef(null)
@@ -157,6 +160,15 @@ export default function AdminUsuarios() {
   const handlePerfilChange = (email, perfil) => {
     const key = `${email}:perfil`
     runAction(key, () => postJson(`/api/admin/users/${encodeURIComponent(email)}/perfil`, { perfil }), `Perfil de ${email} atualizado.`)
+  }
+
+  const handleNameSave = (email, name, onDone) => {
+    const key = `${email}:name`
+    runAction(
+      key,
+      () => postJson(`/api/admin/users/${encodeURIComponent(email)}/name`, { name }),
+      `Nome atualizado.`,
+    ).then(() => { onDone && onDone() })
   }
 
   const list = users || []
@@ -328,9 +340,32 @@ export default function AdminUsuarios() {
                           )
                         }
 
+                        const nameBusy = !!busyMap[`${u.email}:name`]
+                        const nameEditing = editName === u.email
+
                         return (
                           <tr key={u.email}>
-                            <td>{u.nome || '—'}</td>
+                            <td>
+                              {nameEditing ? (
+                                <NameEditor
+                                  initialValue={u.nome || ''}
+                                  busy={nameBusy}
+                                  onSave={(val) => {
+                                    handleNameSave(u.email, val, () => setEditName(null))
+                                  }}
+                                  onCancel={() => setEditName(null)}
+                                />
+                              ) : (
+                                <span className="u-name-cell">
+                                  <span className="u-name-text">{u.nome || '—'}</span>
+                                  <button
+                                    className="u-btn-edit"
+                                    title="Editar nome"
+                                    onClick={() => setEditName(u.email)}
+                                  >✎</button>
+                                </span>
+                              )}
+                            </td>
                             <td className="u-email">{u.email}</td>
                             <td><StatusBadge status={u.status} /></td>
                             <td>
@@ -400,6 +435,19 @@ export default function AdminUsuarios() {
 
         .u-perfil-select { min-width: 110px; padding: 6px 10px; font-size: 12.5px; }
 
+        .u-name-cell { display: inline-flex; align-items: center; gap: 6px; }
+        .u-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+        .u-btn-edit {
+          background: none; border: none; cursor: pointer; color: var(--text-muted);
+          font-size: 13px; padding: 2px 4px; border-radius: 4px; line-height: 1;
+          opacity: 0; transition: opacity 0.1s;
+        }
+        .u-table tr:hover .u-btn-edit { opacity: 1; }
+        .u-btn-edit:hover { color: var(--accent); background: var(--bar-track); }
+
+        .u-name-editor { display: flex; align-items: center; gap: 6px; }
+        .u-name-input { flex: 1; min-width: 0; }
+
         .u-actions { display: flex; gap: 6px; flex-wrap: nowrap; }
 
         .u-btn {
@@ -432,6 +480,47 @@ export default function AdminUsuarios() {
         }
       `}</style>
     </>
+  )
+}
+
+function NameEditor({ initialValue, busy, onSave, onCancel }) {
+  const [value, setValue] = useState(initialValue)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const trimmed = value.trim()
+    if (!trimmed) return
+    onSave(trimmed)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); onCancel() }
+  }
+
+  return (
+    <form className="u-name-editor" onSubmit={handleSubmit}>
+      <input
+        ref={inputRef}
+        className="field-input u-name-input"
+        value={value}
+        maxLength={100}
+        disabled={busy}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <button type="submit" className="u-btn u-btn-primary u-btn-sm" disabled={busy || !value.trim()}>
+        {busy ? '…' : 'Salvar'}
+      </button>
+      <button type="button" className="u-btn u-btn-ghost u-btn-sm" disabled={busy} onClick={onCancel}>
+        Cancelar
+      </button>
+    </form>
   )
 }
 
