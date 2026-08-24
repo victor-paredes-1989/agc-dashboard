@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
+import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 
 const fmt = (n) => { const num = Number(n); return isNaN(num) ? '0' : num.toLocaleString('pt-BR') }
 const fmtDec = (n) => { const num = Number(n); return isNaN(num) ? '0,0' : num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) }
@@ -2504,6 +2506,12 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
 // ── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
+  // session.user.perfil existe só para UX (mostrar/ocultar este item de menu) — a proteção
+  // real de /admin/usuarios é feita no próprio getServerSideProps da página (consulta ao
+  // vivo a USUARIOS_ACESSO), nunca aqui.
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.perfil === 'ADMIN'
+
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -2679,6 +2687,11 @@ export default function Dashboard() {
           <div className="sidebar-divider" />
 
           <div className="sidebar-footer">
+            {isAdmin && (
+              <Link href="/admin/usuarios" className="sidebar-action" title="Admin · Usuários">
+                👤
+              </Link>
+            )}
             <button
               className="sidebar-action"
               onClick={() => fetchData.current(true)}
