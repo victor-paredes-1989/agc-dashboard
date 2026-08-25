@@ -2002,52 +2002,55 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
 
   return (
     <div className="ind-card">
-      {/* Topo: label + valor */}
-      <div>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 6 }}>
+      {/* Topo: label + realizado (contexto secundário) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent)' }}>
           {label}
         </div>
-        <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>
-          {fmtVal(realizado)}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.2 }}>Realizado</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', lineHeight: 1.2 }}>
+            {fmtVal(realizado)}
+          </div>
         </div>
       </div>
 
-      {/* Meio: métricas ou placeholder */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10 }}>
-        {isCurrent ? (
+      {/* Centro: Forecast em destaque */}
+      <div style={{ marginTop: 10 }}>
+        {isCurrent && projecao !== null ? (
           <>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Média </span>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Forecast</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.05, letterSpacing: '-0.01em' }}>
+              {fmtVal(Math.round(projecao))}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
               {fmtMedia(mediaDia)}/{dayMode === 'calendar' ? 'dia' : 'dia útil'}
             </div>
-            {projecao !== null && (
-              <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>Forecast </span>
-                {fmtVal(Math.round(projecao))}
-              </div>
-            )}
-            {metaVal > 0 && (
-              <>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Meta </span>
-                  {fmtVal(metaVal)}
-                </div>
-                {pctMeta !== null && (
-                  <div style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
-                    {pctMeta}% da meta
-                  </div>
-                )}
-              </>
-            )}
           </>
+        ) : isCurrent ? (
+          <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.05 }}>
+            {fmtVal(realizado)}
+          </div>
         ) : (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>—</div>
         )}
       </div>
 
-      {/* Rodapé: contador de dias — fixo na base */}
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-        {isCurrent ? `${diasDecorridos}/${diasTotais} ${diasLabel}` : ' '}
+      {/* Rodapé: meta + % + dias */}
+      <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {isCurrent && metaVal > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Meta {fmtVal(metaVal)}</span>
+            {pctMeta !== null && (
+              <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
+                {pctMeta}%
+              </span>
+            )}
+          </div>
+        )}
+        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+          {isCurrent ? `${diasDecorridos}/${diasTotais} ${diasLabel}` : ' '}
+        </div>
       </div>
     </div>
   )
