@@ -1920,7 +1920,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
   const estadoAtual = visiveis[0]?.stats.estado
 
   return (
-    <div>
+    <div style={{ maxWidth: 940, margin: '0 auto' }}>
       {/* Cabeçalho */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>
@@ -1955,7 +1955,6 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 16px;
-          max-width: 900px;
         }
         @media (max-width: 900px) {
           .ind-grid { grid-template-columns: repeat(2, 1fr); }
