@@ -1907,6 +1907,82 @@ function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoS
   }
 }
 
+// NMRR: série diária real via REUNIOES_GERAL usando countWorkingDays (Mon–Sex + feriados nacionais).
+// NÃO usa buildDailyForecast — esse helper usa countOperationalDays (exclui só domingo).
+// Shape de retorno idêntico ao de buildDailyForecast para compatibilidade com ForecastCurveChart.
+function buildNmrrIndicadorData({ registros, empresa, mes, ano, meta }) {
+  const empNorm = String(empresa).toUpperCase()
+  const mesNorm = String(mes).toUpperCase()
+  const anoNorm = String(ano)
+  const year = Number(anoNorm)
+  const month = monthNumberFromName(mesNorm)
+  const totalDias = new Date(year, month, 0).getDate()
+  const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
+  const porDia = Object.fromEntries(dias.map(d => [d, 0]))
+
+  // Acumular NMRR por dia (PAGO, excluindo DSV e DSO — mesmo critério do cards/sheets.js)
+  ;(registros || []).forEach(r => {
+    if (String(r.empresa || '').toUpperCase() !== empNorm) return
+    if (String(r.mes || '').toUpperCase() !== mesNorm) return
+    if (String(r.ano || '') !== anoNorm) return
+    if (String(r.status || '').toUpperCase().trim() !== 'PAGO') return
+    const servico = String(r.servico || '').toUpperCase().trim()
+    if (servico === 'DSV' || servico === 'DSO') return
+    const d = dayFromDate(r.data)
+    if (!d || d > totalDias) return
+    porDia[d] += Number(r.valor) || 0
+  })
+
+  let acum = 0, ultimoDiaComDado = 0
+  const real = dias.map(d => {
+    acum += porDia[d] || 0
+    if (porDia[d] > 0) ultimoDiaComDado = d
+    return { dia: d, valor: acum }
+  })
+  const realizado = acum
+
+  // cutoff via todayBRT — consistente com calcIndicatorStats do card
+  const brt = todayBRT()
+  const isCurrent = year === brt.year && month === brt.month
+  const isPast = year < brt.year || (year === brt.year && month < brt.month)
+  const cutoffDia = isCurrent ? Math.min(brt.day, totalDias) : (ultimoDiaComDado || totalDias)
+
+  // Dias úteis via countWorkingDays (Mon–Sex + feriados nacionais) — mesma regra do card
+  const diasTotaisWD = countWorkingDays({ year, month, start: 1 })
+  const diasDecWD = isCurrent
+    ? countWorkingDays({ year, month, start: 1, end: brt.day })
+    : (isPast ? diasTotaisWD : 0)
+  const diasRestWD = isCurrent ? countWorkingDays({ year, month, start: cutoffDia + 1, end: totalDias }) : 0
+
+  const metaNum = Number(meta) || 0
+  const mediaDia = diasDecWD > 0 ? realizado / diasDecWD : 0
+  // forecast = mesma fórmula que calcIndicatorStats usa: mediaDia * diasTotais
+  const previsaoFinal = isCurrent && mediaDia > 0 ? mediaDia * diasTotaisWD : realizado
+
+  const gapFuturo = previsaoFinal - realizado
+  const previsaoLine = dias.map(d => {
+    if (d <= cutoffDia) return { dia: d, valor: real[d - 1].valor }
+    if (!isCurrent) return { dia: d, valor: realizado }
+    const op = countWorkingDays({ year, month, start: cutoffDia + 1, end: d })
+    return { dia: d, valor: realizado + (diasRestWD > 0 ? gapFuturo * op / diasRestWD : 0) }
+  })
+
+  const metaLine = dias.map(d => {
+    if (metaNum === 0) return { dia: d, valor: 0 }
+    const ate = countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: diasTotaisWD > 0 ? (metaNum / diasTotaisWD) * ate : 0 }
+  })
+
+  return {
+    dias, totalDias, realizado, meta: metaNum, supermeta: 0,
+    pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
+    previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
+    diasOperacionaisMes: diasTotaisWD, diasOperacionaisDecorridos: diasDecWD, diasOperacionaisRestantes: diasRestWD,
+    real, metaLine, superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    singlePoint: false,
+  }
+}
+
 // Reuniões: adapta evolucao [{data, qtd}] em curva acumulada para ForecastCurveChart.
 function buildReunioesIndicadorData({ evolucao, anoStr, mesNome, estado }) {
   const year = Number(anoStr)
@@ -2100,17 +2176,12 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
     const { id, stats } = indicadorSelecionado
 
     if (id === 'NMRR') {
-      // Reutiliza buildDailyForecast — mesma lógica do Forecast atual
-      chartDados = buildDailyForecast({
+      chartDados = buildNmrrIndicadorData({
         registros,
         empresa: String(empresaSelecionada).toUpperCase(),
         mes: mesUpper,
         ano: anoStr,
-        tipo: 'GERAL',
-        nome: '',
         meta: metaNmrr,
-        supermeta: 0,
-        projecaoVendido: null,
       })
       chartUnidade = 'money'
 
