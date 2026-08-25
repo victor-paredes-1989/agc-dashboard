@@ -1603,24 +1603,30 @@ function countWorkingDays({ year, month, start = 1, end }) {
 
 // Calcula stats de um indicador pré-agregado (sem série histórica diária real).
 // realizado: total acumulado no mês até a data de corte da planilha.
-// ano/mesNome: para calcular dias úteis totais do mês e decorridos até hoje (BRT).
-// Retorna: { realizado, mediaDia, projecao, diasDecorridos, diasTotais, estado }
+// ano/mesNome: para calcular dias totais do mês e decorridos até hoje (BRT).
+// dayMode: 'calendar' (todos os dias) | 'working' (dias úteis Mon–Sex excl. feriados nacionais)
+// Retorna: { realizado, mediaDia, projecao, diasDecorridos, diasTotais, estado, dayMode }
 //   estado: 'current' | 'past' | 'future'
-function calcIndicatorStats({ realizado, anoStr, mesNome }) {
+function calcIndicatorStats({ realizado, anoStr, mesNome, dayMode = 'working' }) {
   const year = Number(anoStr)
   const month = monthNumberFromName(mesNome)
   const brt = todayBRT()
   const isCurrent = year === brt.year && month === brt.month
   const isPast    = year < brt.year || (year === brt.year && month < brt.month)
   const estado    = isCurrent ? 'current' : isPast ? 'past' : 'future'
-  const diasTotais = countWorkingDays({ year, month, start: 1 })
+  const totalDiasCalendario = new Date(year, month, 0).getDate()
+  const diasTotais = dayMode === 'calendar'
+    ? totalDiasCalendario
+    : countWorkingDays({ year, month, start: 1 })
   const diasDecorridos = isCurrent
-    ? countWorkingDays({ year, month, start: 1, end: brt.day })
+    ? (dayMode === 'calendar'
+        ? brt.day
+        : countWorkingDays({ year, month, start: 1, end: brt.day }))
     : 0
   const val = Number(realizado) || 0
   const mediaDia = isCurrent && diasDecorridos > 0 ? val / diasDecorridos : 0
   const projecao = isCurrent && mediaDia > 0 ? mediaDia * diasTotais : null
-  return { realizado: val, mediaDia, projecao, diasDecorridos, diasTotais, estado }
+  return { realizado: val, mediaDia, projecao, diasDecorridos, diasTotais, estado, dayMode }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1889,21 +1895,21 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
   const reunioesVal = Number(cards.total) || 0
 
   // Calcular stats para cada indicador
-  const sLeads       = calcIndicatorStats({ realizado: leadsVal,      anoStr, mesNome })
-  const sLeadsMql    = calcIndicatorStats({ realizado: leadsMqlVal,   anoStr, mesNome })
-  const sAgend       = calcIndicatorStats({ realizado: Number(m.agendamentos) || 0, anoStr, mesNome })
-  const sReunioes    = calcIndicatorStats({ realizado: reunioesVal,    anoStr, mesNome })
-  const sContratos   = calcIndicatorStats({ realizado: contratosVal,   anoStr, mesNome })
-  const sNmrr        = calcIndicatorStats({ realizado: nmrrVal,        anoStr, mesNome })
-  const sDsv         = calcIndicatorStats({ realizado: dsvVal,         anoStr, mesNome })
-  const sInvest      = calcIndicatorStats({ realizado: investVal,      anoStr, mesNome })
+  const sLeads       = calcIndicatorStats({ realizado: leadsVal,      anoStr, mesNome, dayMode: 'calendar' })
+  const sLeadsMql    = calcIndicatorStats({ realizado: leadsMqlVal,   anoStr, mesNome, dayMode: 'calendar' })
+  const sAgend       = calcIndicatorStats({ realizado: Number(m.agendamentos) || 0, anoStr, mesNome, dayMode: 'working' })
+  const sReunioes    = calcIndicatorStats({ realizado: reunioesVal,    anoStr, mesNome, dayMode: 'working' })
+  const sContratos   = calcIndicatorStats({ realizado: contratosVal,   anoStr, mesNome, dayMode: 'working' })
+  const sNmrr        = calcIndicatorStats({ realizado: nmrrVal,        anoStr, mesNome, dayMode: 'working' })
+  const sDsv         = calcIndicatorStats({ realizado: dsvVal,         anoStr, mesNome, dayMode: 'working' })
+  const sInvest      = calcIndicatorStats({ realizado: investVal,      anoStr, mesNome, dayMode: 'calendar' })
 
   const INDICADORES = [
-    { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmtNum1, fmtMedia: fmtNum1 },
-    { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmtNum1, fmtMedia: fmtNum1 },
-    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmtNum1, fmtMedia: fmtNum1 },
-    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmtNum1, fmtMedia: fmtNum1 },
-    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmtNum1, fmtMedia: fmtNum1 },
+    { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmt,     fmtMedia: fmtNum1 },
+    { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmt,     fmtMedia: fmtNum1 },
+    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmt,     fmtMedia: fmtNum1 },
+    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmt,     fmtMedia: fmtNum1 },
+    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmt,     fmtMedia: fmtNum1 },
     { id: 'NMRR',            label: 'NMRR',            stats: sNmrr,      fmt: fmtR1,   fmtMedia: fmtR,   meta: metaNmrr },
     { id: 'DSV/DSO',         label: dsvLabel,          stats: sDsv,       fmt: fmtR1,   fmtMedia: fmtR },
     { id: 'Investimento',    label: 'Investimento',    stats: sInvest,    fmt: fmtR1,   fmtMedia: fmtR },
@@ -1918,7 +1924,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
       {/* Cabeçalho */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Forecast por Indicador</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)' }}>Forecast por Indicador</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{periodoAtivo.label} · {String(empresaSelecionada).toUpperCase()}</div>
         </div>
         <select
@@ -1944,7 +1950,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
       )}
 
       {/* Grid de cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16 }}>
         {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta }) => (
           <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
         ))}
@@ -1952,7 +1958,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
 
       {/* Nota de metodologia */}
       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 18, lineHeight: 1.6 }}>
-        Dias úteis = segunda a sexta, excluindo feriados nacionais oficiais. Resultados em finais de semana ou feriados entram no Atual mas não aumentam o denominador da média.
+        Leads, Leads MQL e Investimento usam dias corridos (calendário). Agendamentos, Reuniões, Contratos, NMRR e DSV/DSO usam dias úteis (Seg–Sex, excluindo feriados nacionais).
       </div>
     </div>
   )
@@ -1961,36 +1967,53 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
 // Card individual de indicador.
 // meta: meta mensal real (opcional) — exibida apenas no mês atual.
 function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
-  const { realizado, mediaDia, projecao, diasDecorridos, diasTotais, estado } = stats
+  const { realizado, mediaDia, projecao, diasDecorridos, diasTotais, estado, dayMode } = stats
   const isCurrent = estado === 'current'
   const metaVal   = Number(meta) || 0
   const pctMeta   = isCurrent && projecao !== null && metaVal > 0
     ? Math.round((projecao / metaVal) * 100)
     : null
+  const diasLabel = dayMode === 'calendar' ? 'dias' : 'dias úteis'
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="card-label">{label}</div>
-      <div className="card-value">{fmtVal(realizado)}</div>
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 0, padding: '16px 18px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1, marginBottom: 10 }}>
+        {fmtVal(realizado)}
+      </div>
       {isCurrent ? (
-        <>
-          <div className="card-sub">
-            {fmtMedia(mediaDia)}/dia útil
-            {projecao !== null && (
-              <> · Proj: <strong>{fmtVal(Math.round(projecao))}</strong></>
-            )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Média </span>
+            {fmtMedia(mediaDia)}/{dayMode === 'calendar' ? 'dia' : 'dia útil'}
           </div>
-          {metaVal > 0 && (
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-              Meta: {fmtVal(metaVal)}{pctMeta !== null ? ` · ${pctMeta}% projetado` : ''}
+          {projecao !== null && (
+            <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>Forecast </span>
+              {fmtVal(Math.round(projecao))}
             </div>
           )}
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: metaVal > 0 ? 0 : 2 }}>
-            {diasDecorridos}/{diasTotais} dias úteis
+          {metaVal > 0 && (
+            <>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Meta </span>
+                {fmtVal(metaVal)}
+              </div>
+              {pctMeta !== null && (
+                <div style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
+                  {pctMeta}% da meta
+                </div>
+              )}
+            </>
+          )}
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+            {diasDecorridos}/{diasTotais} {diasLabel}
           </div>
-        </>
+        </div>
       ) : (
-        <div className="card-sub" style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>—</div>
       )}
     </div>
   )
