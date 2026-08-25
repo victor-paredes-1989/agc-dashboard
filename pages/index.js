@@ -1566,19 +1566,19 @@ function easterDate(year) {
 
 // Feriados nacionais oficiais brasileiros.
 // Fixos: Lei 9.093/95, CF/88, Lei 14.759/2023.
-// Móveis: Sexta-feira Santa e Corpus Christi (Lei 9.093/95, art. 1º).
-// Carnaval NÃO está incluído — é ponto facultativo federal, não feriado nacional.
+// Móvel: Sexta-feira Santa = Páscoa − 2 (feriado nacional, Lei 9.093/95).
+// Corpus Christi NÃO incluído — é ponto facultativo federal, não feriado nacional.
+// Carnaval NÃO incluído — ponto facultativo federal, não feriado nacional.
 function isNationalHoliday(year, month, day) {
   // Fixos (mes, dia)
   const fixed = [[1,1],[4,21],[5,1],[9,7],[10,12],[11,2],[11,15],[11,20],[12,25]]
   if (fixed.some(([m, d]) => m === month && d === day)) return true
-  // Móveis baseados em Páscoa
+  // Móvel: apenas Sexta-feira Santa (Páscoa − 2)
   const easter = easterDate(year)
   const easterMs = Date.UTC(year, easter.month - 1, easter.day)
   const targetMs = Date.UTC(year, month - 1, day)
   const diff = Math.round((targetMs - easterMs) / 86400000)
-  // Sexta-feira Santa = Páscoa - 2; Corpus Christi = Páscoa + 60
-  return diff === -2 || diff === 60
+  return diff === -2
 }
 
 // Dia útil: segunda a sexta, excluindo feriados nacionais.
@@ -1604,20 +1604,23 @@ function countWorkingDays({ year, month, start = 1, end }) {
 // Calcula stats de um indicador pré-agregado (sem série histórica diária real).
 // realizado: total acumulado no mês até a data de corte da planilha.
 // ano/mesNome: para calcular dias úteis totais do mês e decorridos até hoje (BRT).
-// Retorna: { realizado, mediaDia, projecao, diasDecorridos, diasTotais, isMesAtual }
+// Retorna: { realizado, mediaDia, projecao, diasDecorridos, diasTotais, estado }
+//   estado: 'current' | 'past' | 'future'
 function calcIndicatorStats({ realizado, anoStr, mesNome }) {
   const year = Number(anoStr)
   const month = monthNumberFromName(mesNome)
   const brt = todayBRT()
-  const isMesAtual = year === brt.year && month === brt.month
+  const isCurrent = year === brt.year && month === brt.month
+  const isPast    = year < brt.year || (year === brt.year && month < brt.month)
+  const estado    = isCurrent ? 'current' : isPast ? 'past' : 'future'
   const diasTotais = countWorkingDays({ year, month, start: 1 })
-  const diasDecorridos = isMesAtual
+  const diasDecorridos = isCurrent
     ? countWorkingDays({ year, month, start: 1, end: brt.day })
-    : diasTotais
+    : 0
   const val = Number(realizado) || 0
-  const mediaDia = diasDecorridos > 0 ? val / diasDecorridos : 0
-  const projecao = isMesAtual && mediaDia > 0 ? mediaDia * diasTotais : null
-  return { realizado: val, mediaDia, projecao, diasDecorridos, diasTotais, isMesAtual }
+  const mediaDia = isCurrent && diasDecorridos > 0 ? val / diasDecorridos : 0
+  const projecao = isCurrent && mediaDia > 0 ? mediaDia * diasTotais : null
+  return { realizado: val, mediaDia, projecao, diasDecorridos, diasTotais, estado }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1841,7 +1844,7 @@ const FORECAST_ORIGEM_ORDER = ['MQL','FMQL','RECUPERAÇÃO','MÊS PAS','SS','IND
 //   periodoAtivo  — objeto { mesNome, ano, key, label } do mês selecionado
 //   periodoData   — dados do mês: { metricas, reunioes }
 //   empresaSelecionada — 'AI' | 'MO'
-function ForecastIndicadorView({ periodoAtivo, periodoData, empresaSelecionada }) {
+function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSelecionada }) {
   const [filtro, setFiltro] = useState('Todos')
 
   if (!periodoAtivo || !periodoData) {
@@ -1853,6 +1856,13 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, empresaSelecionada }
   const mesNome = periodoAtivo.mesNome
   const anoStr  = String(periodoAtivo.ano)
   const isMO    = String(empresaSelecionada || '').toUpperCase() === 'MO'
+
+  // Meta mensal de NMRR — mesma fonte do Forecast atual (FORECAST_AI/MO col B).
+  // Busca pelo prefixo de 3 letras do mês, idêntico ao PainelGeralView.
+  const fcList = Array.isArray(forecast) ? forecast : []
+  const mesPfx = String(mesNome).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3)
+  const fcEntry = fcList.find(e => String(e.mes||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3) === mesPfx) || {}
+  const metaNmrr = Number(fcEntry.meta) || 0
 
   // Leads MQL — mesma lógica de EvolucaoMensalView:
   // MQL chega como fração (0.32) ou percentual (32) — normalizar para percentual.
@@ -1889,18 +1899,19 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, empresaSelecionada }
   const sInvest      = calcIndicatorStats({ realizado: investVal,      anoStr, mesNome })
 
   const INDICADORES = [
-    { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmtNum1,  fmtMedia: fmtNum1 },
-    { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmtNum1,  fmtMedia: fmtNum1 },
-    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmtNum1,  fmtMedia: fmtNum1 },
-    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmtNum1,  fmtMedia: fmtNum1 },
-    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmtNum1,  fmtMedia: fmtNum1 },
-    { id: 'NMRR',            label: 'NMRR',            stats: sNmrr,      fmt: fmtR1,    fmtMedia: fmtR },
-    { id: 'DSV/DSO',         label: dsvLabel,          stats: sDsv,       fmt: fmtR1,    fmtMedia: fmtR },
-    { id: 'Investimento',    label: 'Investimento',    stats: sInvest,    fmt: fmtR1,    fmtMedia: fmtR },
+    { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmtNum1, fmtMedia: fmtNum1 },
+    { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmtNum1, fmtMedia: fmtNum1 },
+    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmtNum1, fmtMedia: fmtNum1 },
+    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmtNum1, fmtMedia: fmtNum1 },
+    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmtNum1, fmtMedia: fmtNum1 },
+    { id: 'NMRR',            label: 'NMRR',            stats: sNmrr,      fmt: fmtR1,   fmtMedia: fmtR,   meta: metaNmrr },
+    { id: 'DSV/DSO',         label: dsvLabel,          stats: sDsv,       fmt: fmtR1,   fmtMedia: fmtR },
+    { id: 'Investimento',    label: 'Investimento',    stats: sInvest,    fmt: fmtR1,   fmtMedia: fmtR },
   ]
 
   const opcoesDropdown = ['Todos', ...INDICADORES.map(i => i.id)]
   const visiveis = filtro === 'Todos' ? INDICADORES : INDICADORES.filter(i => i.id === filtro)
+  const estadoAtual = visiveis[0]?.stats.estado
 
   return (
     <div>
@@ -1920,49 +1931,67 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, empresaSelecionada }
         </select>
       </div>
 
-      {/* Aviso de mês passado */}
-      {!visiveis[0]?.stats.isMesAtual && visiveis.length > 0 && (
+      {/* Aviso contextual por tipo de mês */}
+      {estadoAtual === 'past' && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, fontStyle: 'italic' }}>
-          Mês encerrado — exibindo realizado sem projeção.
+          Mês encerrado — exibindo apenas o realizado.
+        </div>
+      )}
+      {estadoAtual === 'future' && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, fontStyle: 'italic' }}>
+          Mês futuro — sem dados disponíveis ainda.
         </div>
       )}
 
       {/* Grid de cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-        {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia }) => (
-          <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} />
+        {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta }) => (
+          <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
         ))}
       </div>
 
       {/* Nota de metodologia */}
       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 18, lineHeight: 1.6 }}>
-        Dias úteis = segunda a sexta, excluindo feriados nacionais oficiais. Resultados registrados em finais de semana ou feriados entram no Atual mas não aumentam o denominador da média.
+        Dias úteis = segunda a sexta, excluindo feriados nacionais oficiais. Resultados em finais de semana ou feriados entram no Atual mas não aumentam o denominador da média.
       </div>
     </div>
   )
 }
 
-// Card individual de indicador — sem meta (nenhum indicador desta versão possui
-// meta mensal real disponível na fonte de dados atual).
-function IndicadorCard({ label, stats, fmtVal, fmtMedia }) {
-  const { realizado, mediaDia, projecao, diasDecorridos, diasTotais, isMesAtual } = stats
+// Card individual de indicador.
+// meta: meta mensal real (opcional) — exibida apenas no mês atual.
+function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
+  const { realizado, mediaDia, projecao, diasDecorridos, diasTotais, estado } = stats
+  const isCurrent = estado === 'current'
+  const metaVal   = Number(meta) || 0
+  const pctMeta   = isCurrent && projecao !== null && metaVal > 0
+    ? Math.round((projecao / metaVal) * 100)
+    : null
+
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="card-label">{label}</div>
       <div className="card-value">{fmtVal(realizado)}</div>
-      {diasDecorridos > 0 ? (
-        <div className="card-sub">
-          {fmtMedia(mediaDia)}/dia útil
-          {isMesAtual && projecao !== null && (
-            <> · Proj: <strong>{fmtVal(Math.round(projecao))}</strong></>
+      {isCurrent ? (
+        <>
+          <div className="card-sub">
+            {fmtMedia(mediaDia)}/dia útil
+            {projecao !== null && (
+              <> · Proj: <strong>{fmtVal(Math.round(projecao))}</strong></>
+            )}
+          </div>
+          {metaVal > 0 && (
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+              Meta: {fmtVal(metaVal)}{pctMeta !== null ? ` · ${pctMeta}% projetado` : ''}
+            </div>
           )}
-        </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: metaVal > 0 ? 0 : 2 }}>
+            {diasDecorridos}/{diasTotais} dias úteis
+          </div>
+        </>
       ) : (
-        <div className="card-sub">—</div>
+        <div className="card-sub" style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</div>
       )}
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-        {diasDecorridos}/{diasTotais} dias úteis
-      </div>
     </div>
   )
 }
@@ -3054,7 +3083,7 @@ export default function Dashboard() {
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} empresaSelecionada={empresa} /> :
+               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} /> :
                periodoData ? <>
                  <MetricCards metricas={periodoData.metricas} />
                  <ReuniaoCards cards={periodoData.reunioes?.cards} empresa={empresa} graficos={periodoData.reunioes?.graficos} />
