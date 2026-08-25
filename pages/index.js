@@ -1725,7 +1725,9 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
 }
 
 // ── Forecast chart with hover tooltips on last points ─────────
-function ForecastCurveChart({ dados, tipo }) {
+// unidade: 'qty' = quantidade (fmtNum1), 'money' = monetário (fmtR/fmtR1).
+// Quando omitido, mantém comportamento original via `tipo`.
+function ForecastCurveChart({ dados, tipo, unidade }) {
   const [tooltip, setTooltip] = useState(null)
 
   if (!dados) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
@@ -1741,8 +1743,9 @@ function ForecastCurveChart({ dados, tipo }) {
   const xPos = (dia) => padX + ((dia - 1) / Math.max(dados.totalDias - 1, 1)) * (w - padX * 2)
   const yPos = (valor) => h - padY - (valor / max) * (h - padY * 2)
   const line = (arr) => arr.map(p => `${xPos(p.dia)},${yPos(p.valor)}`).join(' ')
-  const fmtAxis = tipo === 'SDR' ? fmtNum1 : fmtR1
-  const fmtVal = tipo === 'SDR' ? fmtNum1 : fmtR
+  const isQty = unidade === 'qty' || tipo === 'SDR'
+  const fmtAxis = isQty ? fmtNum1 : fmtR1
+  const fmtVal  = isQty ? fmtNum1 : fmtR
 
   // Find last meaningful data point for each series
   const realPoints = dados.real.filter(p => p.valor > 0)
@@ -1770,10 +1773,11 @@ function ForecastCurveChart({ dados, tipo }) {
         ))}
 
         {/* Lines */}
-        <polyline points={line(dados.metaLine)} fill="none" stroke="#8b5cf6" strokeWidth="2" />
+        {dados.meta > 0 && <polyline points={line(dados.metaLine)} fill="none" stroke="#8b5cf6" strokeWidth="2" />}
         {dados.supermeta > 0 && <polyline points={line(dados.superLine)} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="5 5" />}
         <polyline points={line(dados.previsaoLine)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 6" />
-        <polyline points={line(dados.real)} fill="none" stroke="#ef4444" strokeWidth="3" />
+        {/* Para indicadores sem histórico diário, suprimir linha de realizado (apenas ponto) */}
+        {!dados.singlePoint && <polyline points={line(dados.real)} fill="none" stroke="#ef4444" strokeWidth="3" />}
 
         {/* Regular real dots (excluding last) */}
         {realPoints.map((p, i) => i < realPoints.length - 1 && (
@@ -1845,12 +1849,254 @@ function normalizarOrigemForecast(v) {
 }
 const FORECAST_ORIGEM_ORDER = ['MQL','FMQL','RECUPERAÇÃO','MÊS PAS','SS','INDICAÇÃO','LIVE','API','CHURN','MIP','TROCA','SEM ORIGEM']
 
+// ── Helpers de gráfico para Forecast por Indicador ───────────────────────────
+
+// Indicadores SEM série diária real: produz ponto único no dia corrente + linha de forecast.
+// NÃO distribui o total pelos dias anteriores.
+function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoStr, mesNome, estado }) {
+  const year = Number(anoStr)
+  const month = monthNumberFromName(mesNome)
+  const totalDias = new Date(year, month, 0).getDate()
+  const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
+  const brt = todayBRT()
+  const isCurrent = estado === 'current'
+  const cutoffDia = isCurrent ? Math.min(brt.day, totalDias) : totalDias
+  const metaNum = Number(meta) || 0
+  const val = Number(realizado) || 0
+  const proj = (isCurrent && projecao !== null) ? Number(projecao) || 0 : val
+
+  // real: somente o ponto de hoje tem valor — sem linha histórica
+  const real = dias.map(d => ({ dia: d, valor: d === cutoffDia ? val : 0 }))
+
+  // previsaoLine: parte do ponto atual e sobe até proj no último dia
+  const gapFuturo = proj - val
+  const opRestantes = isCurrent
+    ? (dayMode === 'calendar'
+        ? Math.max(totalDias - cutoffDia, 0)
+        : countWorkingDays({ year, month, start: cutoffDia + 1, end: totalDias }))
+    : 0
+  const previsaoLine = dias.map(d => {
+    if (!isCurrent || d <= cutoffDia) return { dia: d, valor: d <= cutoffDia ? (d === cutoffDia ? val : 0) : val }
+    const avanco = dayMode === 'calendar'
+      ? (d - cutoffDia)
+      : countWorkingDays({ year, month, start: cutoffDia + 1, end: d })
+    return { dia: d, valor: val + (opRestantes > 0 ? gapFuturo * avanco / opRestantes : 0) }
+  })
+
+  // metaLine: linear proporcional ao dayMode
+  const metaTotais = dayMode === 'calendar' ? totalDias : countWorkingDays({ year, month, start: 1 })
+  const metaLine = dias.map(d => {
+    if (metaNum === 0) return { dia: d, valor: 0 }
+    const ate = dayMode === 'calendar' ? d : countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: metaTotais > 0 ? (metaNum / metaTotais) * ate : 0 }
+  })
+
+  const diasDecorridos = isCurrent
+    ? (dayMode === 'calendar' ? cutoffDia : countWorkingDays({ year, month, start: 1, end: brt.day }))
+    : 0
+  const diasTotais = dayMode === 'calendar' ? totalDias : countWorkingDays({ year, month, start: 1 })
+
+  return {
+    dias, totalDias, realizado: val, meta: metaNum, supermeta: 0,
+    pctMeta: metaNum > 0 ? (val / metaNum) * 100 : 0,
+    previsaoFinal: proj, mediaDia: 0, cutoffDia, ultimoDiaComDado: cutoffDia,
+    diasOperacionaisMes: diasTotais, diasOperacionaisDecorridos: diasDecorridos,
+    diasOperacionaisRestantes: opRestantes,
+    real, metaLine, superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    singlePoint: true,
+  }
+}
+
+// NMRR: série diária real via REUNIOES_GERAL usando countWorkingDays (Mon–Sex + feriados nacionais).
+// NÃO usa buildDailyForecast — esse helper usa countOperationalDays (exclui só domingo).
+// Shape de retorno idêntico ao de buildDailyForecast para compatibilidade com ForecastCurveChart.
+function buildNmrrIndicadorData({ registros, empresa, mes, ano, meta }) {
+  const empNorm = String(empresa).toUpperCase()
+  const mesNorm = String(mes).toUpperCase()
+  const anoNorm = String(ano)
+  const year = Number(anoNorm)
+  const month = monthNumberFromName(mesNorm)
+  const totalDias = new Date(year, month, 0).getDate()
+  const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
+  const porDia = Object.fromEntries(dias.map(d => [d, 0]))
+
+  // Acumular NMRR por dia (PAGO, excluindo DSV e DSO — mesmo critério do cards/sheets.js)
+  ;(registros || []).forEach(r => {
+    if (String(r.empresa || '').toUpperCase() !== empNorm) return
+    if (String(r.mes || '').toUpperCase() !== mesNorm) return
+    if (String(r.ano || '') !== anoNorm) return
+    if (String(r.status || '').toUpperCase().trim() !== 'PAGO') return
+    const servico = String(r.servico || '').toUpperCase().trim()
+    if (servico === 'DSV' || servico === 'DSO') return
+    const d = dayFromDate(r.data)
+    if (!d || d > totalDias) return
+    porDia[d] += Number(r.valor) || 0
+  })
+
+  let acum = 0, ultimoDiaComDado = 0
+  const real = dias.map(d => {
+    acum += porDia[d] || 0
+    if (porDia[d] > 0) ultimoDiaComDado = d
+    return { dia: d, valor: acum }
+  })
+  const realizado = acum
+
+  // cutoff via todayBRT — consistente com calcIndicatorStats do card
+  const brt = todayBRT()
+  const isCurrent = year === brt.year && month === brt.month
+  const isPast = year < brt.year || (year === brt.year && month < brt.month)
+  const cutoffDia = isCurrent ? Math.min(brt.day, totalDias) : (ultimoDiaComDado || totalDias)
+
+  // Dias úteis via countWorkingDays (Mon–Sex + feriados nacionais) — mesma regra do card
+  const diasTotaisWD = countWorkingDays({ year, month, start: 1 })
+  const diasDecWD = isCurrent
+    ? countWorkingDays({ year, month, start: 1, end: brt.day })
+    : (isPast ? diasTotaisWD : 0)
+  const diasRestWD = isCurrent ? countWorkingDays({ year, month, start: cutoffDia + 1, end: totalDias }) : 0
+
+  const metaNum = Number(meta) || 0
+  const mediaDia = diasDecWD > 0 ? realizado / diasDecWD : 0
+  // forecast = mesma fórmula que calcIndicatorStats usa: mediaDia * diasTotais
+  const previsaoFinal = isCurrent && mediaDia > 0 ? mediaDia * diasTotaisWD : realizado
+
+  const gapFuturo = previsaoFinal - realizado
+  const previsaoLine = dias.map(d => {
+    if (d <= cutoffDia) return { dia: d, valor: real[d - 1].valor }
+    if (!isCurrent) return { dia: d, valor: realizado }
+    const op = countWorkingDays({ year, month, start: cutoffDia + 1, end: d })
+    return { dia: d, valor: realizado + (diasRestWD > 0 ? gapFuturo * op / diasRestWD : 0) }
+  })
+
+  const metaLine = dias.map(d => {
+    if (metaNum === 0) return { dia: d, valor: 0 }
+    const ate = countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: diasTotaisWD > 0 ? (metaNum / diasTotaisWD) * ate : 0 }
+  })
+
+  return {
+    dias, totalDias, realizado, meta: metaNum, supermeta: 0,
+    pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
+    previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
+    diasOperacionaisMes: diasTotaisWD, diasOperacionaisDecorridos: diasDecWD, diasOperacionaisRestantes: diasRestWD,
+    real, metaLine, superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    singlePoint: false,
+  }
+}
+
+// Reuniões: adapta evolucao [{data, qtd}] em curva acumulada para ForecastCurveChart.
+function buildReunioesIndicadorData({ evolucao, anoStr, mesNome, estado }) {
+  const year = Number(anoStr)
+  const month = monthNumberFromName(mesNome)
+  const totalDias = new Date(year, month, 0).getDate()
+  const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
+  const brt = todayBRT()
+  const isCurrent = estado === 'current'
+
+  const porDia = {}
+  ;(evolucao || []).forEach(e => {
+    const d = dayFromDate(e.data)
+    if (d && d >= 1 && d <= totalDias) porDia[d] = (porDia[d] || 0) + (e.qtd || 0)
+  })
+
+  let acum = 0, ultimoDiaComDado = 0
+  const real = dias.map(d => {
+    acum += porDia[d] || 0
+    if (porDia[d]) ultimoDiaComDado = d
+    return { dia: d, valor: acum }
+  })
+  const realizado = acum
+  const cutoffDia = isCurrent ? Math.min(brt.day, totalDias) : (ultimoDiaComDado || totalDias)
+
+  const diasTotaisWD = countWorkingDays({ year, month, start: 1 })
+  const diasDecWD = isCurrent ? countWorkingDays({ year, month, start: 1, end: brt.day }) : diasTotaisWD
+  const diasRestWD = isCurrent ? countWorkingDays({ year, month, start: cutoffDia + 1, end: totalDias }) : 0
+  const mediaDia = diasDecWD > 0 ? realizado / diasDecWD : 0
+  const previsaoFinal = isCurrent ? realizado + mediaDia * diasRestWD : realizado
+  const gapFuturo = previsaoFinal - realizado
+
+  const previsaoLine = dias.map(d => {
+    if (d <= cutoffDia) return { dia: d, valor: real[d - 1].valor }
+    if (!isCurrent) return { dia: d, valor: realizado }
+    const op = countWorkingDays({ year, month, start: cutoffDia + 1, end: d })
+    return { dia: d, valor: realizado + (diasRestWD > 0 ? gapFuturo * op / diasRestWD : 0) }
+  })
+
+  return {
+    dias, totalDias, realizado, meta: 0, supermeta: 0, pctMeta: 0,
+    previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
+    diasOperacionaisMes: diasTotaisWD, diasOperacionaisDecorridos: diasDecWD, diasOperacionaisRestantes: diasRestWD,
+    real, metaLine: dias.map(d => ({ dia: d, valor: 0 })),
+    superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    singlePoint: false,
+  }
+}
+
+// DSV (AI) / DSO (MO): curva acumulada real via REUNIOES_GERAL filtrado por serviço.
+function buildDsvIndicadorData({ registros, empresa, mes, ano, isMO }) {
+  const servicoAlvo = isMO ? 'DSO' : 'DSV'
+  const empNorm = String(empresa).toUpperCase()
+  const mesNorm = String(mes).toUpperCase()
+  const anoNorm = String(ano)
+  const totalDias = daysInMonth(anoNorm, mesNorm)
+  const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
+  const porDia = Object.fromEntries(dias.map(d => [d, 0]))
+
+  ;(registros || []).forEach(r => {
+    if (String(r.empresa || '').toUpperCase() !== empNorm) return
+    if (String(r.mes || '').toUpperCase() !== mesNorm) return
+    if (String(r.ano || '') !== anoNorm) return
+    if (String(r.status || '').toUpperCase().trim() !== 'PAGO') return
+    if (String(r.servico || '').toUpperCase().trim() !== servicoAlvo) return
+    const d = dayFromDate(r.data)
+    if (!d || d > totalDias) return
+    porDia[d] += Number(r.valor) || 0
+  })
+
+  let acum = 0, ultimoDiaComDado = 0
+  const real = dias.map(d => {
+    acum += porDia[d] || 0
+    if (porDia[d] > 0) ultimoDiaComDado = d
+    return { dia: d, valor: acum }
+  })
+  const realizado = acum
+  const mesAtual = isCurrentSelectedMonth(anoNorm, mesNorm)
+  const today = new Date()
+  const cutoffDia = mesAtual ? Math.min(today.getDate(), totalDias) : (ultimoDiaComDado || totalDias)
+
+  // Usar countWorkingDays (Mon–Sex + feriados nacionais) consistente com o card
+  const year = Number(anoNorm)
+  const month = monthNumberFromName(mesNorm)
+  const diasTotaisWD = countWorkingDays({ year, month, start: 1 })
+  const diasDecWD = mesAtual ? countWorkingDays({ year, month, start: 1, end: today.getDate() }) : diasTotaisWD
+  const diasRestWD = mesAtual ? countWorkingDays({ year, month, start: cutoffDia + 1, end: totalDias }) : 0
+  const mediaDia = diasDecWD > 0 ? realizado / diasDecWD : 0
+  const previsaoFinal = mesAtual ? realizado + mediaDia * diasRestWD : realizado
+  const gapFuturo = previsaoFinal - realizado
+
+  const previsaoLine = dias.map(d => {
+    if (d <= cutoffDia) return { dia: d, valor: real[d - 1].valor }
+    if (!mesAtual) return { dia: d, valor: realizado }
+    const op = countWorkingDays({ year, month, start: cutoffDia + 1, end: d })
+    return { dia: d, valor: realizado + (diasRestWD > 0 ? gapFuturo * op / diasRestWD : 0) }
+  })
+
+  return {
+    dias, totalDias, realizado, meta: 0, supermeta: 0, pctMeta: 0,
+    previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
+    diasOperacionaisMes: diasTotaisWD, diasOperacionaisDecorridos: diasDecWD, diasOperacionaisRestantes: diasRestWD,
+    real, metaLine: dias.map(d => ({ dia: d, valor: 0 })),
+    superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    singlePoint: false,
+  }
+}
+
 // ── Forecast por Indicador ────────────────────────────────────────────────────
 // Props:
 //   periodoAtivo  — objeto { mesNome, ano, key, label } do mês selecionado
 //   periodoData   — dados do mês: { metricas, reunioes }
 //   empresaSelecionada — 'AI' | 'MO'
-function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSelecionada }) {
+//   registros     — data.GERAL (REUNIOES_GERAL) para indicadores com série real
+function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSelecionada, registros = [] }) {
   const [filtro, setFiltro] = useState('Todos')
 
   if (!periodoAtivo || !periodoData) {
@@ -1919,6 +2165,53 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
   const visiveis = filtro === 'Todos' ? INDICADORES : INDICADORES.filter(i => i.id === filtro)
   const estadoAtual = visiveis[0]?.stats.estado
 
+  // ── Gráfico: somente quando um indicador específico está selecionado ──────
+  const indicadorSelecionado = filtro !== 'Todos' && visiveis.length === 1 ? visiveis[0] : null
+  const mesUpper = String(mesNome).toUpperCase()
+
+  let chartDados = null
+  let chartUnidade = 'qty'
+
+  if (indicadorSelecionado && estadoAtual !== 'future') {
+    const { id, stats } = indicadorSelecionado
+
+    if (id === 'NMRR') {
+      chartDados = buildNmrrIndicadorData({
+        registros,
+        empresa: String(empresaSelecionada).toUpperCase(),
+        mes: mesUpper,
+        ano: anoStr,
+        meta: metaNmrr,
+      })
+      chartUnidade = 'money'
+
+    } else if (id === 'Reuniões') {
+      chartDados = buildReunioesIndicadorData({
+        evolucao: periodoData.reunioes?.graficos?.evolucao || [],
+        anoStr, mesNome, estado: stats.estado,
+      })
+      chartUnidade = 'qty'
+
+    } else if (id === 'DSV/DSO') {
+      chartDados = buildDsvIndicadorData({
+        registros, empresa: String(empresaSelecionada).toUpperCase(),
+        mes: mesUpper, ano: anoStr, isMO,
+      })
+      chartUnidade = 'money'
+
+    } else {
+      // Leads, Leads MQL, Agendamentos, Contratos Pagos, Investimento — sem série diária
+      chartDados = buildSinglePointForecastData({
+        realizado: stats.realizado,
+        projecao: stats.projecao,
+        meta: indicadorSelecionado.meta || 0,
+        dayMode: stats.dayMode,
+        anoStr, mesNome, estado: stats.estado,
+      })
+      chartUnidade = id === 'Investimento' ? 'money' : 'qty'
+    }
+  }
+
   return (
     <div style={{ maxWidth: 940, margin: '0 auto' }}>
       {/* Cabeçalho */}
@@ -1980,6 +2273,23 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
         ))}
       </div>
+
+      {/* Gráfico detalhado — somente quando um indicador específico está selecionado */}
+      {chartDados && (
+        <div style={{ marginTop: 28 }}>
+          <div className="chart-card">
+            <div className="chart-title">
+              Evolução e Forecast — {indicadorSelecionado?.label}
+            </div>
+            <ForecastCurveChart dados={chartDados} unidade={chartUnidade} />
+            {chartDados.singlePoint && (
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
+                Histórico diário não disponível. A projeção parte do resultado atual.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Nota de metodologia */}
       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 18, lineHeight: 1.6 }}>
@@ -3143,7 +3453,7 @@ export default function Dashboard() {
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} /> :
+               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} registros={data?.GERAL} /> :
                periodoData ? <>
                  <MetricCards metricas={periodoData.metricas} />
                  <ReuniaoCards cards={periodoData.reunioes?.cards} empresa={empresa} graficos={periodoData.reunioes?.graficos} />
