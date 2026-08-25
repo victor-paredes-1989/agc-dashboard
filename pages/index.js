@@ -1712,7 +1712,7 @@ function ForecastCurveChart({ dados, tipo }) {
           <div className="tooltip-value" style={{ color: tooltip.color }}>
             {fmtVal(tooltip.valor)}
             {(tooltip.key === 'real' || tooltip.key === 'prev') && tooltip.meta > 0 && (
-              <span style={{ fontSize: '0.7em', fontWeight: 500, marginLeft: 6, opacity: 0.85 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 6 }}>
                 → {Math.round((tooltip.valor / tooltip.meta) * 100)}%
               </span>
             )}
