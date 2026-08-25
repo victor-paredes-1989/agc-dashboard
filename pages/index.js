@@ -1235,7 +1235,7 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
         <div className="card amber"><div className="card-label">Valor Pago Total</div><div className="card-value">{fmtR(sum(pagos))}</div></div>
         <div className="card amber"><div className="card-label">NMRR</div><div className="card-value">{fmtR(nmrr)}</div><div className="card-sub">TKM: {fmtR(tkm)}</div></div>
         <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR(sum(dsvDso))}</div><div className="card-sub">{fmt(dsvDso.length)} contratos</div></div>
-        <div className="card blue"><div className="card-label">FUP + PM</div><div className="card-value">{fmt(filtrados.filter(r => ['FUP','PM'].includes(norm(r.status))).length)}</div></div>
+        <div className="card blue"><div className="card-label">Pipeline Ativo</div><div className="card-value">{fmt(pipelineRows.length)}</div></div>
         <div className="card purple"><div className="card-label">Valor Pipeline</div><div className="card-value">{fmtR(sum(pipelineRows))}</div><div className="card-sub">{fmt(pipelineRows.length)} oportunidades</div></div>
         <div className="card red"><div className="card-label">Perdidos/Fugiram</div><div className="card-value">{fmt(filtrados.filter(r => ['FORA','FUGIU'].includes(norm(r.status))).length)}</div></div>
       </div>
