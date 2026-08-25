@@ -1532,6 +1532,95 @@ function isCurrentSelectedMonth(ano, mes) {
   return Number(ano) === today.getFullYear() && monthNumberFromName(mes) === today.getMonth() + 1
 }
 
+// ── Helpers para Forecast por Indicador ──────────────────────────────────────
+// Funções novas, isoladas. NÃO alteram isOperationalDay/countOperationalDays/
+// buildDailyForecast — o Forecast atual continua intacto.
+
+// Data atual no fuso América/São Paulo via offset fixo UTC-3.
+// Vercel roda em UTC; sem biblioteca, subtrair 3h é conservador e correto
+// durante horário padrão (BRST não é considerado nesta versão simples).
+function todayBRT() {
+  const now = new Date()
+  const brt = new Date(now.getTime() - 3 * 60 * 60 * 1000)
+  return { year: brt.getUTCFullYear(), month: brt.getUTCMonth() + 1, day: brt.getUTCDate() }
+}
+
+// Algoritmo de Meeus/Jones/Butcher para calcular a data da Páscoa.
+function easterDate(year) {
+  const a = year % 19
+  const b = Math.floor(year / 100)
+  const c = year % 100
+  const d = Math.floor(b / 4)
+  const e = b % 4
+  const f = Math.floor((b + 8) / 25)
+  const g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4)
+  const k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31)
+  const day = ((h + l - 7 * m + 114) % 31) + 1
+  return { month, day }
+}
+
+// Feriados nacionais oficiais brasileiros.
+// Fixos: Lei 9.093/95, CF/88, Lei 14.759/2023.
+// Móveis: Sexta-feira Santa e Corpus Christi (Lei 9.093/95, art. 1º).
+// Carnaval NÃO está incluído — é ponto facultativo federal, não feriado nacional.
+function isNationalHoliday(year, month, day) {
+  // Fixos (mes, dia)
+  const fixed = [[1,1],[4,21],[5,1],[9,7],[10,12],[11,2],[11,15],[11,20],[12,25]]
+  if (fixed.some(([m, d]) => m === month && d === day)) return true
+  // Móveis baseados em Páscoa
+  const easter = easterDate(year)
+  const easterMs = Date.UTC(year, easter.month - 1, easter.day)
+  const targetMs = Date.UTC(year, month - 1, day)
+  const diff = Math.round((targetMs - easterMs) / 86400000)
+  // Sexta-feira Santa = Páscoa - 2; Corpus Christi = Páscoa + 60
+  return diff === -2 || diff === 60
+}
+
+// Dia útil: segunda a sexta, excluindo feriados nacionais.
+function isWorkingDay(year, month, day) {
+  const dt = new Date(year, month - 1, day)
+  const dow = dt.getDay()
+  if (dow === 0 || dow === 6) return false
+  return !isNationalHoliday(year, month, day)
+}
+
+// Conta dias úteis (segunda-sexta, sem feriados) em [start, end] de um mês/ano.
+function countWorkingDays({ year, month, start = 1, end }) {
+  const total = new Date(year, month, 0).getDate()
+  const ini = Math.max(1, Number(start) || 1)
+  const fim = Math.min(total, Number(end) || total)
+  let count = 0
+  for (let d = ini; d <= fim; d++) {
+    if (isWorkingDay(year, month, d)) count++
+  }
+  return count
+}
+
+// Calcula stats de um indicador pré-agregado (sem série histórica diária real).
+// realizado: total acumulado no mês até a data de corte da planilha.
+// ano/mesNome: para calcular dias úteis totais do mês e decorridos até hoje (BRT).
+// Retorna: { realizado, mediaDia, projecao, diasDecorridos, diasTotais, isMesAtual }
+function calcIndicatorStats({ realizado, anoStr, mesNome }) {
+  const year = Number(anoStr)
+  const month = monthNumberFromName(mesNome)
+  const brt = todayBRT()
+  const isMesAtual = year === brt.year && month === brt.month
+  const diasTotais = countWorkingDays({ year, month, start: 1 })
+  const diasDecorridos = isMesAtual
+    ? countWorkingDays({ year, month, start: 1, end: brt.day })
+    : diasTotais
+  const val = Number(realizado) || 0
+  const mediaDia = diasDecorridos > 0 ? val / diasDecorridos : 0
+  const projecao = isMesAtual && mediaDia > 0 ? mediaDia * diasTotais : null
+  return { realizado: val, mediaDia, projecao, diasDecorridos, diasTotais, isMesAtual }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, supermeta, projecaoVendido }) {
   const totalDias = daysInMonth(ano, mes)
   const dias = Array.from({ length: totalDias }, (_, i) => i + 1)
@@ -1746,6 +1835,138 @@ function normalizarOrigemForecast(v) {
   return s || 'SEM ORIGEM'
 }
 const FORECAST_ORIGEM_ORDER = ['MQL','FMQL','RECUPERAÇÃO','MÊS PAS','SS','INDICAÇÃO','LIVE','API','CHURN','MIP','TROCA','SEM ORIGEM']
+
+// ── Forecast por Indicador ────────────────────────────────────────────────────
+// Props:
+//   periodoAtivo  — objeto { mesNome, ano, key, label } do mês selecionado
+//   periodoData   — dados do mês: { metricas, reunioes }
+//   empresaSelecionada — 'AI' | 'MO'
+function ForecastIndicadorView({ periodoAtivo, periodoData, empresaSelecionada }) {
+  const [filtro, setFiltro] = useState('Todos')
+
+  if (!periodoAtivo || !periodoData) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 32, textAlign: 'center' }}>Selecione um mês para ver o Forecast por Indicador.</div>
+  }
+
+  const m = periodoData.metricas || {}
+  const cards = periodoData.reunioes?.cards || {}
+  const mesNome = periodoAtivo.mesNome
+  const anoStr  = String(periodoAtivo.ano)
+  const isMO    = String(empresaSelecionada || '').toUpperCase() === 'MO'
+
+  // Leads MQL — mesma lógica de EvolucaoMensalView:
+  // MQL chega como fração (0.32) ou percentual (32) — normalizar para percentual.
+  const leadsVal  = Number(m.leads)  || 0
+  const mqlN      = Number(m.mql) || 0
+  const mqlRaw    = mqlN && Math.abs(mqlN) <= 1 ? mqlN * 100 : mqlN
+  const mqlFrac   = mqlRaw > 0 ? mqlRaw / 100 : 0
+  const leadsMqlVal = leadsVal && mqlFrac > 0 ? Math.round(leadsVal * mqlFrac) : 0
+
+  // DSV/DSO — mesma lógica de ReuniaoCards (linha 748+)
+  const dsvLabel = isMO ? 'DSO Vendido' : 'DSV Vendido'
+  const dsvVal   = isMO ? (Number(cards.dsoTotal) || 0) : (Number(cards.dsvOnlyTotal) || 0)
+
+  // Contratos Pagos — EXCLUSIVAMENTE metricas.contratosPagos (DASH/MASTER)
+  const contratosVal = Number(m.contratosPagos) || 0
+
+  // NMRR — metricas.nmrr (DASH)
+  const nmrrVal = Number(m.nmrr) || 0
+
+  // Investimento
+  const investVal = Number(m.investimento) || 0
+
+  // Reuniões — cards.total de REUNIOES_GERAL
+  const reunioesVal = Number(cards.total) || 0
+
+  // Calcular stats para cada indicador
+  const sLeads       = calcIndicatorStats({ realizado: leadsVal,      anoStr, mesNome })
+  const sLeadsMql    = calcIndicatorStats({ realizado: leadsMqlVal,   anoStr, mesNome })
+  const sAgend       = calcIndicatorStats({ realizado: Number(m.agendamentos) || 0, anoStr, mesNome })
+  const sReunioes    = calcIndicatorStats({ realizado: reunioesVal,    anoStr, mesNome })
+  const sContratos   = calcIndicatorStats({ realizado: contratosVal,   anoStr, mesNome })
+  const sNmrr        = calcIndicatorStats({ realizado: nmrrVal,        anoStr, mesNome })
+  const sDsv         = calcIndicatorStats({ realizado: dsvVal,         anoStr, mesNome })
+  const sInvest      = calcIndicatorStats({ realizado: investVal,      anoStr, mesNome })
+
+  const INDICADORES = [
+    { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmtNum1,  fmtMedia: fmtNum1 },
+    { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmtNum1,  fmtMedia: fmtNum1 },
+    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmtNum1,  fmtMedia: fmtNum1 },
+    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmtNum1,  fmtMedia: fmtNum1 },
+    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmtNum1,  fmtMedia: fmtNum1 },
+    { id: 'NMRR',            label: 'NMRR',            stats: sNmrr,      fmt: fmtR1,    fmtMedia: fmtR },
+    { id: 'DSV/DSO',         label: dsvLabel,          stats: sDsv,       fmt: fmtR1,    fmtMedia: fmtR },
+    { id: 'Investimento',    label: 'Investimento',    stats: sInvest,    fmt: fmtR1,    fmtMedia: fmtR },
+  ]
+
+  const opcoesDropdown = ['Todos', ...INDICADORES.map(i => i.id)]
+  const visiveis = filtro === 'Todos' ? INDICADORES : INDICADORES.filter(i => i.id === filtro)
+
+  return (
+    <div>
+      {/* Cabeçalho */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Forecast por Indicador</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{periodoAtivo.label} · {String(empresaSelecionada).toUpperCase()}</div>
+        </div>
+        <select
+          className="period-select has-selection"
+          value={filtro}
+          onChange={e => setFiltro(e.target.value)}
+          style={{ marginLeft: 'auto', minWidth: 170 }}
+        >
+          {opcoesDropdown.map(op => <option key={op} value={op}>{op}</option>)}
+        </select>
+      </div>
+
+      {/* Aviso de mês passado */}
+      {!visiveis[0]?.stats.isMesAtual && visiveis.length > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, fontStyle: 'italic' }}>
+          Mês encerrado — exibindo realizado sem projeção.
+        </div>
+      )}
+
+      {/* Grid de cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+        {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia }) => (
+          <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} />
+        ))}
+      </div>
+
+      {/* Nota de metodologia */}
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 18, lineHeight: 1.6 }}>
+        Dias úteis = segunda a sexta, excluindo feriados nacionais oficiais. Resultados registrados em finais de semana ou feriados entram no Atual mas não aumentam o denominador da média.
+      </div>
+    </div>
+  )
+}
+
+// Card individual de indicador — sem meta (nenhum indicador desta versão possui
+// meta mensal real disponível na fonte de dados atual).
+function IndicadorCard({ label, stats, fmtVal, fmtMedia }) {
+  const { realizado, mediaDia, projecao, diasDecorridos, diasTotais, isMesAtual } = stats
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="card-label">{label}</div>
+      <div className="card-value">{fmtVal(realizado)}</div>
+      {diasDecorridos > 0 ? (
+        <div className="card-sub">
+          {fmtMedia(mediaDia)}/dia útil
+          {isMesAtual && projecao !== null && (
+            <> · Proj: <strong>{fmtVal(Math.round(projecao))}</strong></>
+          )}
+        </div>
+      ) : (
+        <div className="card-sub">—</div>
+      )}
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+        {diasDecorridos}/{diasTotais} dias úteis
+      </div>
+    </div>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ── Forecast view with month dropdown ─────────────────────────
 function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSelecionada = 'AI' }) {
@@ -2649,13 +2870,14 @@ export default function Dashboard() {
     ['COMPARATIVO', 'Comparativo Mensal'],
     ['DADOS',       'Dados Específicos'],
     ['METAS_ORIGEM','Metas por Origem'],
+    ['FORECAST_IND','Forecast por Indicador'],
   ]
 
   // isSpecialView: true quando a aba ativa é uma análise especial (não a visão mensal padrão)
   const isSpecialView = specialViews.some(([k]) => k === periodo)
   // activeMesKey: chave do mês para buscar dados — independe da aba ativa
   const activeMesKey = isSpecialView ? mesSelAtivo : periodo
-  const periodoData = currentData && activeMesKey && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO'].includes(periodo)
+  const periodoData = currentData && activeMesKey && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO','FORECAST_IND'].includes(periodo)
     ? (currentData[activeMesKey] ?? null)
     : null
 
@@ -2832,6 +3054,7 @@ export default function Dashboard() {
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
+               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} empresaSelecionada={empresa} /> :
                periodoData ? <>
                  <MetricCards metricas={periodoData.metricas} />
                  <ReuniaoCards cards={periodoData.reunioes?.cards} empresa={empresa} graficos={periodoData.reunioes?.graficos} />
