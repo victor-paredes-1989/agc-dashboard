@@ -1733,10 +1733,19 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
   if (!dados) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
 
   const w = 720, h = 260, padX = 34, padY = 22
+  const hasMeta = dados.meta > 0
+  const hasSuper = dados.supermeta > 0
+
+  // Para indicadores com série diária: cortar real no último dia com dado real
+  // (evita linha horizontal entrando no futuro)
+  const realSeries = dados.singlePoint
+    ? dados.real
+    : dados.real.filter(p => p.dia <= (dados.ultimoDiaComDado || dados.cutoffDia || dados.totalDias))
+
   const allVals = [
-    ...dados.real.map(p => p.valor),
-    ...dados.metaLine.map(p => p.valor),
-    ...dados.superLine.map(p => p.valor),
+    ...realSeries.map(p => p.valor),
+    ...(hasMeta ? dados.metaLine.map(p => p.valor) : []),
+    ...(hasSuper ? dados.superLine.map(p => p.valor) : []),
     ...dados.previsaoLine.map(p => p.valor),
   ]
   const max = Math.max(...allVals, 1)
@@ -1747,16 +1756,14 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
   const fmtAxis = isQty ? fmtNum1 : fmtR1
   const fmtVal  = isQty ? fmtNum1 : fmtR
 
-  // Find last meaningful data point for each series
-  const realPoints = dados.real.filter(p => p.valor > 0)
-  const lastReal = realPoints[realPoints.length - 1]
-  const lastMeta = dados.metaLine[dados.metaLine.length - 1]
-  const lastSuper = dados.supermeta > 0 ? dados.superLine[dados.superLine.length - 1] : null
-  const lastPrevisao = dados.previsaoLine[dados.previsaoLine.length - 1]
+  const lastReal = realSeries.length > 0 ? realSeries[realSeries.length - 1] : null
+  const lastMeta = hasMeta ? dados.metaLine[dados.metaLine.length - 1] : null
+  const lastSuper = hasSuper ? dados.superLine[dados.superLine.length - 1] : null
+  const lastPrevisao = dados.previsaoLine.length > 0 ? dados.previsaoLine[dados.previsaoLine.length - 1] : null
 
   const endPoints = [
     lastReal && { key: 'real', label: 'Realizado', color: '#ef4444', last: lastReal },
-    { key: 'meta', label: 'Meta', color: '#8b5cf6', last: lastMeta },
+    lastMeta && { key: 'meta', label: 'Meta', color: '#8b5cf6', last: lastMeta },
     lastSuper && { key: 'super', label: 'Supermeta', color: '#f59e0b', last: lastSuper },
     lastPrevisao && { key: 'prev', label: 'Previsão', color: '#94a3b8', last: lastPrevisao },
   ].filter(Boolean)
@@ -1772,19 +1779,19 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
           </g>
         ))}
 
-        {/* Lines */}
-        {dados.meta > 0 && <polyline points={line(dados.metaLine)} fill="none" stroke="#8b5cf6" strokeWidth="2" />}
-        {dados.supermeta > 0 && <polyline points={line(dados.superLine)} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="5 5" />}
-        <polyline points={line(dados.previsaoLine)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 6" />
-        {/* Para indicadores sem histórico diário, suprimir linha de realizado (apenas ponto) */}
-        {!dados.singlePoint && <polyline points={line(dados.real)} fill="none" stroke="#ef4444" strokeWidth="3" />}
+        {/* Lines — somente séries com valor real */}
+        {hasMeta && <polyline points={line(dados.metaLine)} fill="none" stroke="#8b5cf6" strokeWidth="2" />}
+        {hasSuper && <polyline points={line(dados.superLine)} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="5 5" />}
+        {dados.previsaoLine.length > 1 && <polyline points={line(dados.previsaoLine)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 6" />}
+        {/* Realizado: para singlePoint somente o ponto; para séries diárias, linha até ultimoDiaComDado */}
+        {!dados.singlePoint && realSeries.length > 1 && <polyline points={line(realSeries)} fill="none" stroke="#ef4444" strokeWidth="3" />}
 
-        {/* Regular real dots (excluding last) */}
-        {realPoints.map((p, i) => i < realPoints.length - 1 && (
+        {/* Pontos intermediários da série real */}
+        {!dados.singlePoint && realSeries.map((p, i) => i < realSeries.length - 1 && p.valor > 0 && (
           <circle key={i} cx={xPos(p.dia)} cy={yPos(p.valor)} r="3" fill="#ef4444" />
         ))}
 
-        {/* Last-point markers with hover for all series */}
+        {/* Marcadores finais com hover */}
         {endPoints.map((s) => {
           const cx = xPos(s.last.dia)
           const cy = yPos(s.last.valor)
@@ -1801,13 +1808,13 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
           )
         })}
 
-        {/* Day labels */}
+        {/* Rótulos de dia */}
         {[1, 5, 10, 15, 20, 25, dados.totalDias].filter((d, i, arr) => d <= dados.totalDias && arr.indexOf(d) === i).map(d => (
           <text key={d} x={xPos(d)} y={h-4} fill="#94a3b8" fontSize="10" textAnchor="middle">{d}</text>
         ))}
       </svg>
 
-      {/* Tooltip shown top-right when hovering a last point */}
+      {/* Tooltip */}
       {tooltip && (
         <div className="tooltip-box" style={{ position: 'absolute', top: 8, right: 8, borderLeft: `3px solid ${tooltip.color}` }}>
           <div className="tooltip-label">{tooltip.label} — valor final</div>
@@ -1822,11 +1829,12 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
         </div>
       )}
 
+      {/* Legenda dinâmica — somente séries que realmente existem */}
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
-        <span><b style={{ color: '#ef4444' }}>●</b> Realizado</span>
-        <span><b style={{ color: '#8b5cf6' }}>—</b> Meta</span>
-        <span><b style={{ color: '#f59e0b' }}>--</b> Supermeta</span>
-        <span><b style={{ color: '#94a3b8' }}>--</b> Previsão</span>
+        {lastReal && <span><b style={{ color: '#ef4444' }}>●</b> Realizado</span>}
+        {lastMeta && <span><b style={{ color: '#8b5cf6' }}>—</b> Meta</span>}
+        {lastSuper && <span><b style={{ color: '#f59e0b' }}>--</b> Supermeta</span>}
+        {lastPrevisao && <span><b style={{ color: '#94a3b8' }}>--</b> Previsão</span>}
       </div>
     </div>
   )
@@ -1865,23 +1873,25 @@ function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoS
   const val = Number(realizado) || 0
   const proj = (isCurrent && projecao !== null) ? Number(projecao) || 0 : val
 
-  // real: somente o ponto de hoje tem valor — sem linha histórica
-  const real = dias.map(d => ({ dia: d, valor: d === cutoffDia ? val : 0 }))
+  // real: somente o ponto atual — sem linha histórica, sem zeros antes
+  const real = [{ dia: cutoffDia, valor: val }]
 
-  // previsaoLine: parte do ponto atual e sobe até proj no último dia
+  // previsaoLine: só do cutoff em diante (não fabricar pontos antes)
   const gapFuturo = proj - val
   const opRestantes = isCurrent
     ? (dayMode === 'calendar'
         ? Math.max(totalDias - cutoffDia, 0)
         : countWorkingDays({ year, month, start: cutoffDia + 1, end: totalDias }))
     : 0
-  const previsaoLine = dias.map(d => {
-    if (!isCurrent || d <= cutoffDia) return { dia: d, valor: d <= cutoffDia ? (d === cutoffDia ? val : 0) : val }
-    const avanco = dayMode === 'calendar'
-      ? (d - cutoffDia)
-      : countWorkingDays({ year, month, start: cutoffDia + 1, end: d })
-    return { dia: d, valor: val + (opRestantes > 0 ? gapFuturo * avanco / opRestantes : 0) }
-  })
+  const previsaoLine = isCurrent
+    ? dias.filter(d => d >= cutoffDia).map(d => {
+        if (d === cutoffDia) return { dia: d, valor: val }
+        const avanco = dayMode === 'calendar'
+          ? (d - cutoffDia)
+          : countWorkingDays({ year, month, start: cutoffDia + 1, end: d })
+        return { dia: d, valor: val + (opRestantes > 0 ? gapFuturo * avanco / opRestantes : 0) }
+      })
+    : [{ dia: cutoffDia, valor: val }]
 
   // metaLine: linear proporcional ao dayMode
   const metaTotais = dayMode === 'calendar' ? totalDias : countWorkingDays({ year, month, start: 1 })
@@ -2279,7 +2289,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
         <div style={{ marginTop: 28 }}>
           <div className="chart-card">
             <div className="chart-title">
-              Evolução e Forecast — {indicadorSelecionado?.label}
+              {chartDados.singlePoint ? 'Forecast' : 'Evolução e Forecast'} — {indicadorSelecionado?.label}
             </div>
             <ForecastCurveChart dados={chartDados} unidade={chartUnidade} />
             {chartDados.singlePoint && (
