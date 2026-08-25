@@ -1920,7 +1920,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
   const estadoAtual = visiveis[0]?.stats.estado
 
   return (
-    <div>
+    <div style={{ maxWidth: 940, margin: '0 auto' }}>
       {/* Cabeçalho */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>
