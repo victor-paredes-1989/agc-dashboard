@@ -1949,8 +1949,33 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
         </div>
       )}
 
-      {/* Grid de cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16 }}>
+      {/* Grid de cards — 4 colunas fixas no desktop, responsivo em telas menores */}
+      <style>{`
+        .ind-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          max-width: 900px;
+        }
+        @media (max-width: 900px) {
+          .ind-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+          .ind-grid { grid-template-columns: 1fr; }
+        }
+        .ind-card {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 18px 20px 16px;
+          border-radius: 12px;
+          border: 1px solid var(--border);
+          background: var(--card-bg, var(--bg-secondary));
+          min-height: 172px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        }
+      `}</style>
+      <div className="ind-grid">
         {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta }) => (
           <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
         ))}
@@ -1976,45 +2001,54 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
   const diasLabel = dayMode === 'calendar' ? 'dias' : 'dias úteis'
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 0, padding: '16px 18px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 8 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1, marginBottom: 10 }}>
-        {fmtVal(realizado)}
-      </div>
-      {isCurrent ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Média </span>
-            {fmtMedia(mediaDia)}/{dayMode === 'calendar' ? 'dia' : 'dia útil'}
-          </div>
-          {projecao !== null && (
-            <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>Forecast </span>
-              {fmtVal(Math.round(projecao))}
-            </div>
-          )}
-          {metaVal > 0 && (
-            <>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Meta </span>
-                {fmtVal(metaVal)}
-              </div>
-              {pctMeta !== null && (
-                <div style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
-                  {pctMeta}% da meta
-                </div>
-              )}
-            </>
-          )}
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-            {diasDecorridos}/{diasTotais} {diasLabel}
-          </div>
+    <div className="ind-card">
+      {/* Topo: label + valor */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 6 }}>
+          {label}
         </div>
-      ) : (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>—</div>
-      )}
+        <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>
+          {fmtVal(realizado)}
+        </div>
+      </div>
+
+      {/* Meio: métricas ou placeholder */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10 }}>
+        {isCurrent ? (
+          <>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Média </span>
+              {fmtMedia(mediaDia)}/{dayMode === 'calendar' ? 'dia' : 'dia útil'}
+            </div>
+            {projecao !== null && (
+              <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>Forecast </span>
+                {fmtVal(Math.round(projecao))}
+              </div>
+            )}
+            {metaVal > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Meta </span>
+                  {fmtVal(metaVal)}
+                </div>
+                {pctMeta !== null && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
+                    {pctMeta}% da meta
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        ) : (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</div>
+        )}
+      </div>
+
+      {/* Rodapé: contador de dias — fixo no fundo */}
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+        {isCurrent ? `${diasDecorridos}/${diasTotais} ${diasLabel}` : ' '}
+      </div>
     </div>
   )
 }
