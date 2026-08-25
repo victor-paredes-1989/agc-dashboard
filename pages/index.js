@@ -521,10 +521,11 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const totalNmrrOrigem = origemRows.reduce((s, r) => s + r.nmrr, 0)
 
   // ── Componentes internos ──
-  const Stat = ({ label, value, color, big }) => (
+  const Stat = ({ label, value, color, big, sub }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontSize: big ? 22 : 15, fontWeight: 700, color: color || 'var(--text-primary)', lineHeight: 1.1 }}>{value}</span>
+      {sub && <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{sub}</span>}
     </div>
   )
 
@@ -613,7 +614,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
           <Divider />
           <Row2 items={[
             { label: `Pagos${c.taxa ? ` (${pct(c.taxa)} conv.)` : ''}`, value: f0(c.pagos), color: '#10b981', big: true },
-            { label: 'Pipeline Ativo', value: valorNaMesa > 0 ? r1(valorNaMesa) : '-' },
+            { label: 'Pipeline Ativo', value: valorNaMesa > 0 ? r1(valorNaMesa) : '-', sub: 'Valor na Mesa' },
           ]} />
           <Divider />
           <Row2 items={[
