@@ -1692,7 +1692,7 @@ function ForecastCurveChart({ dados, tipo }) {
               <circle cx={cx} cy={cy} r={isHovered ? 9 : 7} fill="none" stroke={s.color} strokeWidth="1.5" opacity={isHovered ? 0.8 : 0.45} />
               <circle cx={cx} cy={cy} r={isHovered ? 6 : 5} fill={s.color}
                 style={{ cursor: 'pointer' }}
-                onMouseEnter={() => setTooltip({ key: s.key, label: s.label, valor: s.last.valor, color: s.color })}
+                onMouseEnter={() => setTooltip({ key: s.key, label: s.label, valor: s.last.valor, color: s.color, meta: dados.meta })}
                 onMouseLeave={() => setTooltip(null)}
               />
             </g>
@@ -1709,7 +1709,14 @@ function ForecastCurveChart({ dados, tipo }) {
       {tooltip && (
         <div className="tooltip-box" style={{ position: 'absolute', top: 8, right: 8, borderLeft: `3px solid ${tooltip.color}` }}>
           <div className="tooltip-label">{tooltip.label} — valor final</div>
-          <div className="tooltip-value" style={{ color: tooltip.color }}>{fmtVal(tooltip.valor)}</div>
+          <div className="tooltip-value" style={{ color: tooltip.color }}>
+            {fmtVal(tooltip.valor)}
+            {(tooltip.key === 'real' || tooltip.key === 'prev') && tooltip.meta > 0 && (
+              <span style={{ fontSize: '0.7em', fontWeight: 500, marginLeft: 6, opacity: 0.85 }}>
+                → {Math.round((tooltip.valor / tooltip.meta) * 100)}%
+              </span>
+            )}
+          </div>
         </div>
       )}
 
