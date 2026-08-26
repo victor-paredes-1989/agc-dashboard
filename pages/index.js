@@ -775,142 +775,139 @@ function FunilPrincipal({ metricas }) {
   const contratosPagos = Number(metricas.contratosPagos) || 0
   const nmrr           = Number(metricas.nmrr)           || 0
 
-  // Fontes e fórmulas — inalteradas em relação à primeira versão do Funil Principal.
+  // Fontes e fórmulas — inalteradas desde a primeira versão do Funil Principal.
   const pct = (num, den) => den > 0 ? (num / den) * 100 : null
   const fmtTaxa = (v) => v === null ? '—' : fmtPct(v)
-  // Sempre um hex literal (nunca var(--...)) — precisa ser concatenável com sufixo de alpha
-  // (ex.: "1a") para tingir o fundo/borda do badge sem gerar CSS inválido.
-  const taxaColor = (v, fallback) => v === null ? '#94a3b8' : v > 100 ? '#f97316' : fallback
+  // var(--accent)/var(--text-muted) têm bom contraste nos dois temas — nada aqui é
+  // concatenado com sufixo de alpha, então usar var(--...) diretamente é seguro.
+  const taxaColor = (v) => v === null ? 'var(--text-muted)' : v > 100 ? '#f97316' : 'var(--accent)'
 
   const t1 = pct(agendamentos, leads)
   const t2 = pct(realizadas, agendamentos)
   const t3 = pct(contratosPagos, realizadas)
   const tTotal = pct(contratosPagos, leads)
 
-  // Largura visual de cada faixa do funil — puramente estética, nunca usada em nenhuma
-  // conversão exibida. Representa o volume da etapa em relação a Leads (100%), com piso
-  // mínimo para o texto continuar legível e sem nunca alargar de uma etapa pra outra
-  // (mesmo se o dado da planilha vier fora de ordem).
-  const WIDTH_MIN = 42
+  // Largura de cada etapa do funil (topo de cada faixa) — puramente estética, nunca usada em
+  // nenhuma conversão exibida. Representa o volume da etapa em relação a Leads (100%), com
+  // piso mínimo só para a faixa não desaparecer visualmente, e sempre não-crescente entre
+  // etapas (mesmo se o dado da planilha vier fora de ordem). Como o texto agora fica FORA da
+  // silhueta (não mais dentro dela), o piso pode ser bem mais baixo que na versão anterior.
+  const WIDTH_MIN = 8
   const stageWidth = (valor, prevWidth) =>
-    leads > 0 ? Math.min(prevWidth, Math.max(WIDTH_MIN, (valor / leads) * 100)) : WIDTH_MIN
+    leads > 0 ? Math.min(prevWidth, Math.max(WIDTH_MIN, (valor / leads) * 100)) : prevWidth
 
   const wLeads        = 100
   const wAgendamentos = stageWidth(agendamentos, wLeads)
   const wRealizadas   = stageWidth(realizadas, wAgendamentos)
   const wContratos    = stageWidth(contratosPagos, wRealizadas)
+  // Fecho visual da última faixa — desce um pouco além do próprio topo pra a base do funil
+  // terminar numa ponta, sem representar nenhum dado novo.
+  const wFecho = Math.max(4, wContratos - 6)
 
+  // Topo/base de cada faixa: a base da faixa N é sempre igual ao topo da faixa N+1, então as
+  // faixas se encaixam sem nenhuma emenda/gap — uma silhueta contínua de funil de verdade.
   const ETAPAS = [
-    { key: 'leads',        label: 'Leads',          valor: fmt(leads),          color: '#3b82f6', width: wLeads,        taxa: null },
-    { key: 'agendamentos', label: 'Agendamentos',   valor: fmt(agendamentos),   color: '#6366f1', width: wAgendamentos, taxa: t1 },
-    { key: 'realizadas',   label: 'Realizadas',     valor: fmt(realizadas),     color: '#14b8a6', width: wRealizadas,   taxa: t2 },
-    { key: 'pagos',        label: 'Contratos Pagos', valor: fmt(contratosPagos), color: '#10b981', width: wContratos,    taxa: t3 },
+    { key: 'leads',        label: 'Leads',           valor: fmt(leads),          top: wLeads,        bottom: wAgendamentos, taxa: null },
+    { key: 'agendamentos', label: 'Agendamentos',    valor: fmt(agendamentos),   top: wAgendamentos, bottom: wRealizadas,   taxa: t1 },
+    { key: 'realizadas',   label: 'Realizadas',      valor: fmt(realizadas),     top: wRealizadas,   bottom: wContratos,    taxa: t2 },
+    { key: 'pagos',        label: 'Contratos Pagos', valor: fmt(contratosPagos), top: wContratos,    bottom: wFecho,        taxa: t3 },
   ]
+  const clipFor = (top, bottom) => {
+    const tl = (100 - top) / 2, tr = 100 - tl
+    const bl = (100 - bottom) / 2, br = 100 - bl
+    return `polygon(${tl}% 0, ${tr}% 0, ${br}% 100%, ${bl}% 100%)`
+  }
 
   return (
     <div className="funil-wrap">
       <div className="funil-header">
         <div className="funil-title">Funil Principal</div>
-        <div className="funil-subtitle">Leads → Agendamentos → Realizadas → Contratos Pagos → NMRR</div>
+        <div className="funil-subtitle">{fmt(leads)} leads até {fmt(contratosPagos)} contratos pagos</div>
       </div>
 
       <div className="chart-card funil-card">
-        <div className="funil-track">
+        <div className="funil-grid">
           {ETAPAS.map((e, i) => (
-            <div className="funil-row" key={e.key}>
-              <div className="funil-stage-col">
-                <div
-                  className="funil-stage"
-                  style={{ width: `${e.width}%`, background: `linear-gradient(135deg, ${e.color} 0%, ${e.color}cc 100%)` }}
-                >
-                  <span className="funil-stage-label">{e.label}</span>
-                  <span className="funil-stage-value">{e.valor}</span>
-                </div>
-                {i < ETAPAS.length - 1 && <div className="funil-connector" />}
+            <div className="funil-grid-row" key={e.key} style={{ '--i': i }}>
+              <div className="funil-label-cell">
+                <span className="funil-label-name">{e.label}</span>
+                <span className="funil-label-value">{e.valor}</span>
               </div>
-              <div className="funil-badge-col">
+              <div className="funil-shape-cell">
+                <div className="funil-band" style={{ clipPath: clipFor(e.top, e.bottom) }} />
+              </div>
+              <div className="funil-pct-cell">
                 {/* Leads (i===0) não tem conversão de entrada — as demais sempre mostram um
-                    badge, com "—" quando o denominador da etapa anterior for zero. */}
-                {i > 0 && (
-                  <div className="funil-badge" style={{ background: `${taxaColor(e.taxa, e.color)}1a`, borderColor: `${taxaColor(e.taxa, e.color)}55`, color: taxaColor(e.taxa, e.color) }}>
-                    <span className="funil-badge-value">{fmtTaxa(e.taxa)}</span>
-                    <span className="funil-badge-caption">conversão</span>
-                  </div>
-                )}
+                    valor, com "—" quando o denominador da etapa anterior for zero. */}
+                {i > 0 && <span style={{ color: taxaColor(e.taxa) }}>{fmtTaxa(e.taxa)}</span>}
               </div>
             </div>
           ))}
+        </div>
 
-          {/* NMRR — resultado financeiro final; fecha o funil como base de destaque, sem
-              seguir o afunilamento das etapas de contagem acima. */}
-          <div className="funil-connector funil-connector-nmrr" />
-          <div className="funil-nmrr">
-            <span className="funil-nmrr-label">NMRR · resultado do mês</span>
-            <span className="funil-nmrr-value">{nmrr > 0 ? fmtR1(nmrr) : '—'}</span>
-          </div>
+        {/* NMRR — resultado financeiro final; fecha o funil como base de destaque, sem
+            seguir o afunilamento das etapas de contagem acima. */}
+        <div className="funil-nmrr">
+          <span className="funil-nmrr-label">NMRR · resultado do mês</span>
+          <span className="funil-nmrr-value">{nmrr > 0 ? fmtR1(nmrr) : '—'}</span>
         </div>
 
         <div className="funil-footer">
           <span>Conversão total do funil</span>
-          <strong style={{ color: tTotal !== null ? '#10b981' : 'var(--text-muted)' }}>{fmtTaxa(tTotal)}</strong>
+          <strong style={{ color: tTotal !== null ? 'var(--accent)' : 'var(--text-muted)' }}>{fmtTaxa(tTotal)}</strong>
           <span className="funil-footer-note">Contratos Pagos ÷ Leads</span>
         </div>
       </div>
 
       <style>{`
         .funil-wrap { margin-top: 32px; margin-bottom: 8px; }
-        .funil-header { margin-bottom: 14px; }
+        .funil-header { margin-bottom: 16px; }
         .funil-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
-        .funil-subtitle { font-size: 11px; color: var(--text-muted); opacity: 0.7; margin-top: 3px; }
+        .funil-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
 
-        .funil-card { padding: 32px 28px 24px; display: flex; flex-direction: column; align-items: center; }
-        .funil-track { width: 100%; max-width: 640px; }
+        .funil-card { padding: 30px 26px 26px; display: flex; flex-direction: column; align-items: center; }
 
-        .funil-row { display: flex; align-items: center; gap: 16px; }
-        .funil-stage-col { flex: 1; min-width: 0; }
-        .funil-badge-col { width: 92px; flex-shrink: 0; display: flex; justify-content: center; }
-
-        .funil-stage {
-          margin: 0 auto;
-          min-width: 190px;
-          height: 60px;
-          clip-path: polygon(5% 0, 95% 0, 100% 100%, 0% 100%);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-          transition: width 0.3s ease;
+        .funil-grid {
+          --funil-row-h: 60px;
+          width: 100%; max-width: 620px;
+          display: flex; flex-direction: column;
         }
-        .funil-stage-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.88); }
-        .funil-stage-value { font-size: 24px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.25; }
-
-        .funil-connector { width: 2px; height: 10px; background: var(--border-strong); margin: 2px auto 0; }
-        .funil-connector-nmrr { margin: 2px auto 0; }
-
-        .funil-badge {
-          display: flex; flex-direction: column; align-items: center;
-          border: 1.5px solid; border-radius: 10px;
-          padding: 6px 10px 5px;
-          min-width: 76px;
+        .funil-grid-row {
+          display: grid;
+          grid-template-columns: minmax(96px, 150px) 1fr minmax(52px, 76px);
+          align-items: stretch;
+          column-gap: 18px;
+          height: var(--funil-row-h);
         }
-        .funil-badge-value { font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
-        .funil-badge-caption { font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+
+        .funil-label-cell { display: flex; flex-direction: column; justify-content: center; }
+        .funil-label-name { font-size: 12px; color: var(--text-secondary); }
+        .funil-label-value { font-size: 21px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.25; }
+
+        .funil-shape-cell { position: relative; }
+        .funil-band {
+          position: absolute; inset: 0;
+          background-image: linear-gradient(180deg, #5eead4 0%, #0f766e 100%);
+          background-size: 100% calc(var(--funil-row-h) * 4);
+          background-position: 0 calc(var(--funil-row-h) * var(--i) * -1);
+        }
+
+        .funil-pct-cell { display: flex; align-items: center; justify-content: flex-end; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
         .funil-nmrr {
-          width: 100%; margin: 0 auto; box-sizing: border-box;
-          background: linear-gradient(135deg, rgba(245,158,11,0.16) 0%, rgba(245,158,11,0.05) 100%);
-          border: 1.5px solid rgba(245,158,11,0.4);
-          border-radius: 12px;
-          padding: 16px 22px;
+          width: 100%; max-width: 620px; margin-top: 14px; box-sizing: border-box;
+          background: linear-gradient(135deg, rgba(245,158,11,0.14) 0%, rgba(245,158,11,0.04) 100%);
+          border: 1.5px solid rgba(245,158,11,0.35);
+          border-radius: 10px;
+          padding: 14px 20px;
           display: flex; align-items: center; justify-content: space-between;
         }
         .funil-nmrr-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
-        .funil-nmrr-value { font-size: 28px; font-weight: 800; color: #f59e0b; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+        .funil-nmrr-value { font-size: 24px; font-weight: 800; color: #f59e0b; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
         .funil-footer {
-          margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
-          width: 100%; max-width: 640px; box-sizing: border-box;
+          margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+          width: 100%; max-width: 620px; box-sizing: border-box;
           display: flex; align-items: baseline; justify-content: center; gap: 8px;
           font-size: 12px; color: var(--text-muted);
         }
@@ -918,15 +915,17 @@ function FunilPrincipal({ metricas }) {
         .funil-footer-note { opacity: 0.65; }
 
         @media (max-width: 640px) {
-          .funil-card { padding: 22px 14px 18px; }
-          .funil-row { gap: 8px; }
-          .funil-badge-col { width: 64px; }
-          .funil-stage { min-width: 0; height: 52px; }
-          .funil-stage-value { font-size: 19px; }
-          .funil-badge { padding: 5px 6px 4px; min-width: 0; }
-          .funil-badge-value { font-size: 16px; }
-          .funil-nmrr { padding: 13px 16px; }
-          .funil-nmrr-value { font-size: 22px; }
+          .funil-card { padding: 20px 14px 18px; }
+          .funil-grid { --funil-row-h: 42px; }
+          .funil-grid-row { grid-template-columns: minmax(72px, 108px) 1fr minmax(40px, 56px); column-gap: 10px; }
+          .funil-label-name { font-size: 10.5px; }
+          .funil-label-value { font-size: 16px; }
+          .funil-pct-cell { font-size: 12.5px; }
+          .funil-nmrr { flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; }
+          .funil-nmrr-label { white-space: nowrap; }
+          .funil-nmrr-value { font-size: 19px; }
+          .funil-footer { flex-direction: column; align-items: center; gap: 2px; }
+          .funil-footer-note { display: block; }
         }
       `}</style>
     </div>
