@@ -913,3 +913,121 @@ body {
   [style*="display: 'grid'"],
   [style*="display:grid"] { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   PR A — FUNDAÇÃO DO DESIGN SYSTEM (VP Dash · Precision Dark)
+   ══════════════════════════════════════════════════════════════════════
+   Camada de tokens NOVA e ADITIVA sobre a existente (linhas 1–915 acima).
+   Nenhum token antigo foi removido, renomeado ou teve seu valor alterado —
+   isto aqui só nomeia formalmente o que já existe (via var(--token-antigo))
+   e preenche lacunas (spacing, motion, escala de radius/typography) que a
+   auditoria de design system identificou.
+
+   Nada neste bloco é consumido por nenhum componente ainda: é só a base
+   para os próximos PRs (cards, tabelas, filtros, charts, motion visível).
+   Zero mudança de layout, zero mudança de view, zero mudança de dado.
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces — hierarquia de profundidade ──────────────────────────
+     fundo geral → superfície → card → card elevado (tooltip/popover/modal).
+     Todos são alias de tokens já existentes: adaptam a dark/light sozinhos. */
+  --surface-0:        var(--bg-primary);
+  --surface-1:         var(--bg-card);
+  --surface-2:         var(--bg-card-hover);
+  --surface-elevated:  var(--bg-tooltip);
+
+  /* ── Borders ─────────────────────────────────────────────────────── */
+  --border-subtle:     rgba(255,255,255,0.045); /* novo — mais discreta que --border; override light abaixo */
+  --border-default:    var(--border);
+  /* --border-strong já existe acima (linha 22) e continua sendo o nome canônico de borda forte — não redeclarado aqui. */
+
+  /* ── Shadows — no máx. 3 níveis, todos alias das sombras já em uso ── */
+  --shadow-sm:          var(--shadow-nav);
+  --shadow-md:          var(--shadow-card);
+  --shadow-lg:          var(--shadow-card-hover);
+
+  /* ── Radius — escala curta ───────────────────────────────────────── */
+  --radius-sm:          8px;
+  --radius-md:          12px;
+  --radius-lg:          var(--radius-card); /* = 14px, mesmo valor já usado em cards hoje */
+  --radius-xl:          20px;
+
+  /* ── Spacing — escala 4→48, nomeada pelo próprio valor em px ─────── */
+  --space-4:   4px;
+  --space-8:   8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+
+  /* ── Typography — tokens por papel semântico ──────────────────────
+     Valores replicam o que já é usado hoje em .card-label/.section-title/
+     .card-value/.hero-headline etc. — não são números novos, são os
+     mesmos já em produção, agora nomeados. Aplicação vem em PR futuro. */
+  --font-label-size:          10.5px;
+  --font-label-weight:        700;
+  --font-label-tracking:      0.08em;
+
+  --font-body-size:           14px;
+  --font-body-weight:         400;
+
+  --font-body-small-size:     12.5px;
+  --font-body-small-weight:   500;
+
+  --font-section-title-size:      10.5px;
+  --font-section-title-weight:    700;
+  --font-section-title-tracking:  0.09em;
+
+  --font-card-value-size:      18px;
+  --font-card-value-weight:    700;
+
+  --font-page-title-size:      26px;
+  --font-page-title-weight:    800;
+
+  /* ── Motion — durações e easings nomeados ─────────────────────────
+     ease-standard reaproveita exatamente o cubic-bezier já usado em
+     .bar-fill (única curva customizada hoje no código). */
+  --duration-fast:    180ms; /* micro-interações: hover, foco */
+  --duration-normal:  260ms; /* entrada de elementos: fade/slide */
+  --duration-slow:    650ms; /* preenchimento de barra/progresso/chart */
+  --ease-standard:    cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-entrance:    cubic-bezier(0, 0, 0.2, 1);
+
+  /* ── Semantic colors — camada de significado sobre a paleta existente
+     --accent permanece como está. Teal/roxo seguem disponíveis via seus
+     nomes originais (--teal, --purple) para uso pontual/conceitual — não
+     entram no conjunto semântico central para evitar paleta arco-íris. */
+  --positive:      var(--green);
+  --positive-bg:   var(--green-bg);
+  --negative:      var(--red);
+  --negative-bg:   var(--red-bg);
+  --warning:       var(--amber);
+  --warning-bg:    var(--amber-bg);
+  --info:          var(--blue);
+  --info-bg:       var(--blue-bg);
+}
+
+/* --border-subtle é o único token novo com valor literal (não-alias) que
+   muda por tema — mesma convenção já usada por todo o resto do arquivo:
+   default em :root, override só onde o valor realmente muda no claro. */
+[data-theme="light"] {
+  --border-subtle: rgba(0,0,0,0.045);
+}
+
+/* Respeita a preferência do sistema por menos movimento. Não aplicado a
+   nenhuma animação específica ainda (nenhuma visível foi adicionada neste
+   PR) — isto só garante que qualquer animação/transição futura já nasça
+   redutível, incluindo as que já existem hoje (spin, fadeIn, pulse-dot,
+   hovers). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
