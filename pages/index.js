@@ -767,6 +767,95 @@ function ReuniaoCards({ cards, empresa, graficos }) {
   )
 }
 
+function FunilPrincipal({ metricas }) {
+  if (!metricas || metricas.leads === undefined) return null
+  const leads          = Number(metricas.leads)          || 0
+  const agendamentos   = Number(metricas.agendamentos)   || 0
+  const realizadas     = Number(metricas.realizadas)     || 0
+  const contratosPagos = Number(metricas.contratosPagos) || 0
+  const nmrr           = Number(metricas.nmrr)           || 0
+
+  const pct = (num, den) => den > 0 ? (num / den) * 100 : null
+  const fmtTaxa = (v) => v === null ? '—' : fmtPct(v)
+  const taxaColor = (v) => v === null ? 'var(--text-muted)' : v > 100 ? '#f97316' : '#94a3b8'
+
+  const t1 = pct(agendamentos, leads)
+  const t2 = pct(realizadas, agendamentos)
+  const t3 = pct(contratosPagos, realizadas)
+  const tTotal = pct(contratosPagos, leads)
+
+  const ETAPAS = [
+    { label: 'Leads',           valor: fmt(leads),          color: '#3b82f6', taxa: t1 },
+    { label: 'Agendamentos',    valor: fmt(agendamentos),   color: '#6366f1', taxa: t2 },
+    { label: 'Realizadas',      valor: fmt(realizadas),     color: '#14b8a6', taxa: t3 },
+    { label: 'Contratos Pagos', valor: fmt(contratosPagos), color: '#10b981', taxa: null },
+  ]
+
+  return (
+    <div style={{ marginTop: 32, marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 14 }}>Funil Principal</div>
+      <div className="chart-card" style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 560 }}>
+          {ETAPAS.map((e, i) => (
+            <div key={e.label}>
+              {/* Etapa */}
+              <div style={{
+                background: 'var(--bg-secondary, rgba(148,163,184,0.07))',
+                border: `1.5px solid ${e.color}22`,
+                borderLeft: `4px solid ${e.color}`,
+                borderRadius: 10,
+                padding: '14px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{e.label}</span>
+                <span style={{ fontSize: 26, fontWeight: 700, color: e.color, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{e.valor}</span>
+              </div>
+              {/* Seta + taxa */}
+              {e.taxa !== undefined && e.taxa !== null || (e.taxa === null && i < ETAPAS.length - 1) ? (
+                i < ETAPAS.length - 1 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 0' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: taxaColor(e.taxa), marginBottom: 1 }}>{fmtTaxa(e.taxa)}</span>
+                    <span style={{ fontSize: 18, color: 'var(--text-muted)', lineHeight: 1 }}>↓</span>
+                  </div>
+                )
+              ) : null}
+            </div>
+          ))}
+
+          {/* NMRR — resultado financeiro final */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 0' }}>
+            <span style={{ fontSize: 18, color: 'var(--text-muted)', lineHeight: 1 }}>↓</span>
+          </div>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 100%)',
+            border: '1.5px solid rgba(245,158,11,0.35)',
+            borderLeft: '4px solid #f59e0b',
+            borderRadius: 10,
+            padding: '14px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>NMRR</span>
+            <span style={{ fontSize: 26, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{nmrr > 0 ? fmtR1(nmrr) : '—'}</span>
+          </div>
+
+          {/* Rodapé: conversão total */}
+          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+            Conversão total do funil:&nbsp;
+            <strong style={{ color: tTotal !== null ? '#10b981' : 'var(--text-muted)' }}>
+              {fmtTaxa(tTotal)}
+            </strong>
+            <span style={{ marginLeft: 8, opacity: 0.6 }}>Contratos Pagos ÷ Leads</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReuniaoGraficos({ graficos }) {
   if (!graficos) return null
   return (
@@ -3467,6 +3556,7 @@ export default function Dashboard() {
                periodoData ? <>
                  <MetricCards metricas={periodoData.metricas} />
                  <ReuniaoCards cards={periodoData.reunioes?.cards} empresa={empresa} graficos={periodoData.reunioes?.graficos} />
+                 <FunilPrincipal metricas={periodoData.metricas} />
                  <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
                </> : <div className="loading">Sem dados para este período</div>}
             </div>
