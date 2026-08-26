@@ -559,7 +559,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const Divider = () => <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       {/* ── Cabeçalho executivo ── */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16,
@@ -728,8 +728,8 @@ function MetricCards({ metricas }) {
   const gapPositive = gapNumber < 0
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Métricas do Mês</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Métricas do Mês</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
         {[
           { label: 'Leads', value: fmt(metricas.leads), sub: `MQL: ${fmtPct(metricas.mql)}`, color: 'blue' },
           { label: 'Agendamentos', value: fmt(metricas.agendamentos), sub: `Taxa: ${fmtPct(metricas.taxaAgendamento)}`, color: '' },
@@ -762,8 +762,8 @@ function ReuniaoCards({ cards, empresa, graficos }) {
     .reduce((s, p) => s + (p.valor || 0), 0)
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12, marginTop: 28 }}>Resumo das Reuniões</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, marginTop: 32 }}>Resumo das Reuniões</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
         <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value">{fmt(cards.total)}</div></div>
         <div className="card green"><div className="card-label">Fechamentos (PAGO)</div><div className="card-value">{fmt(cards.pagos)}</div><div className="card-sub">Taxa: {fmtPct(cards.taxa)}</div></div>
         <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value">{fmtR1(cards.valorTotal)}</div></div>
@@ -945,7 +945,7 @@ function ReuniaoGraficos({ graficos }) {
   if (!graficos) return null
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12, marginTop: 28 }}>Análise das Reuniões</div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, marginTop: 32 }}>Análise das Reuniões</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <div className="chart-card"><div className="chart-title">Valor Pago por Origem (R$)</div>
           <BarChart data={graficos.valorPagoPorOrigem} valueKey="valor" conceptColor formatVal={v=>`R$${(v/1000).toFixed(1).replace('.', ',')}k`} showPct /></div>
@@ -1129,7 +1129,7 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
         <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem registros para essa combinação</div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 20 }}>
             <div className="card"><div className="card-label">Total no Período</div><div className="card-value">{fmt(totalQtd)}</div><div className="card-sub">{eventoLabel.toLowerCase()}</div></div>
             <div className="card blue"><div className="card-label">Média Mensal</div><div className="card-value">{fmtDec(mediaMensal)}</div></div>
             <div className="card green"><div className="card-label">Melhor Mês</div><div className="card-value">{melhorMes ? fmt(melhorMes.qtd) : '-'}</div><div className="card-sub">{melhorMes?.nome || ''}</div></div>
@@ -1380,9 +1380,9 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Filtros — Dados Específicos</div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros — Dados Específicos</div>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 32 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
           <SelectFiltro label="Empresa" value={filtros.empresa} onChange={v=>setFiltro('empresa', v)} options={unique('empresa')} allLabel="Todas" />
           <SelectFiltro label="Mês" value={filtros.mes} onChange={v=>setFiltro('mes', v)} options={unique('mes')} />
           <SelectFiltro label="Ano" value={filtros.ano} onChange={v=>setFiltro('ano', v)} options={unique('ano')} />
@@ -1403,8 +1403,8 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Resumo filtrado</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Resumo filtrado</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 32 }}>
         <div className="card"><div className="card-label">Total de Reuniões</div><div className="card-value">{fmt(total)}</div></div>
         <div className="card green"><div className="card-label">Contratos Pagos</div><div className="card-value">{fmt(pagos.length)}</div><div className="card-sub">Taxa de conversão: {fmtPct(taxa)}</div></div>
         <div className="card amber"><div className="card-label">Valor Pago Total</div><div className="card-value">{fmtR(sum(pagos))}</div></div>
@@ -1415,8 +1415,8 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
         <div className="card red"><div className="card-label">Perdidos/Fugiram</div><div className="card-value">{fmt(filtrados.filter(r => ['FORA','FUGIU'].includes(norm(r.status))).length)}</div></div>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Gráficos filtrados</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Gráficos filtrados</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
         <div className="chart-card"><div className="chart-title">Reuniões por Origem</div><BarChart data={countBy(filtrados, 'origem')} valueKey="qtd" conceptColor showPct /></div>
         <div className="chart-card"><div className="chart-title">Pagos por Origem</div><BarChart data={countBy(pagos, 'origem')} valueKey="qtd" conceptColor showPct /></div>
         <div className="chart-card"><div className="chart-title">Valor Pago por Origem</div><BarChart data={valueBy(pagos, 'origem')} valueKey="valor" conceptColor formatVal={v=>fmtR1(v)} showPct /></div>
@@ -1428,7 +1428,7 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
         <div className="chart-card"><div className="chart-title">Evolução por Data</div><LineChartWithTooltip data={evolucao()} color="#14b8a6" /></div>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Registros filtrados</div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Registros filtrados</div>
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
@@ -1719,8 +1719,8 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Filtros — Metas por Origem</div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros — Metas por Origem</div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 32 }}>
         <Select label="Empresa" value={filters.empresa} options={opts.empresa} onChange={v=>setFilter('empresa', v)} />
         <Select label="Ano" value={filters.ano} options={opts.ano} onChange={v=>setFilter('ano', v)} />
         <Select label="Mês" value={filters.mes} options={opts.mes} onChange={v=>setFilter('mes', v)} />
@@ -1728,7 +1728,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
       </div>
 
       {/* ── Cards de resumo ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16, marginBottom: 32 }}>
         <ResumoCard label="Reuniões" real={realReunioes} meta={metaReunioes} gap={realReunioes - metaReunioes} pctVal={pctReunioes} fmtFn={fmtNum1} />
         <ResumoCard label="Pagos" real={realPagos} meta={metaPagos} gap={realPagos - metaPagos} pctVal={pctPagos} fmtFn={fmtNum1} />
         <ResumoCard label="NMRR" real={realNmrr} meta={metaNmrr} gap={realNmrr - metaNmrr} pctVal={pctNmrr} fmtFn={fmtR1} />
@@ -1736,7 +1736,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
       </div>
 
       {/* ── Performance por Origem ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Performance por Origem</div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-muted)' }}>
           Ordenar por
@@ -1748,7 +1748,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
       {performancePorOrigem.length === 0 && !temOutras ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>Nenhuma origem com meta configurada para os filtros atuais.</div>
       ) : (
-        <div className="mo-perf-grid" style={{ marginBottom: 28 }}>
+        <div className="mo-perf-grid" style={{ marginBottom: 32 }}>
           {performancePorOrigem.map(r => (
             <div className="mo-perf-card" key={r.origem}>
               <div className="mo-perf-title">{r.origem}</div>
@@ -1776,14 +1776,14 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
       {/* Adicionais sem meta — só acrescenta leitura (quais origens específicas, sem meta,
           geraram receita) além do card agregado acima; por isso continua existindo. */}
       {adicionaisSemMeta.length > 0 && (
-        <div className="chart-card" style={{ marginBottom: 28 }}>
+        <div className="chart-card" style={{ marginBottom: 32 }}>
           <div className="chart-title">Adicionais sem Meta — detalhamento por origem</div>
           <AdditionalOriginChart data={adicionaisSemMeta} />
         </div>
       )}
 
       {/* ── Detalhamento por Origem ── */}
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Detalhamento por Origem</div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Detalhamento por Origem</div>
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
@@ -1820,7 +1820,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
            depende de quantas origens existem: sempre 3 colunas até 900px, 2 até 480px,
            1 abaixo disso — a última linha simplesmente fica parcial se a contagem não for
            múltipla da coluna, como qualquer grid comum. */
-        .mo-perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .mo-perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         .mo-perf-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px 18px; }
         .mo-perf-card-outras { border-style: dashed; }
         .mo-perf-outras-tag { font-size: 9.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 6px; }
@@ -2625,7 +2625,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 18px 20px 16px;
+          padding: 20px 20px 16px;
           border-radius: 12px;
           border: 1px solid var(--border);
           background: var(--card-bg, var(--bg-secondary));
@@ -2641,7 +2641,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
 
       {/* Gráfico detalhado — somente quando um indicador específico está selecionado */}
       {chartDados && (
-        <div style={{ marginTop: 28 }}>
+        <div style={{ marginTop: 32 }}>
           <div className="chart-card">
             <div className="chart-title">
               {chartDados.singlePoint ? 'Forecast' : 'Evolução e Forecast'} — {indicadorSelecionado?.label}
@@ -2808,7 +2808,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
         )}
       </div>
 
-      <div className="chart-card" style={{ marginBottom: 24 }}>
+      <div className="chart-card" style={{ marginBottom: 32 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 0.75fr)', gap: 18, alignItems: 'stretch' }}>
           <div>
             <div className="chart-title">Evolução do Forecast — {tipoVisao === 'GERAL' ? empresaSelecionada : nomeAtivo} · {mesAtivo} {anoAtivo}</div>
@@ -2845,8 +2845,8 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 
       {forecastMes && forecastMes.mes && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Resumo do Forecast Mensal</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Resumo do Forecast Mensal</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 20 }}>
             <div className="card blue"><div className="card-label">Meta</div><div className="card-value">{fmtR1(forecastMes.meta)}</div><div className="card-sub">meta do mês</div></div>
             <div className={`card ${Number(forecastMes.meta || 0) > 0 && Number(forecastMes.mrrPago || 0) < Number(forecastMes.meta || 0) ? 'red' : 'green'}`}><div className="card-label">MRR Pago Projetado</div><div className="card-value">{fmtR1(forecastMes.mrrPago)}</div><div className="card-sub">{fmtPct(forecastMes.pctPago)} da meta</div></div>
             <div className={`card ${gapCardClass(forecastMes.gapPago)}`}><div className="card-label">Gap Pago</div><div className="card-value">{fmtR1(forecastMes.gapPago)}</div><div className="card-sub">{gapSub(forecastMes.gapPago)}</div></div>
@@ -2881,8 +2881,8 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
         ].map(o => ({ origem: o, ...stats[o] }))
         if (!ordered.length) return null
         return (
-          <div style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
+          <div style={{ marginTop: 32 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>
               Por Origem — {mesAtivo} {anoAtivo}
             </div>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
@@ -3307,7 +3307,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
     if (metrAtiva) {
       return (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 24 }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 32 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
@@ -3341,7 +3341,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     }
 
     return (
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 24 }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 32 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
@@ -3463,7 +3463,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
               color={metricaAtiva.color} formatVal={metricaAtiva.fmt}
             />
           </div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>
             Tabela resumo — {metricaAtiva.label} · {empresaSelecionada}
           </div>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>

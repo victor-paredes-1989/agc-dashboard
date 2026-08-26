@@ -309,7 +309,10 @@ body {
 
 /* ── Page & Layout ───────────────────────────────────────── */
 .page {
-  padding: 28px 24px;
+  /* PR C: mais respiração vertical no topo/base de toda view (28→32px,
+     var(--space-32)). Horizontal fica em var(--space-24) — mesmo valor de
+     antes, não reduz a área útil de dados. */
+  padding: var(--space-32) var(--space-24);
   width: 100%;
   box-sizing: border-box;
   animation: fadeIn 0.22s ease;
@@ -332,7 +335,7 @@ body {
 .semanas-grid-comparar {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: var(--space-16); /* PR C: 14→16px */
   width: 100%;
   align-items: flex-start;
 }
@@ -350,8 +353,8 @@ body {
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 14px;
-  margin-top: 32px;
+  margin-bottom: var(--space-16); /* PR C: 14→16px — distância título→conteúdo */
+  margin-top: var(--space-32);
 }
 .section-title:first-child { margin-top: 0; }
 
@@ -359,8 +362,8 @@ body {
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: var(--space-16); /* PR C: 12→16px — cards menos "grudados" */
+  margin-bottom: var(--space-8);
 }
 
 .card {
@@ -465,8 +468,8 @@ body {
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-top: 14px;
+  gap: var(--space-16); /* PR C: 14→16px */
+  margin-top: var(--space-16);
 }
 @media (max-width: 1024px) { .charts-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px)  { .charts-grid { grid-template-columns: 1fr; } }
@@ -478,7 +481,7 @@ body {
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.03);
   border-radius: var(--radius-lg);
-  padding: 18px 16px;
+  padding: var(--space-20) var(--space-16); /* PR C: 18→20px vertical — alinha com .card */
   transition: background var(--duration-fast) var(--ease-standard),
               box-shadow var(--duration-fast) var(--ease-standard),
               border-color var(--duration-fast) var(--ease-standard);
@@ -930,7 +933,7 @@ body {
 .painel-blocos-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  gap: var(--space-24); /* PR C: 20→24px — blocos principais, não só cards de KPI */
 }
 @media (max-width: 1024px) {
   .painel-blocos-grid { grid-template-columns: repeat(2, 1fr); }
@@ -940,7 +943,7 @@ body {
 }
 
 @media (max-width: 480px) {
-  .page { padding: 10px; }
+  .page { padding: var(--space-8); } /* PR C: 10→8px — mantém densidade em telas pequenas */
   .card-value { font-size: 20px; }
   .overflow-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
