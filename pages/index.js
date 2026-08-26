@@ -1655,6 +1655,9 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
     .filter(r => (Number(r.realReunioes) || 0) > 0 || (Number(r.realPagos) || 0) > 0 || (Number(r.realNmrr) || 0) > 0)
     .sort((a, b) => (Number(b.realNmrr) || 0) - (Number(a.realNmrr) || 0))
     .map(r => ({ nome: r.origem, valor: Number(r.realNmrr) || 0, realReunioes: Number(r.realReunioes) || 0, realPagos: Number(r.realPagos) || 0, realNmrr: Number(r.realNmrr) || 0 }))
+  // Mesma condição usada para decidir se o gráfico "Adicionais sem Meta" tem algo a mostrar
+  // — reaproveitada aqui para decidir se o card "Outras" aparece no grid.
+  const temOutras = adicionaisSemMeta.length > 0
 
   // Ordenação da tabela de detalhamento — mesmo padrão já usado em DadosEspecificosView
   // (clique no cabeçalho ordena; clique de novo inverte a direção).
@@ -1742,7 +1745,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
           </select>
         </label>
       </div>
-      {performancePorOrigem.length === 0 ? (
+      {performancePorOrigem.length === 0 && !temOutras ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>Nenhuma origem com meta configurada para os filtros atuais.</div>
       ) : (
         <div className="mo-perf-grid" style={{ marginBottom: 28 }}>
@@ -1754,6 +1757,19 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
               <OrigemMetricRow label="NMRR" real={r.realNmrr} meta={r.metaNmrr} pctVal={r.pctNmrr} fmtFn={fmtR1} />
             </div>
           ))}
+          {/* "Outras" não é uma origem com meta própria — é o resumo agregado de todas as
+              origens sem meta configurada (mesmo critério temMeta de sempre), sempre por
+              último no grid, nunca com Meta/Gap/%/status verde-vermelho (não haveria meta
+              para comparar). Mesmos números já mostrados no card "Adicional sem Meta" do
+              topo — só reaproveitados aqui, nenhum cálculo novo. */}
+          {temOutras && (
+            <div className="mo-perf-card mo-perf-card-outras" key="outras">
+              <div className="mo-perf-title">Outras <span className="mo-perf-outras-tag">sem meta</span></div>
+              <div className="mo-metric-row"><span className="mo-metric-label">Reuniões</span><span className="mo-metric-values">{fmtNum1(realReunioesAdicional)}</span></div>
+              <div className="mo-metric-row"><span className="mo-metric-label">Pagos</span><span className="mo-metric-values">{fmtNum1(realPagosAdicional)}</span></div>
+              <div className="mo-metric-row"><span className="mo-metric-label">NMRR</span><span className="mo-metric-values">{fmtR1(realNmrrAdicional)}</span></div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1806,6 +1822,8 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
            múltipla da coluna, como qualquer grid comum. */
         .mo-perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .mo-perf-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px 18px; }
+        .mo-perf-card-outras { border-style: dashed; }
+        .mo-perf-outras-tag { font-size: 9.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 6px; }
         .mo-perf-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
         .mo-metric-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
         .mo-metric-row:first-of-type { border-top: none; }
