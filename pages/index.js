@@ -536,8 +536,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   )
 
   const Block = ({ title, color, children }) => (
-    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16,
-                  padding: '20px 22px', boxShadow: 'var(--shadow-card)' }}>
+    <div className="concept-block" style={{ '--concept-color': color || 'var(--accent)', padding: '20px 22px' }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
                     color: color || 'var(--accent)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ display: 'inline-block', width: 3, height: 14, borderRadius: 2, background: color || 'var(--accent)' }} />
@@ -559,8 +558,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       {/* ── Cabeçalho executivo ── */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16,
-                    padding: '22px 26px', boxShadow: 'var(--shadow-card)' }}>
+      <div className="hero-elevated" style={{ borderRadius: 16, padding: '22px 26px' }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
                       color: 'var(--text-muted)', marginBottom: 6 }}>
           {nomeEmpresa} · {mesLabel}
@@ -653,6 +651,11 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
               color: pctMeta != null ? (pctMeta >= 100 ? '#10b981' : '#f59e0b') : undefined,
             },
           ]} />
+          {pctMeta != null && (
+            <div className="metric-progress" style={{ marginTop: 8, '--progress-value': `${Math.min(pctMeta, 100)}%` }}>
+              <div className={`metric-progress-fill ${pctMeta >= 100 ? 'positive' : 'warning'}`} />
+            </div>
+          )}
           {m.gap !== undefined && m.gap !== '' && <><Divider />
           <Stat label="Gap da Meta" value={v(m.gap)}
             color={parseDisplayNumber(m.gap||'') <= 0 ? '#10b981' : '#ef4444'} /></>}
@@ -729,7 +732,7 @@ function MetricCards({ metricas }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
         {[
           { label: 'Leads', value: fmt(metricas.leads), sub: `MQL: ${fmtPct(metricas.mql)}`, color: 'blue' },
-          { label: 'Agendamentos', value: fmt(metricas.agendamentos), sub: `Taxa: ${fmtPct(metricas.taxaAgendamento)}`, color: '' },
+          { label: 'Agendamentos', value: fmt(metricas.agendamentos), sub: `Taxa: ${fmtPct(metricas.taxaAgendamento)}`, color: 'blue' },
           { label: 'Realizadas', value: fmt(metricas.realizadas), sub: `Comparec.: ${fmtPct(metricas.taxaRealizadas)}`, color: '' },
           { label: 'Contratos Pagos', value: fmt(metricas.contratosPagos), sub: `Vendidos: ${fmt(metricas.contratosVendidos)}`, color: 'green' },
           { label: 'NMRR', value: fmtR1(metricas.nmrr), sub: `TKM: ${fmtR1(metricas.tkm)}`, color: 'amber' },
@@ -1703,6 +1706,9 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
         <>
           <div className="card-sub">Meta: {fmtFn(meta)}</div>
           <div className="card-sub" style={{ color: gapColor(gap) }}>Gap: {fmtGap(gap, fmtFn)} · {fmtPct(pctVal)} da meta</div>
+          <div className="metric-progress" style={{ marginTop: 8, '--progress-value': `${Math.min(Math.max(pctVal, 0), 100)}%` }}>
+            <div className={`metric-progress-fill ${real >= meta ? 'positive' : 'negative'}`} />
+          </div>
         </>
       ) : (
         <div className="card-sub">Meta não configurada</div>
@@ -1720,6 +1726,11 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
         <span className="mo-metric-label">{label}</span>
         <span className="mo-metric-values">{fmtFn(real)} / {meta > 0 ? fmtFn(meta) : '—'}</span>
         <span className={`mo-metric-pct ${status}`}>{meta > 0 ? fmtPct(pctVal) : '—'}</span>
+        {meta > 0 && (
+          <div className="metric-progress metric-progress-sm" style={{ '--progress-value': `${Math.min(Math.max(pctVal, 0), 100)}%` }}>
+            <div className={`metric-progress-fill ${status}`} />
+          </div>
+        )}
       </div>
     )
   }
@@ -1828,12 +1839,21 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
            1 abaixo disso — a última linha simplesmente fica parcial se a contagem não for
            múltipla da coluna, como qualquer grid comum. */
         .mo-perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .mo-perf-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px 18px; }
+        .mo-perf-card {
+          background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+          border: 1px solid var(--border-default);
+          border-radius: var(--radius-card);
+          box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
+          padding: 16px 18px;
+          transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+        }
+        .mo-perf-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07); }
         .mo-perf-card-outras { border-style: dashed; }
         .mo-perf-outras-tag { font-size: 9.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 6px; }
         .mo-perf-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
-        .mo-metric-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
+        .mo-metric-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
         .mo-metric-row:first-of-type { border-top: none; }
+        .mo-metric-row .metric-progress { flex-basis: 100%; margin-top: 2px; }
         .mo-metric-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; width: 62px; flex-shrink: 0; }
         .mo-metric-values { font-size: 12px; color: var(--text-secondary); flex: 1; text-align: right; font-variant-numeric: tabular-nums; }
         .mo-metric-pct { font-size: 13px; font-weight: 700; width: 58px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
@@ -2634,10 +2654,19 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           justify-content: space-between;
           padding: 20px 20px 16px;
           border-radius: 12px;
-          border: 1px solid var(--border);
-          background: var(--surface-1);
+          border: 1px solid var(--border-default);
+          background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
           min-height: 172px;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+          box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
+          transition: box-shadow var(--duration-fast) var(--ease-standard),
+                      border-color var(--duration-fast) var(--ease-standard),
+                      transform var(--duration-fast) var(--ease-standard);
+          animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
+        }
+        .ind-card:hover {
+          border-color: var(--border-strong);
+          box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07);
+          transform: translateY(-2px);
         }
       `}</style>
       <div className="ind-grid">
@@ -2721,14 +2750,21 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
       {/* Rodapé: meta + % + dias */}
       <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
         {isCurrent && metaVal > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Meta {fmtVal(metaVal)}</span>
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Meta {fmtVal(metaVal)}</span>
+              {pctMeta !== null && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
+                  {pctMeta}%
+                </span>
+              )}
+            </div>
             {pctMeta !== null && (
-              <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
-                {pctMeta}%
-              </span>
+              <div className="metric-progress metric-progress-sm" style={{ '--progress-value': `${Math.min(Math.max(pctMeta, 0), 100)}%` }}>
+                <div className={`metric-progress-fill ${pctMeta >= 100 ? 'positive' : pctMeta >= 80 ? 'warning' : 'negative'}`} />
+              </div>
             )}
-          </div>
+          </>
         )}
         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
           {isCurrent ? `${diasDecorridos}/${diasTotais} ${diasLabel}` : ' '}
@@ -2837,8 +2873,8 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
             <div>
               <div className="card-label">Objetivo do mês</div>
               <div className="card-value">{valorFmt(metaGrafico)}</div>
-              <div style={{ width: '100%', background: 'var(--bar-track)', height: 8, borderRadius: 999, margin: '8px 0' }}>
-                <div style={{ width: `${Math.min(Math.max(dadosGrafico.pctMeta, 0), 100)}%`, height: '100%', borderRadius: 999, background: '#8b5cf6' }} />
+              <div className="metric-progress" style={{ margin: '8px 0', '--progress-value': `${Math.min(Math.max(dadosGrafico.pctMeta, 0), 100)}%` }}>
+                <div className="metric-progress-fill" style={{ background: 'var(--purple)' }} />
               </div>
               <div className="card-sub">{fmtPct(dadosGrafico.pctMeta)} realizado</div>
             </div>
