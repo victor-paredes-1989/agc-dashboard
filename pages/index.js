@@ -399,30 +399,27 @@ function SemanasComparativo({ semanas }) {
     color: ativo ? '#fff' : 'var(--text-secondary)',
     fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
   })
-  const selStyle = {
-    padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)',
-    background: 'var(--bg-card)', color: 'var(--text-primary)',
-    fontSize: 12, cursor: 'pointer',
-  }
 
   return (
     <div style={{ width: '100%' }}>
+      <div className="view-header">
+        <div className="view-header-title">Por Semana</div>
+      </div>
+
       {/* Barra de filtros */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 24,
-                    background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12,
-                    padding: '12px 16px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', marginRight: 4 }}>Visualizar</span>
+      <div className="filter-bar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 24, padding: '12px 16px' }}>
+        <span className="field-label" style={{ display: 'inline', marginBottom: 0, marginRight: 4 }}>Visualizar</span>
         <button style={btnStyle(modo === 'mes')} onClick={() => setModo('mes')}>Mês selecionado</button>
         <button style={btnStyle(modo === 'comparar')} onClick={() => setModo('comparar')}>Comparar semana</button>
-        <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+        <div className="topbar-divider" />
         {modo === 'mes' ? (
-          <select style={selStyle} value={mesFinal} onChange={e => setMesSel(e.target.value)}>
+          <select className="field-input" value={mesFinal} onChange={e => setMesSel(e.target.value)}>
             {mesesDisp.map(mk => (
               <option key={mk} value={mk}>{monthMeta[mk]?.label || mk}</option>
             ))}
           </select>
         ) : (
-          <select style={selStyle} value={semanaFinal} onChange={e => setSemanaSel(e.target.value)}>
+          <select className="field-input" value={semanaFinal} onChange={e => setSemanaSel(e.target.value)}>
             {semanasDisp.map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
@@ -1079,10 +1076,15 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
 
   return (
     <div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+      <div className="view-header">
+        <div className="view-header-title">Comparativo Mensal</div>
+        <div className="view-header-sub">{empresaAtiva} · {eventoLabel}</div>
+      </div>
+
+      <div className="filter-bar" style={{ padding: 20, marginBottom: 24 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Empresa</div>
+            <div className="field-label">Empresa</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {empresas.map(e => (
                 <ToggleButton key={e} active={empresaAtiva === e} label={e} onClick={() => { setEmpresaSel(e); setPessoaSel(''); setOrigemSel('') }} />
@@ -1091,7 +1093,7 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Posição</div>
+            <div className="field-label">Posição</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {COMPARATIVO_POSICOES.map(p => (
                 <ToggleButton key={p.key} active={posicaoKey === p.key} label={p.label} onClick={() => { setPosicaoKey(p.key); setPessoaSel(''); setOrigemSel('') }} />
@@ -1100,7 +1102,8 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>{posicao.label}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="field-label" style={{ marginBottom: 0 }}>{posicao.label}</span>
               <select value={pessoaAtiva} onChange={e => { setPessoaSel(e.target.value); setOrigemSel('') }} className="field-input">
                 {pessoas.length === 0 && <option value="">Sem dados</option>}
                 {pessoas.map(p => <option key={p} value={p}>{p}</option>)}
@@ -1108,14 +1111,15 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
             </label>
 
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Evento</div>
+              <div className="field-label">Evento</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <ToggleButton active={evento === 'REUNIAO'} label="Reunião" onClick={() => setEvento('REUNIAO')} />
                 <ToggleButton active={evento === 'VENDAS'} label="Vendas" onClick={() => setEvento('VENDAS')} />
               </div>
             </div>
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Origem
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="field-label" style={{ marginBottom: 0 }}>Origem</span>
               <select value={origemAtiva} onChange={e => setOrigemSel(e.target.value)} className="field-input">
                 <option value="">Todas as origens</option>
                 {origens.map(o => <option key={o} value={o}>{o}</option>)}
@@ -1330,8 +1334,8 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
   const SelectFiltro = ({ label, value, onChange, options, allLabel = 'Todos' }) => {
     const allValue = allLabel === 'Todas' ? 'TODAS' : 'TODOS'
     return (
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-        {label}
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span className="field-label" style={{ marginBottom: 0 }}>{label}</span>
         <select value={value} onChange={e => onChange(e.target.value)} className="field-input">
           <option value={allValue}>{allLabel}</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -1381,7 +1385,7 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros — Dados Específicos</div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 32 }}>
+      <div className="filter-bar" style={{ padding: 16, marginBottom: 32 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
           <SelectFiltro label="Empresa" value={filtros.empresa} onChange={v=>setFiltro('empresa', v)} options={unique('empresa')} allLabel="Todas" />
           <SelectFiltro label="Mês" value={filtros.mes} onChange={v=>setFiltro('mes', v)} options={unique('mes')} />
@@ -1391,13 +1395,16 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
           <SelectFiltro label="Origem" value={filtros.origem} onChange={v=>setFiltro('origem', v)} options={unique('origem')} allLabel="Todas" />
           <SelectFiltro label="Status" value={filtros.status} onChange={v=>setFiltro('status', v)} options={unique('status')} />
           <SelectFiltro label="Serviço" value={filtros.servico} onChange={v=>setFiltro('servico', v)} options={unique('servico')} />
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Data inicial
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="field-label" style={{ marginBottom: 0 }}>Data inicial</span>
             <input type="date" value={filtros.dataIni} onChange={e=>setFiltro('dataIni', e.target.value)} className="field-input" />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>Data final
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="field-label" style={{ marginBottom: 0 }}>Data final</span>
             <input type="date" value={filtros.dataFim} onChange={e=>setFiltro('dataFim', e.target.value)} className="field-input" />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)', gridColumn: 'span 2' }}>Buscar cliente/informação
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 2' }}>
+            <span className="field-label" style={{ marginBottom: 0 }}>Buscar cliente/informação</span>
             <input value={filtros.busca} onChange={e=>setFiltro('busca', e.target.value)} placeholder="Digite um nome, origem, SDR..." className="field-input" />
           </label>
         </div>
@@ -1675,8 +1682,8 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
   if (!list.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de metas por origem. Atualize a aba PERFORMANCE_ORIGEM na planilha.</div>
 
   const Select = ({ label, value, options, onChange }) => (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-      {label}
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="field-label" style={{ marginBottom: 0 }}>{label}</span>
       <select value={value} onChange={e=>onChange(e.target.value)} className="field-input" style={{ minWidth: 150 }}>
         <option value="TODOS">Todos</option>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -1720,7 +1727,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros — Metas por Origem</div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 32 }}>
+      <div className="filter-bar" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px 20px', marginBottom: 32 }}>
         <Select label="Empresa" value={filters.empresa} options={opts.empresa} onChange={v=>setFilter('empresa', v)} />
         <Select label="Ano" value={filters.ano} options={opts.ano} onChange={v=>setFilter('ano', v)} />
         <Select label="Mês" value={filters.mes} options={opts.mes} onChange={v=>setFilter('mes', v)} />
@@ -2628,7 +2635,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           padding: 20px 20px 16px;
           border-radius: 12px;
           border: 1px solid var(--border);
-          background: var(--card-bg, var(--bg-secondary));
+          background: var(--surface-1);
           min-height: 172px;
           box-shadow: 0 1px 4px rgba(0,0,0,0.07);
         }
@@ -2787,25 +2794,32 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 
   return (
     <div>
-      {/* Month dropdown */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <label style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Mês do forecast:</label>
-        <select value={mesAtivo} onChange={e => setMesSel(e.target.value)} className="field-input" style={{ minWidth: 160 }}>
-          {meses.map(m => <option key={m} value={m}>{m} {anoAtivo}</option>)}
-        </select>
+      <div className="view-header">
+        <div className="view-header-title">Forecast</div>
+        <div className="view-header-sub">{mesAtivo} {anoAtivo} · {empresaSelecionada}</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Visão:</span>
-        <FilterButton value="GERAL" label="Forecast mensal" />
-        <FilterButton value="CLOSER" label="Por Closer" />
-        <FilterButton value="SDR" label="Por SDR" />
-        {tipoVisao !== 'GERAL' && (
-          <select value={nomeAtivo} onChange={e => setNomeSel(e.target.value)} className="field-input" style={{ minWidth: 180 }}>
-            {nomes.length === 0 && <option value="">Sem pessoas cadastradas</option>}
-            {nomes.map(n => <option key={n} value={n}>{n}</option>)}
+      <div className="filter-bar" style={{ padding: '14px 20px', marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Month dropdown */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Mês do forecast:</label>
+          <select value={mesAtivo} onChange={e => setMesSel(e.target.value)} className="field-input" style={{ minWidth: 160 }}>
+            {meses.map(m => <option key={m} value={m}>{m} {anoAtivo}</option>)}
           </select>
-        )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Visão:</span>
+          <FilterButton value="GERAL" label="Forecast mensal" />
+          <FilterButton value="CLOSER" label="Por Closer" />
+          <FilterButton value="SDR" label="Por SDR" />
+          {tipoVisao !== 'GERAL' && (
+            <select value={nomeAtivo} onChange={e => setNomeSel(e.target.value)} className="field-input" style={{ minWidth: 180 }}>
+              {nomes.length === 0 && <option value="">Sem pessoas cadastradas</option>}
+              {nomes.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
+        </div>
       </div>
 
       <div className="chart-card" style={{ marginBottom: 32 }}>
@@ -3036,11 +3050,6 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   )
 }
 
-const SEL_STYLE = {
-  background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8,
-  color: 'var(--text-primary)', padding: '7px 12px', fontSize: 13, cursor: 'pointer', outline: 'none',
-}
-
 function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }) {
   const CATEGORIAS = [
     { key: 'comercial',   label: 'Dados Comerciais' },
@@ -3260,8 +3269,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     if (lista) setMetrica(lista[0].key)
   }
 
-  const dropdownStyle = { ...SEL_STYLE, minWidth: 160 }
-
   function geralMetricVal(s, key) {
     if (key === 'realizadas') return s.realizadas
     if (key === 'pagos') return s.pagos
@@ -3399,27 +3406,32 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   return (
     <div>
+      <div className="view-header">
+        <div className="view-header-title">Evolução Mensal</div>
+        <div className="view-header-sub">{empresaSelecionada}</div>
+      </div>
+
       {/* Dropdowns row — alignItems: flex-start mantém labels alinhados pelo topo */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div className="filter-bar" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', padding: '14px 20px', marginBottom: 16 }}>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Categoria</label>
-          <select style={dropdownStyle} value={categoria} onChange={e => changeCategoria(e.target.value)}>
+          <span className="field-label">Categoria</span>
+          <select className="field-input" value={categoria} onChange={e => changeCategoria(e.target.value)}>
             {CATEGORIAS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Ano</label>
-          <select style={dropdownStyle} value={anoFiltro} onChange={e => setAnoFiltro(e.target.value)}>
+          <span className="field-label">Ano</span>
+          <select className="field-input" value={anoFiltro} onChange={e => setAnoFiltro(e.target.value)}>
             <option value="todos">Todos os anos</option>
             {anosDisp.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
         {isGeral && (
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+            <span className="field-label">
               {categoria === 'origem' ? 'Origem' : categoria === 'closer' ? 'Closer' : 'SDR'}
-            </label>
-            <select style={dropdownStyle} value={subFiltro} onChange={e => setSubFiltro(e.target.value)}>
+            </span>
+            <select className="field-input" value={subFiltro} onChange={e => setSubFiltro(e.target.value)}>
               <option value="todos">Ver todos</option>
               {geralVals.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
@@ -3427,16 +3439,16 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
         )}
         {isGeral && (
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Métrica</label>
-            <select style={dropdownStyle} value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
+            <span className="field-label">Métrica</span>
+            <select className="field-input" value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
               {METRICAS_GERAL.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
           </div>
         )}
         {!isGeral && (
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Métrica</label>
-            <select style={dropdownStyle} value={metrica} onChange={e => setMetrica(e.target.value)}>
+            <span className="field-label">Métrica</span>
+            <select className="field-input" value={metrica} onChange={e => setMetrica(e.target.value)}>
               {currentMetrics.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
           </div>
@@ -3708,10 +3720,11 @@ export default function Dashboard() {
         <div className="main-area">
           {/* Top bar */}
           <header className="top-bar">
-            {/* Esquerda: nome da empresa + seletor de mês */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'var(--accent)' }}>◆</span>{nomeEmpresa}
+            {/* Esquerda: identidade da empresa + seletor de mês */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 0 }}>
+              <div className="topbar-brand">
+                <span className="topbar-brand-mark">◆</span>
+                <span className="topbar-brand-name">{nomeEmpresa}</span>
               </div>
               {periodosDinamicos.length > 0 && (
                 <select
@@ -3731,6 +3744,8 @@ export default function Dashboard() {
                 </select>
               )}
             </div>
+
+            <div className="topbar-divider" />
 
             {/* Centro: dropdown de análises */}
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 12px', gap: 8 }}>
@@ -3755,14 +3770,16 @@ export default function Dashboard() {
             </div>
 
             {/* Direita: sync + tema */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               {lastSync && !syncing && <span className="last-sync" style={{ fontSize: 10 }}>Às {lastSync}</span>}
-              <button className="sidebar-action" onClick={() => fetchData.current(true)} disabled={syncing} title={syncing ? 'Sincronizando…' : 'Sincronizar'}>
-                <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 15 }}>↻</span>
-              </button>
-              <button className="sidebar-action" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Tema claro' : 'Tema escuro'}>
-                <span style={{ fontSize: 15 }}>{darkMode ? '☀️' : '🌙'}</span>
-              </button>
+              <div className="topbar-actions">
+                <button className="sidebar-action" onClick={() => fetchData.current(true)} disabled={syncing} title={syncing ? 'Sincronizando…' : 'Sincronizar'}>
+                  <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none', fontSize: 15 }}>↻</span>
+                </button>
+                <button className="sidebar-action" onClick={() => setDarkMode(d => !d)} title={darkMode ? 'Tema claro' : 'Tema escuro'}>
+                  <span style={{ fontSize: 15 }}>{darkMode ? '☀️' : '🌙'}</span>
+                </button>
+              </div>
             </div>
           </header>
 
