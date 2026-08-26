@@ -364,12 +364,19 @@ body {
 }
 
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-  border-radius: var(--radius-card);
-  padding: 18px 12px;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+  /* Precision Dark — PR B: superfície premium. --surface-1/--border-subtle/
+     --shadow-md e o inset highlight de 1px substituem os valores literais
+     antigos (--bg-card/--border/--shadow-card), com o MESMO resultado visual
+     de profundidade — só a borda fica um pouco mais discreta em repouso e
+     ganha o realce superior sutil pedido no briefing. */
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.03);
+  border-radius: var(--radius-lg);
+  padding: var(--space-20) var(--space-12);
+  transition: background var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard),
+              border-color var(--duration-fast) var(--ease-standard);
   animation: fadeIn 0.2s ease;
   display: flex;
   flex-direction: column;
@@ -377,25 +384,54 @@ body {
   justify-content: center;
   text-align: center;
 }
+/* Hover global fica só em borda + sombra (sem transform): cards de KPI são
+   informativos, não clicáveis — um lift chamaria atenção como se fossem
+   botão. O lift fica reservado para .card-interactive (abaixo), para uso
+   futuro em cards que realmente naveguem/ajam ao clique. */
 .card:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* Variante opcional para cards genuinamente clicáveis (nenhum uso ainda —
+   infraestrutura para PRs futuros). Soma o lift ao hover padrão acima. */
+.card-interactive {
+  transition: background var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard),
+              border-color var(--duration-fast) var(--ease-standard),
+              transform var(--duration-fast) var(--ease-standard);
+  cursor: pointer;
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+}
+
+/* Variante opcional de superfície "acima" do card padrão — para destacar um
+   card específico (ex.: KPI principal) sem inventar uma cor nova. Nenhum uso
+   ainda; infraestrutura para PRs futuros. */
+.card-elevated {
+  background: var(--surface-2);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .card-label {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-label-size);
+  font-weight: var(--font-label-weight);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  margin-bottom: 10px;
+  letter-spacing: var(--font-label-tracking);
+  margin-bottom: var(--space-8);
   text-align: center;
 }
 
 .card-value {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  /* Protagonismo do valor (§5): 18→20px via --font-card-value-size (PR A
+     tinha deixado o token igual ao valor antigo; ajustado agora, que é
+     onde a hierarquia do KPI card entra em cena). */
+  font-size: var(--font-card-value-size);
+  font-weight: var(--font-card-value-weight);
+  letter-spacing: -0.025em;
   color: var(--text-primary);
   line-height: 1.2;
   text-align: center;
@@ -403,10 +439,10 @@ body {
 }
 
 .card-sub {
-  font-size: 11.5px;
+  font-size: var(--font-body-small-size);
   font-weight: 400;
   color: var(--text-secondary);
-  margin-top: 5px;
+  margin-top: var(--space-4);
   line-height: 1.4;
   text-align: center;
 }
@@ -436,15 +472,22 @@ body {
 @media (max-width: 640px)  { .charts-grid { grid-template-columns: 1fr; } }
 
 .chart-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-  border-radius: var(--radius-card);
+  /* Mesmo tratamento de superfície do .card (§9 do briefing: só o container
+     externo, nunca o SVG/legendas/tooltip internos, que ficam intocados). */
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.03);
+  border-radius: var(--radius-lg);
   padding: 18px 16px;
-  transition: background 0.2s ease, box-shadow 0.2s ease;
+  transition: background var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard),
+              border-color var(--duration-fast) var(--ease-standard);
   animation: fadeIn 0.22s ease;
 }
-.chart-card:hover { box-shadow: var(--shadow-card-hover); }
+.chart-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.04);
+}
 
 .chart-title {
   font-size: 11px;
@@ -982,7 +1025,7 @@ body {
   --font-section-title-weight:    700;
   --font-section-title-tracking:  0.09em;
 
-  --font-card-value-size:      18px;
+  --font-card-value-size:      20px; /* PR B: 18→20px — protagonismo do valor de KPI (§5 do briefing) */
   --font-card-value-weight:    700;
 
   --font-page-title-size:      26px;
