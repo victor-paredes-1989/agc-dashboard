@@ -149,16 +149,25 @@ function ProgressByOriginChart({ data, emptyLabel = 'Sem dados' }) {
 }
 
 function AdditionalOriginChart({ data }) {
-  if (!data || data.length === 0) {
+  // Filtro só de apresentação: uma origem com reuniões=0, pagos=0 e NMRR=0 não acrescenta
+  // leitura a este gráfico — mas continua existindo normalmente nos dados e na tabela
+  // "Detalhamento por Origem" (esta função nunca toca a lista original).
+  const comResultado = (data || []).filter(d =>
+    (Number(d.realReunioes) || 0) > 0 || (Number(d.realPagos) || 0) > 0 || (Number(d.realNmrr) || 0) > 0
+  )
+  if (comResultado.length === 0) {
     return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>Sem adicionais sem meta</div>
   }
-  const max = Math.max(...data.map(d => Number(d.realNmrr) || 0), 1)
+  const max = Math.max(...comResultado.map(d => Number(d.realNmrr) || 0), 1)
+  // Cor única e neutra (mesma família do card "Adicional sem Meta", que já usa .card.blue) —
+  // "sem meta" não é sucesso nem fracasso, então não deve usar as cores verde/vermelho que
+  // no resto do dashboard já significam "acima/abaixo da meta".
+  const color = 'var(--blue)'
   return (
     <div>
-      {data.slice(0, 12).map((d, i) => {
+      {comResultado.slice(0, 12).map((d, i) => {
         const val = Number(d.realNmrr) || 0
         const barPct = max > 0 ? (val / max) * 100 : 0
-        const color = getConceptColor(d.nome, CLOSER_COLORS, i)
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
@@ -1790,7 +1799,12 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
       </div>
 
       <style>{`
-        .mo-perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+        /* 3 colunas fixas no desktop — evita o desequilíbrio de um grid auto-fit (ex.: 5
+           cards numa linha + 1 "órfão" sozinho na linha seguinte, com 6 origens). Não
+           depende de quantas origens existem: sempre 3 colunas até 900px, 2 até 480px,
+           1 abaixo disso — a última linha simplesmente fica parcial se a contagem não for
+           múltipla da coluna, como qualquer grid comum. */
+        .mo-perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .mo-perf-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px 18px; }
         .mo-perf-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
         .mo-metric-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
@@ -1801,7 +1815,9 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
         .mo-metric-pct.positive { color: var(--green); }
         .mo-metric-pct.negative { color: var(--red); }
         .mo-metric-pct.neutral { color: var(--text-muted); }
+        @media (max-width: 900px) { .mo-perf-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 480px) {
+          .mo-perf-grid { grid-template-columns: 1fr; }
           .mo-metric-label { width: 50px; font-size: 10px; }
           .mo-metric-values { font-size: 11px; }
         }
