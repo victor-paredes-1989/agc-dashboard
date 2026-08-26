@@ -16,7 +16,9 @@
   --bg-sub-nav:      #0f111a;
   --bg-input:        #13161f;
   --bg-tooltip:      #1e2235;
-  --bg-sidebar:      #0c0e14;
+  --bg-sidebar:      #0a0c11; /* PR D: token já existia sem uso — agora liga a sidebar a uma
+                                  superfície discretamente mais profunda que --bg-primary/--bg-nav,
+                                  criando o contraste "rail vs. conteúdo" pedido no briefing. */
 
   --border:          rgba(255,255,255,0.07);
   --border-strong:   rgba(255,255,255,0.12);
@@ -290,22 +292,31 @@ body {
 .period-select-wrapper { flex-shrink: 0; display: flex; align-items: center; }
 
 .period-select {
-  background: var(--bg-card);
+  /* PR D: appearance:none + seta própria via background-image — técnica padrão
+     (não é hack), funciona em qualquer navegador moderno e não depende de
+     :: pseudo-elementos frágeis. */
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238993a4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center;
+  background-size: 10px 6px;
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-btn);
-  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  padding: 7px 32px 7px 13px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   outline: none;
-  transition: border-color 0.18s ease;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+              background-color var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard);
   min-width: 164px;
 }
-.period-select:focus { border-color: var(--accent-border); }
+.period-select:hover { border-color: var(--border-strong); background-color: var(--surface-2); }
+.period-select:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-light); }
 .period-select option { background: var(--bg-card); color: var(--text-primary); }
-.period-select.has-selection { border-color: var(--accent-border); color: var(--accent); }
+.period-select.has-selection { border-color: var(--accent-border); color: var(--accent); background-color: var(--accent-light); }
 
 /* ── Page & Layout ───────────────────────────────────────── */
 .page {
@@ -578,16 +589,33 @@ body {
   background: var(--bg-input);
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-btn);
+  border-radius: var(--radius-sm);
   padding: 9px 12px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   outline: none;
-  transition: border-color 0.18s ease;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+              background-color var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard);
 }
-.field-input:focus { border-color: var(--accent-border); }
+.field-input:hover { border-color: var(--border-strong); background-color: var(--surface-2); }
+.field-input:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-light); }
 .field-input option { background: var(--bg-input); color: var(--text-primary); }
+
+/* Seta própria só em <select class="field-input"> — inputs de texto/data não
+   ganham ícone nenhum (appearance:none + background-image, mesma técnica
+   robusta do .period-select). */
+select.field-input {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238993a4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  background-size: 10px 6px;
+}
 
 /* ── Sync banner ─────────────────────────────────────────── */
 .sync-banner {
@@ -635,7 +663,7 @@ body {
 
 .sidebar {
   width: 72px;
-  background: var(--bg-nav);
+  background: var(--bg-sidebar); /* PR D: distinto de --bg-nav (topbar) e --bg-primary (conteúdo) */
   border-right: 1px solid var(--border);
   box-shadow: var(--shadow-nav);
   display: flex;
@@ -647,7 +675,7 @@ body {
   left: 0;
   bottom: 0;
   z-index: 200;
-  transition: background 0.25s ease, border-color 0.25s ease;
+  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
   gap: 4px;
 }
 
@@ -671,29 +699,34 @@ body {
 .sidebar-item {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
-  border: none;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
   background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all var(--duration-fast) var(--ease-standard);
   color: var(--text-muted);
-  gap: 2px;
+  gap: 3px;
   padding: 4px;
   position: relative;
 }
 
 .sidebar-item:hover {
-  background: var(--bar-track);
+  background: var(--surface-2);
+  border-color: var(--border-subtle);
   color: var(--text-secondary);
 }
 
+/* Active state — assinatura mais premium (§1): superfície elevada + borda
+   accent + leve glow, não só uma tinta de fundo. */
 .sidebar-item.active {
   background: var(--accent-light);
+  border-color: var(--accent-border);
   color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-border) inset, 0 2px 10px rgba(20,184,166,0.16);
 }
 
 .sidebar-item.active::before {
@@ -703,16 +736,32 @@ body {
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 24px;
+  height: 26px;
   background: var(--accent);
   border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 6px rgba(20,184,166,0.55);
 }
 
+/* Ícone ganha um pequeno "chip" de superfície própria — padroniza tamanho/
+   container pedido no briefing, sem trocar a biblioteca de ícones (segue
+   texto simples, só passa a ter uma moldura). */
 .sidebar-icon {
-  font-size: 13px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
+  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.sidebar-item.active .sidebar-icon {
+  background: var(--accent);
+  color: #fff;
 }
 
 .sidebar-label {
@@ -727,7 +776,7 @@ body {
 .sidebar-divider {
   width: 28px;
   height: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   margin: 8px 0;
   flex-shrink: 0;
 }
@@ -743,8 +792,8 @@ body {
 .sidebar-action {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
   background: transparent;
   display: flex;
   align-items: center;
@@ -752,12 +801,18 @@ body {
   cursor: pointer;
   color: var(--text-muted);
   font-size: 16px;
-  transition: all 0.18s ease;
+  transition: all var(--duration-fast) var(--ease-standard);
 }
 .sidebar-action:hover {
-  background: var(--bar-track);
+  background: var(--surface-2);
   color: var(--text-secondary);
   border-color: var(--border-strong);
+}
+
+.sidebar-item:focus-visible,
+.sidebar-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-light), 0 0 0 1px var(--accent-border) inset;
 }
 
 /* Main area offset for sidebar */
@@ -782,7 +837,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  transition: background 0.25s ease;
+  transition: background var(--duration-fast) var(--ease-standard);
 }
 
 .top-bar-title {
@@ -796,6 +851,68 @@ body {
 .top-bar-title span {
   color: var(--accent);
   margin-right: 8px;
+}
+
+/* Identidade da empresa no topbar (§2) — marca pequena + nome, hierarquia
+   mais clara que o texto solto de antes. Sem flex:1 (diferente de
+   .top-bar-title) para não brigar com o layout de 3 regiões do topbar do
+   dashboard principal. */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.topbar-brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.topbar-brand-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Agrupa visualmente os botões de ação (sync/tema/admin) — mesma superfície
+   discreta usada nos outros clusters de controle do shell. */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+}
+.topbar-actions .sidebar-action {
+  border-color: transparent;
+  background: transparent;
+}
+.topbar-actions .sidebar-action:hover {
+  background: var(--surface-2);
+  border-color: var(--border-subtle);
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
 }
 
 /* ── Hero section ────────────────────────────────────────── */
@@ -911,6 +1028,9 @@ body {
   .top-bar-title { font-size: 14px; }
   .sync-btn span:last-child { display: none; }
   .theme-toggle span:not(.theme-toggle-icon) { display: none; }
+  .topbar-divider { display: none; }
+  .topbar-brand-name { max-width: 96px; }
+  .view-header-title { font-size: 20px; }
 
   .sub-nav { padding: 0 14px; height: auto; min-height: 44px; flex-wrap: nowrap; gap: 4px; padding-top: 6px; padding-bottom: 6px; }
   .period-select { min-width: 130px; font-size: 12.5px; }
@@ -1076,4 +1196,54 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PR D — SHELL VISUAL (VP Dash · Precision Dark)
+   ══════════════════════════════════════════════════════════════════════
+   Sidebar/topbar/period-select/field-input foram editados em-place acima
+   (mesma seção onde já viviam). O que segue aqui é infraestrutura nova:
+   toolbar de filtros, label de campo e cabeçalho de view — aplicadas nas
+   views que hoje começam direto nos dados (Forecast, Evolução Mensal,
+   Comparativo Mensal, Por Semana) ou em filtros que hoje são só um <div>
+   com background solto.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Superfície única para toda barra de filtro do app — cada view mantém seu
+   próprio layout interno (row/column/gap), só a "casca" (fundo/borda/
+   radius/sombra) passa a ser compartilhada. */
+.filter-bar {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.field-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-4);
+}
+
+/* Cabeçalho de view — só para views que hoje não têm nenhum título/contexto
+   no topo (Forecast, Evolução Mensal, Comparativo Mensal, Por Semana). As
+   demais já têm hero/cabeçalho próprio ou o eyebrow "Filtros — X" já nomeia
+   a view; não duplicado ali. */
+.view-header {
+  margin-bottom: var(--space-24);
+}
+.view-header-title {
+  font-size: var(--font-page-title-size);
+  font-weight: var(--font-page-title-weight);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.view-header-sub {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 4px;
 }
