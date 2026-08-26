@@ -1480,12 +1480,29 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
 }
 
 
-function MetasOrigemView({ performance, empresaSelecionada }) {
-  const [filters, setFilters] = useState({ empresa: empresaSelecionada || 'TODOS', ano: 'TODOS', mes: 'TODOS', origem: 'TODOS' })
+function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
+  const [filters, setFilters] = useState({
+    empresa: empresaSelecionada || 'TODOS',
+    ano: periodoAtivo?.ano || 'TODOS',
+    mes: periodoAtivo?.mesNome || 'TODOS',
+    origem: 'TODOS',
+  })
+  const [ordenarPor, setOrdenarPor] = useState('pctNmrr')
+  const [sortKey, setSortKey] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
 
+  // Sincroniza Empresa/Ano/Mês com o período selecionado no topo do dashboard — mesmo
+  // padrão já usado em DadosEspecificosView. "TODOS" continua disponível nos 3 selects para
+  // quem quiser uma leitura histórica; "Origem" nunca é sincronizado (não existe seleção de
+  // origem fora desta aba).
   useEffect(() => {
-    if (empresaSelecionada) setFilters(f => ({ ...f, empresa: empresaSelecionada }))
-  }, [empresaSelecionada])
+    setFilters(f => ({
+      ...f,
+      empresa: empresaSelecionada || 'TODOS',
+      ano: periodoAtivo?.ano || 'TODOS',
+      mes: periodoAtivo?.mesNome || 'TODOS',
+    }))
+  }, [empresaSelecionada, periodoAtivo?.key])
 
   const clean = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   const norm = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -1515,6 +1532,20 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
     return norm(v)
   }
 
+  // Soma real/meta de um grupo de linhas de PERFORMANCE_ORIGEM e recalcula gap/% — mesma
+  // fórmula de sempre (real-meta; real/meta*100 quando meta>0), só reaproveitada tanto para
+  // agregar por empresa×ano×mês×origem (list) quanto por origem sozinha (performance por
+  // origem, abaixo). Nenhum cálculo novo.
+  const withGapPct = (r) => ({
+    ...r,
+    gapReunioes: r.realReunioes - r.metaReunioes,
+    pctReunioes: r.metaReunioes > 0 ? (r.realReunioes / r.metaReunioes) * 100 : 0,
+    gapPagos: r.realPagos - r.metaPagos,
+    pctPagos: r.metaPagos > 0 ? (r.realPagos / r.metaPagos) * 100 : 0,
+    gapNmrr: r.realNmrr - r.metaNmrr,
+    pctNmrr: r.metaNmrr > 0 ? (r.realNmrr / r.metaNmrr) * 100 : 0,
+  })
+
   const rawList = Array.isArray(performance) ? performance : []
   const list = Object.values(rawList.reduce((acc, r) => {
     const empresa = norm(r.empresa)
@@ -1533,15 +1564,7 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
     acc[key].metaNmrr += Number(r.metaNmrr) || 0
     acc[key].realNmrr += Number(r.realNmrr) || 0
     return acc
-  }, {})).map(r => ({
-    ...r,
-    gapReunioes: r.realReunioes - r.metaReunioes,
-    pctReunioes: r.metaReunioes > 0 ? (r.realReunioes / r.metaReunioes) * 100 : 0,
-    gapPagos: r.realPagos - r.metaPagos,
-    pctPagos: r.metaPagos > 0 ? (r.realPagos / r.metaPagos) * 100 : 0,
-    gapNmrr: r.realNmrr - r.metaNmrr,
-    pctNmrr: r.metaNmrr > 0 ? (r.realNmrr / r.metaNmrr) * 100 : 0,
-  }))
+  }, {})).map(withGapPct)
 
   const unique = (key) => [...new Set(list.map(r => norm(r[key])).filter(Boolean))].sort()
   const opts = {
@@ -1580,18 +1603,62 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
   const pctReunioes = pct(realReunioes, metaReunioes)
   const pctPagos = pct(realPagos, metaPagos)
   const pctNmrr = pct(realNmrr, metaNmrr)
-  const cardClass = (real, meta) => meta > 0 && real >= meta ? 'green' : 'red'
-  const gapClass = (gap) => Number(gap || 0) >= 0 ? 'green' : 'red'
+  // Meta agregada 0 não é "0% de performance" — é ausência de meta para o recorte atual.
+  // Card fica neutro (sem verde/vermelho) nesse caso, em vez de cair em vermelho por padrão.
+  const cardClass = (real, meta) => meta > 0 ? (real >= meta ? 'green' : 'red') : ''
+  // Sinal +/- consistente nos 3 Gaps (Reuniões, Pagos e agora também NMRR).
+  const fmtGap = (gap, fmtFn) => `${Number(gap || 0) >= 0 ? '+' : ''}${fmtFn(gap)}`
+  const gapColor = (gap) => Number(gap || 0) >= 0 ? 'var(--green)' : 'var(--red)'
 
-  const progressoOrigem = [...filtradosComMeta]
-    .filter(r => (Number(r.metaNmrr) || 0) > 0 || (Number(r.metaPagos) || 0) > 0)
-    .sort((a, b) => (Number(b.pctNmrr) || 0) - (Number(a.pctNmrr) || 0))
-    .map(r => ({ nome: r.origem, pct: Number(r.pctNmrr) || 0, pctPagos: Number(r.pctPagos) || 0, realPagos: Number(r.realPagos) || 0, metaPagos: Number(r.metaPagos) || 0, realNmrr: Number(r.realNmrr) || 0, metaNmrr: Number(r.metaNmrr) || 0 }))
+  // Performance por Origem — uma linha por origem, somando todas as combinações ano/mês que
+  // passarem pelos filtros atuais (com um único mês selecionado, que é o padrão agora, cada
+  // origem já corresponde a exatamente 1 linha, então esta soma não muda nada na prática; ela
+  // só evita origem duplicada quando o usuário escolhe "TODOS" em Ano/Mês para uma leitura
+  // histórica). Mesmo critério "tem meta" (temMeta) já usado para separar Adicional sem Meta
+  // — inclui a origem se qualquer uma das 3 metas estiver configurada.
+  const performancePorOrigemBase = Object.values(
+    filtradosComMeta.reduce((acc, r) => {
+      const k = r.origem
+      if (!acc[k]) acc[k] = { origem: k, metaReunioes: 0, realReunioes: 0, metaPagos: 0, realPagos: 0, metaNmrr: 0, realNmrr: 0 }
+      acc[k].metaReunioes += r.metaReunioes
+      acc[k].realReunioes += r.realReunioes
+      acc[k].metaPagos += r.metaPagos
+      acc[k].realPagos += r.realPagos
+      acc[k].metaNmrr += r.metaNmrr
+      acc[k].realNmrr += r.realNmrr
+      return acc
+    }, {})
+  ).map(withGapPct)
+
+  const ORDER_OPTIONS = [
+    { key: 'pctNmrr', label: '% NMRR' },
+    { key: 'pctPagos', label: '% Pagos' },
+    { key: 'pctReunioes', label: '% Reuniões' },
+    { key: 'realNmrr', label: 'NMRR Real' },
+    { key: 'origem', label: 'Origem' },
+  ]
+  const performancePorOrigem = [...performancePorOrigemBase].sort((a, b) => {
+    if (ordenarPor === 'origem') return a.origem.localeCompare(b.origem, 'pt-BR')
+    return (Number(b[ordenarPor]) || 0) - (Number(a[ordenarPor]) || 0)
+  })
 
   const adicionaisSemMeta = [...filtradosSemMeta]
     .filter(r => (Number(r.realReunioes) || 0) > 0 || (Number(r.realPagos) || 0) > 0 || (Number(r.realNmrr) || 0) > 0)
     .sort((a, b) => (Number(b.realNmrr) || 0) - (Number(a.realNmrr) || 0))
     .map(r => ({ nome: r.origem, valor: Number(r.realNmrr) || 0, realReunioes: Number(r.realReunioes) || 0, realPagos: Number(r.realPagos) || 0, realNmrr: Number(r.realNmrr) || 0 }))
+
+  // Ordenação da tabela de detalhamento — mesmo padrão já usado em DadosEspecificosView
+  // (clique no cabeçalho ordena; clique de novo inverte a direção).
+  const TEXT_COLUMNS = new Set(['empresa', 'ano', 'mes', 'origem'])
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+  const filtradosOrdenados = !sortKey ? filtrados : [...filtrados].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    if (TEXT_COLUMNS.has(sortKey)) return dir * String(a[sortKey] || '').localeCompare(String(b[sortKey] || ''), 'pt-BR')
+    return dir * ((Number(a[sortKey]) || 0) - (Number(b[sortKey]) || 0))
+  })
 
   if (!list.length) return <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem dados de metas por origem. Atualize a aba PERFORMANCE_ORIGEM na planilha.</div>
 
@@ -1605,6 +1672,39 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
     </label>
   )
 
+  // Um dos 3 cards de resumo (Reuniões/Pagos/NMRR) — mesmo padrão visual para os três:
+  // título, Real em destaque, Meta, Gap e % da meta. Quando a meta agregada é 0 (nenhuma
+  // meta configurada para o recorte atual), mostra "Meta não configurada" em vez de
+  // Gap/% — nunca trata meta 0 como 0% de performance.
+  const ResumoCard = ({ label, real, meta, gap, pctVal, fmtFn }) => (
+    <div className={`card ${cardClass(real, meta)}`}>
+      <div className="card-label">{label}</div>
+      <div className="card-value">{fmtFn(real)}</div>
+      {meta > 0 ? (
+        <>
+          <div className="card-sub">Meta: {fmtFn(meta)}</div>
+          <div className="card-sub" style={{ color: gapColor(gap) }}>Gap: {fmtGap(gap, fmtFn)} · {fmtPct(pctVal)} da meta</div>
+        </>
+      ) : (
+        <div className="card-sub">Meta não configurada</div>
+      )}
+    </div>
+  )
+
+  // Um bloco de origem no grid "Performance por Origem" — 3 linhas (Reuniões/Pagos/NMRR),
+  // cada uma com status independente (verde = meta atingida, vermelho = abaixo, neutro =
+  // sem meta configurada para aquela métrica específica nesta origem).
+  const OrigemMetricRow = ({ label, real, meta, pctVal, fmtFn }) => {
+    const status = meta > 0 ? (real >= meta ? 'positive' : 'negative') : 'neutral'
+    return (
+      <div className="mo-metric-row">
+        <span className="mo-metric-label">{label}</span>
+        <span className="mo-metric-values">{fmtFn(real)} / {meta > 0 ? fmtFn(meta) : '—'}</span>
+        <span className={`mo-metric-pct ${status}`}>{meta > 0 ? fmtPct(pctVal) : '—'}</span>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Filtros — Metas por Origem</div>
@@ -1615,41 +1715,97 @@ function MetasOrigemView({ performance, empresaSelecionada }) {
         <Select label="Origem" value={filters.origem} options={opts.origem} onChange={v=>setFilter('origem', v)} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 28 }}>
-        <div className={`card ${cardClass(realReunioes, metaReunioes)}`}><div className="card-label">Reuniões</div><div className="card-value">{fmtNum1(realReunioes)} / {fmtNum1(metaReunioes)}</div><div className="card-sub">{fmtPct(pctReunioes)} da meta</div></div>
-        <div className={`card ${gapClass(realReunioes - metaReunioes)}`}><div className="card-label">Gap Reuniões</div><div className="card-value">{(realReunioes - metaReunioes) >= 0 ? '+' : ''}{fmtNum1(realReunioes - metaReunioes)}</div><div className="card-sub">real - meta</div></div>
-        <div className={`card ${cardClass(realPagos, metaPagos)}`}><div className="card-label">Pagos</div><div className="card-value">{fmtNum1(realPagos)} / {fmtNum1(metaPagos)}</div><div className="card-sub">{fmtPct(pctPagos)} da meta</div></div>
-        <div className={`card ${gapClass(realPagos - metaPagos)}`}><div className="card-label">Gap Pagos</div><div className="card-value">{(realPagos - metaPagos) >= 0 ? '+' : ''}{fmtNum1(realPagos - metaPagos)}</div><div className="card-sub">real - meta</div></div>
-        <div className={`card ${cardClass(realNmrr, metaNmrr)}`}><div className="card-label">NMRR</div><div className="card-value">{fmtR1(realNmrr)}</div><div className="card-sub">Meta: {fmtR1(metaNmrr)} · {fmtPct(pctNmrr)}</div></div>
-        <div className={`card ${gapClass(realNmrr - metaNmrr)}`}><div className="card-label">Gap NMRR</div><div className="card-value">{fmtR1(realNmrr - metaNmrr)}</div><div className="card-sub">real - meta</div></div>
+      {/* ── Cards de resumo ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 28 }}>
+        <ResumoCard label="Reuniões" real={realReunioes} meta={metaReunioes} gap={realReunioes - metaReunioes} pctVal={pctReunioes} fmtFn={fmtNum1} />
+        <ResumoCard label="Pagos" real={realPagos} meta={metaPagos} gap={realPagos - metaPagos} pctVal={pctPagos} fmtFn={fmtNum1} />
+        <ResumoCard label="NMRR" real={realNmrr} meta={metaNmrr} gap={realNmrr - metaNmrr} pctVal={pctNmrr} fmtFn={fmtR1} />
         <div className="card blue"><div className="card-label">Adicional sem Meta</div><div className="card-value">{fmtR1(realNmrrAdicional)}</div><div className="card-sub">{fmtNum1(realReunioesAdicional)} reuniões · {fmtNum1(realPagosAdicional)} pagos</div></div>
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
-        O gráfico abaixo mostra o progresso real por origem. Exemplo: SS → 1 - R$ 2.000,0 / 20,0% significa 1 contrato pago, R$ 2.000,0 de NMRR e 20,0% da meta de NMRR batida.
+      {/* ── Performance por Origem ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Performance por Origem</div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+          Ordenar por
+          <select value={ordenarPor} onChange={e => setOrdenarPor(e.target.value)} className="field-input" style={{ minWidth: 160 }}>
+            {ORDER_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+        </label>
       </div>
+      {performancePorOrigem.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>Nenhuma origem com meta configurada para os filtros atuais.</div>
+      ) : (
+        <div className="mo-perf-grid" style={{ marginBottom: 28 }}>
+          {performancePorOrigem.map(r => (
+            <div className="mo-perf-card" key={r.origem}>
+              <div className="mo-perf-title">{r.origem}</div>
+              <OrigemMetricRow label="Reuniões" real={r.realReunioes} meta={r.metaReunioes} pctVal={r.pctReunioes} fmtFn={fmtNum1} />
+              <OrigemMetricRow label="Pagos" real={r.realPagos} meta={r.metaPagos} pctVal={r.pctPagos} fmtFn={fmtNum1} />
+              <OrigemMetricRow label="NMRR" real={r.realNmrr} meta={r.metaNmrr} pctVal={r.pctNmrr} fmtFn={fmtR1} />
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 28 }}>
-        <div className="chart-card"><div className="chart-title">Progresso por Origem</div><ProgressByOriginChart data={progressoOrigem} /></div>
-        <div className="chart-card"><div className="chart-title">Adicionais sem Meta</div><AdditionalOriginChart data={adicionaisSemMeta} /></div>
-      </div>
+      {/* Adicionais sem meta — só acrescenta leitura (quais origens específicas, sem meta,
+          geraram receita) além do card agregado acima; por isso continua existindo. */}
+      {adicionaisSemMeta.length > 0 && (
+        <div className="chart-card" style={{ marginBottom: 28 }}>
+          <div className="chart-title">Adicionais sem Meta — detalhamento por origem</div>
+          <AdditionalOriginChart data={adicionaisSemMeta} />
+        </div>
+      )}
 
+      {/* ── Detalhamento por Origem ── */}
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Detalhamento por Origem</div>
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead><tr>{['Empresa','Ano','Mês','Origem','Meta Reuniões','Real Reuniões','Gap','%','Meta Pagos','Real Pagos','Gap','%','Meta NMRR','Real NMRR','Gap','%'].map((h, i) => <th key={i} style={{ textAlign: i < 4 ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
+          <thead>
+            <tr>
+              {[
+                ['Empresa','empresa'], ['Ano','ano'], ['Mês','mes'], ['Origem','origem'],
+                ['Meta Reuniões','metaReunioes'], ['Real Reuniões','realReunioes'], ['Gap','gapReunioes'], ['%','pctReunioes'],
+                ['Meta Pagos','metaPagos'], ['Real Pagos','realPagos'], ['Gap','gapPagos'], ['%','pctPagos'],
+                ['Meta NMRR','metaNmrr'], ['Real NMRR','realNmrr'], ['Gap','gapNmrr'], ['%','pctNmrr'],
+              ].map(([h, key], i) => (
+                <th key={h} onClick={() => handleSort(key)}
+                  style={{ textAlign: i < 4 ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
+                  {h}{sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                </th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
-            {filtrados.map((r, i) => (
+            {filtradosOrdenados.map((r, i) => (
               <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '9px 8px' }}>{r.empresa}</td><td style={{ padding: '9px 8px' }}>{r.ano}</td><td style={{ padding: '9px 8px' }}>{r.mes}</td><td style={{ padding: '9px 8px', fontWeight: 600 }}>{r.origem}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapReunioes) >= 0 ? '#10b981' : '#ef4444' }}>{Number(r.gapReunioes) >= 0 ? '+' : ''}{fmtNum1(r.gapReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctReunioes)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapPagos) >= 0 ? '#10b981' : '#ef4444' }}>{Number(r.gapPagos) >= 0 ? '+' : ''}{fmtNum1(r.gapPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctPagos)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtR1(r.metaNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b' }}>{fmtR1(r.realNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: Number(r.gapNmrr) >= 0 ? '#10b981' : '#ef4444' }}>{fmtR1(r.gapNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtPct(r.pctNmrr)}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: gapColor(r.gapReunioes) }}>{fmtGap(r.gapReunioes, fmtNum1)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: r.metaReunioes > 0 ? (r.pctReunioes >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaReunioes > 0 ? fmtPct(r.pctReunioes) : '—'}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: gapColor(r.gapPagos) }}>{fmtGap(r.gapPagos, fmtNum1)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: r.metaPagos > 0 ? (r.pctPagos >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaPagos > 0 ? fmtPct(r.pctPagos) : '—'}</td>
+                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtR1(r.metaNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b' }}>{fmtR1(r.realNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: gapColor(r.gapNmrr) }}>{fmtGap(r.gapNmrr, fmtR1)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: r.metaNmrr > 0 ? (r.pctNmrr >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaNmrr > 0 ? fmtPct(r.pctNmrr) : '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <style>{`
+        .mo-perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+        .mo-perf-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px 18px; }
+        .mo-perf-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+        .mo-metric-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
+        .mo-metric-row:first-of-type { border-top: none; }
+        .mo-metric-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; width: 62px; flex-shrink: 0; }
+        .mo-metric-values { font-size: 12px; color: var(--text-secondary); flex: 1; text-align: right; font-variant-numeric: tabular-nums; }
+        .mo-metric-pct { font-size: 13px; font-weight: 700; width: 58px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+        .mo-metric-pct.positive { color: var(--green); }
+        .mo-metric-pct.negative { color: var(--red); }
+        .mo-metric-pct.neutral { color: var(--text-muted); }
+        @media (max-width: 480px) {
+          .mo-metric-label { width: 50px; font-size: 10px; }
+          .mo-metric-values { font-size: 11px; }
+        }
+      `}</style>
     </div>
   )
 }
@@ -3626,7 +3782,7 @@ export default function Dashboard() {
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
-               periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} /> :
+               periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} registros={data?.GERAL} /> :
                periodoData ? <>
