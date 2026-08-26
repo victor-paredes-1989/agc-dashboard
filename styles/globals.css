@@ -9,28 +9,31 @@
 
 /* ── Design tokens — Dark (default) ──────────────────────── */
 :root {
-  --bg-primary:      #0c0e14;
-  --bg-card:         #13161f;
-  --bg-card-hover:   #181b26;
+  /* PR E: mais distância entre os níveis (fundo → superfície → card →
+     card elevado) — bg-primary desce um pouco, bg-card/bg-card-hover sobem
+     um pouco. Nunca preto absoluto (§12 do briefing). */
+  --bg-primary:      #090a10;
+  --bg-card:         #171c28;
+  --bg-card-hover:   #1e2433;
   --bg-nav:          #0c0e14;
   --bg-sub-nav:      #0f111a;
-  --bg-input:        #13161f;
-  --bg-tooltip:      #1e2235;
+  --bg-input:        #171c28;
+  --bg-tooltip:      #232a42; /* nível "elevado" — mais distinto de --bg-card que antes */
   --bg-sidebar:      #0a0c11; /* PR D: token já existia sem uso — agora liga a sidebar a uma
                                   superfície discretamente mais profunda que --bg-primary/--bg-nav,
                                   criando o contraste "rail vs. conteúdo" pedido no briefing. */
 
-  --border:          rgba(255,255,255,0.07);
-  --border-strong:   rgba(255,255,255,0.12);
-  --border-tooltip:  rgba(255,255,255,0.15);
+  --border:          rgba(255,255,255,0.08);
+  --border-strong:   rgba(255,255,255,0.14);
+  --border-tooltip:  rgba(255,255,255,0.16);
 
   --text-primary:    #f0f2f7;
   --text-secondary:  #8b95a9;
   --text-muted:      #4f5b6e;
 
-  --bar-track:       rgba(255,255,255,0.05);
-  --pie-stroke:      #13161f;
-  --grid-line:       rgba(255,255,255,0.06);
+  --bar-track:       rgba(255,255,255,0.06);
+  --pie-stroke:      #171c28; /* acompanha --bg-card */
+  --grid-line:       rgba(255,255,255,0.07);
   --axis-text:       #8b95a9;
 
   --accent:          #0f766e;
@@ -49,10 +52,12 @@
   --teal-bg:         rgba(20,184,166,0.10);
   --red:             #ef4444;
   --red-bg:          rgba(239,68,68,0.10);
-  --card-gradient-base: #13161f;
+  --card-gradient-base: #171c28; /* acompanha --bg-card */
 
-  --shadow-card:     0 1px 3px rgba(0,0,0,0.4), 0 1px 8px rgba(0,0,0,0.3);
-  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.4);
+  /* PR E: sombra de card claramente perceptível (era quase uma sombra de
+     nav plana) — duas camadas, blur/alcance maior, ainda elegante. */
+  --shadow-card:     0 4px 14px rgba(0,0,0,0.32), 0 14px 34px rgba(0,0,0,0.30);
+  --shadow-card-hover: 0 8px 22px rgba(0,0,0,0.4), 0 22px 48px rgba(0,0,0,0.36);
   --shadow-nav:      0 1px 0 rgba(255,255,255,0.06);
   --radius-card:     14px;
   --radius-btn:      9px;
@@ -60,31 +65,38 @@
 
 /* ── Light theme ─────────────────────────────────────────── */
 [data-theme="light"] {
-  --bg-primary:      #f4f6fb;
+  /* PR E: fundo da página com um pouco mais de definição (era quase
+     idêntico ao branco dos cards — §13 do briefing: "excessivamente
+     lavado"); cards continuam brancos, de verdade elevados. */
+  --bg-primary:      #eef1f8;
   --bg-card:         #ffffff;
-  --bg-card-hover:   #f8f9fd;
+  --bg-card-hover:   #f3f5fb;
   --bg-nav:          #ffffff;
-  --bg-sub-nav:      #f4f6fb;
+  --bg-sub-nav:      #eef1f8;
   --bg-input:        #f8f9fd;
   --bg-tooltip:      #ffffff;
   --bg-sidebar:      #ffffff;
 
-  --border:          rgba(0,0,0,0.07);
-  --border-strong:   rgba(0,0,0,0.12);
-  --border-tooltip:  rgba(0,0,0,0.12);
+  --border:          rgba(15,23,42,0.09);
+  --border-strong:   rgba(15,23,42,0.16);
+  --border-tooltip:  rgba(15,23,42,0.14);
 
   --text-primary:    #111827;
   --text-secondary:  #4b5563;
   --text-muted:      #9ca3af;
 
-  --bar-track:       rgba(0,0,0,0.05);
-  --pie-stroke:      #f4f6fb;
-  --grid-line:       rgba(0,0,0,0.06);
+  --bar-track:       rgba(15,23,42,0.06);
+  --pie-stroke:      #eef1f8;
+  --grid-line:       rgba(15,23,42,0.07);
   --axis-text:       #6b7280;
 
-  --accent:          #0f766e;
-  --accent-light:    rgba(15,118,110,0.08);
-  --accent-border:   rgba(15,118,110,0.25);
+  /* Accent mais vivo no light (antes era literalmente o mesmo hex do dark,
+     #0f766e — inconsistente com o resto da paleta semântica, que já tem
+     variante própria por tema). Reaproveita o --teal já validado do light,
+     não inventa cor nova. */
+  --accent:          #0d9488;
+  --accent-light:    rgba(13,148,136,0.10);
+  --accent-border:   rgba(13,148,136,0.32);
 
   --green:           #059669;
   --green-bg:        rgba(5,150,105,0.08);
@@ -100,9 +112,12 @@
   --red-bg:          rgba(220,38,38,0.08);
   --card-gradient-base: #ffffff;
 
-  --shadow-card:     0 1px 3px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04);
-  --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
-  --shadow-nav:      0 1px 0 rgba(0,0,0,0.07);
+  /* PR E: sombra claramente perceptível (era quase invisível — "lavada").
+     rgba com base slate (15,23,42) em vez de preto puro: mais refinado
+     sobre fundo claro. */
+  --shadow-card:     0 2px 8px rgba(15,23,42,0.07), 0 14px 28px rgba(15,23,42,0.09);
+  --shadow-card-hover: 0 6px 16px rgba(15,23,42,0.10), 0 22px 42px rgba(15,23,42,0.13);
+  --shadow-nav:      0 1px 0 rgba(15,23,42,0.08);
 }
 
 /* ── Base ─────────────────────────────────────────────────── */
@@ -378,20 +393,20 @@ body {
 }
 
 .card {
-  /* Precision Dark — PR B: superfície premium. --surface-1/--border-subtle/
-     --shadow-md e o inset highlight de 1px substituem os valores literais
-     antigos (--bg-card/--border/--shadow-card), com o MESMO resultado visual
-     de profundidade — só a borda fica um pouco mais discreta em repouso e
-     ganha o realce superior sutil pedido no briefing. */
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.03);
+  /* PR E: relevo claramente perceptível. Gradiente vertical muito sutil
+     (--surface-2 no topo → --surface-1) + --shadow-md, agora bem mais
+     presente (ver tokens em :root), + realce interno superior mais visível.
+     Borda passa de --border-subtle para --border-default: um pouco mais de
+     contraste, como pedido. */
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
   border-radius: var(--radius-lg);
   padding: var(--space-20) var(--space-12);
   transition: background var(--duration-fast) var(--ease-standard),
               box-shadow var(--duration-fast) var(--ease-standard),
               border-color var(--duration-fast) var(--ease-standard);
-  animation: fadeIn 0.2s ease;
+  animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -400,12 +415,22 @@ body {
 }
 /* Hover global fica só em borda + sombra (sem transform): cards de KPI são
    informativos, não clicáveis — um lift chamaria atenção como se fossem
-   botão. O lift fica reservado para .card-interactive (abaixo), para uso
-   futuro em cards que realmente naveguem/ajam ao clique. */
+   botão. O lift fica reservado para .card-interactive (abaixo) e para
+   .chart-card (cards analíticos/visuais — §7 do briefing do PR E). */
 .card:hover {
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.04);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07);
 }
+
+/* Stagger de entrada — só nos grids de KPI/resumo (§6): cada card aparece
+   um pouco depois do anterior. Cap em 6 para não acumular atraso perceptível
+   em grids maiores; do 7º em diante, mesmo delay do 6º. */
+.cards-grid > *:nth-child(1), .painel-blocos-grid > *:nth-child(1) { animation-delay: 0ms; }
+.cards-grid > *:nth-child(2), .painel-blocos-grid > *:nth-child(2) { animation-delay: 40ms; }
+.cards-grid > *:nth-child(3), .painel-blocos-grid > *:nth-child(3) { animation-delay: 80ms; }
+.cards-grid > *:nth-child(4) { animation-delay: 120ms; }
+.cards-grid > *:nth-child(5) { animation-delay: 160ms; }
+.cards-grid > *:nth-child(n+6) { animation-delay: 200ms; }
 
 /* Variante opcional para cards genuinamente clicáveis (nenhum uso ainda —
    infraestrutura para PRs futuros). Soma o lift ao hover padrão acima. */
@@ -440,14 +465,13 @@ body {
 }
 
 .card-value {
-  /* Protagonismo do valor (§5): 18→20px via --font-card-value-size (PR A
-     tinha deixado o token igual ao valor antigo; ajustado agora, que é
-     onde a hierarquia do KPI card entra em cena). */
+  /* PR E: protagonismo real do valor — 20→24px e peso 700→800 (tokens em
+     :root, §2 do briefing "número maior, peso maior"). */
   font-size: var(--font-card-value-size);
   font-weight: var(--font-card-value-weight);
   letter-spacing: -0.025em;
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.15;
   text-align: center;
   word-break: break-word;
 }
@@ -461,18 +485,23 @@ body {
   text-align: center;
 }
 
-/* Colored card variants */
-.card.green  { border-color: rgba(16,185,129,0.2);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(16,185,129,0.05) 100%); }
+/* Colored card variants — PR E: troca o tint de borda nas 4 faces por uma
+   "accent strip" só no topo (§2/§3 do briefing: cor com significado sem
+   pintar o card inteiro, mais parecido com um edge/strip do que com um
+   contorno colorido completo). Fundo continua com o mesmo gradiente sutil
+   de antes (5% de opacidade), só a cor de base mudou de --card-gradient-base
+   fixo para a superfície gradiente do .card. */
+.card.green  { border-top: 2.5px solid var(--green);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(16,185,129,0.06) 100%); }
 .card.green  .card-value { color: var(--green); }
-.card.purple { border-color: rgba(139,92,246,0.2);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(139,92,246,0.05) 100%); }
+.card.purple { border-top: 2.5px solid var(--purple); background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(139,92,246,0.06) 100%); }
 .card.purple .card-value { color: var(--purple); }
-.card.amber  { border-color: rgba(245,158,11,0.2);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(245,158,11,0.05) 100%); }
+.card.amber  { border-top: 2.5px solid var(--amber);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(245,158,11,0.06) 100%); }
 .card.amber  .card-value { color: var(--amber); }
-.card.blue   { border-color: rgba(59,130,246,0.2);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(59,130,246,0.05) 100%); }
+.card.blue   { border-top: 2.5px solid var(--blue);   background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(59,130,246,0.06) 100%); }
 .card.blue   .card-value { color: var(--blue); }
-.card.teal   { border-color: rgba(20,184,166,0.2);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(20,184,166,0.05) 100%); }
+.card.teal   { border-top: 2.5px solid var(--teal);   background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(20,184,166,0.06) 100%); }
 .card.teal   .card-value { color: var(--teal); }
-.card.red    { border-color: rgba(239,68,68,0.2);   background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(239,68,68,0.05) 100%); }
+.card.red    { border-top: 2.5px solid var(--red);    background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(239,68,68,0.06) 100%); }
 .card.red    .card-value { color: var(--red); }
 
 /* ── Charts ──────────────────────────────────────────────── */
@@ -488,19 +517,23 @@ body {
 .chart-card {
   /* Mesmo tratamento de superfície do .card (§9 do briefing: só o container
      externo, nunca o SVG/legendas/tooltip internos, que ficam intocados). */
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.03);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
   border-radius: var(--radius-lg);
   padding: var(--space-20) var(--space-16); /* PR C: 18→20px vertical — alinha com .card */
   transition: background var(--duration-fast) var(--ease-standard),
               box-shadow var(--duration-fast) var(--ease-standard),
-              border-color var(--duration-fast) var(--ease-standard);
-  animation: fadeIn 0.22s ease;
+              border-color var(--duration-fast) var(--ease-standard),
+              transform var(--duration-fast) var(--ease-standard);
+  animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
 }
+/* Diferente do .card (KPI, informativo): chart-card é um card "analítico/
+   visual" (§7 do briefing do PR E), por isso ganha um lift sutil no hover. */
 .chart-card:hover {
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.04);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07);
+  transform: translateY(-2px);
 }
 
 .chart-title {
@@ -1043,7 +1076,7 @@ select.field-input {
 
   .page { padding: 14px; }
   .card { padding: 14px 12px; }
-  .card-value { font-size: 22px; }
+  .card-value { font-size: 24px; }
   .card-label { font-size: 10px; }
   .card-sub { font-size: 11px; }
   .charts-grid { grid-template-columns: 1fr !important; }
@@ -1064,7 +1097,7 @@ select.field-input {
 
 @media (max-width: 480px) {
   .page { padding: var(--space-8); } /* PR C: 10→8px — mantém densidade em telas pequenas */
-  .card-value { font-size: 20px; }
+  .card-value { font-size: 22px; }
   .overflow-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
@@ -1148,8 +1181,8 @@ select.field-input {
   --font-section-title-weight:    700;
   --font-section-title-tracking:  0.09em;
 
-  --font-card-value-size:      20px; /* PR B: 18→20px — protagonismo do valor de KPI (§5 do briefing) */
-  --font-card-value-weight:    700;
+  --font-card-value-size:      24px; /* PR E: 20→24px — "número maior" (§2) */
+  --font-card-value-weight:    800;  /* PR E: 700→800 — "peso maior" (§2) */
 
   --font-page-title-size:      26px;
   --font-page-title-weight:    800;
@@ -1246,4 +1279,67 @@ select.field-input {
   font-size: 12.5px;
   color: var(--text-secondary);
   margin-top: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PR E — VISUAL DEPTH + COLOR + MOTION (VP Dash · Precision Dark)
+   ══════════════════════════════════════════════════════════════════════
+   Profundidade de .card/.chart-card e os tokens de superfície/sombra foram
+   ajustados em-place acima (mesma seção onde já viviam). O que segue aqui
+   é infraestrutura nova: progress bar de meta/percentual e o bloco de
+   conceito (Marketing/Comercial/Resultado) do Painel Geral.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Progress bar — só onde já existe real/meta ou um percentual explícito
+   (§4). Track discreto + fill semântico + preenchimento animado 0%→valor
+   real via CSS puro (custom property --progress-value setada inline pelo
+   componente). Nunca decide o que é "meta" — só desenha o valor que a view
+   já calculava. */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: var(--progress-value, 0%); }
+}
+.metric-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--bar-track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.metric-progress-sm { height: 4px; }
+.metric-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  width: var(--progress-value, 0%);
+  animation: progress-fill var(--duration-slow) var(--ease-standard) both;
+}
+.metric-progress-fill.positive { background: var(--positive); }
+.metric-progress-fill.negative { background: var(--negative); }
+.metric-progress-fill.warning  { background: var(--warning); }
+.metric-progress-fill.info     { background: var(--info); }
+
+/* ── Bloco de conceito (Painel Geral: Marketing/Comercial/Resultado/Pace) —
+   §10 do briefing: "queremos que o usuário enxergue imediatamente os 3
+   blocos". --concept-color é setado inline pelo componente Block (mesma
+   cor que já usava no título) — accent strip no topo + glow própria muito
+   discreta, sem pintar o card inteiro. */
+.concept-block {
+  position: relative;
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 60%);
+  border: 1px solid var(--border-default);
+  border-top: 2.5px solid var(--concept-color, var(--accent));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: box-shadow var(--duration-fast) var(--ease-standard),
+              border-color var(--duration-fast) var(--ease-standard);
+}
+
+/* ── Hero/cabeçalho do Painel Geral — mais presença (§10): superfície
+   elevada + gradiente + accent discreto no topo. */
+.hero-elevated {
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 70%);
+  border: 1px solid var(--border-default);
+  border-top: 2.5px solid var(--accent-border);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.06);
 }
