@@ -775,83 +775,160 @@ function FunilPrincipal({ metricas }) {
   const contratosPagos = Number(metricas.contratosPagos) || 0
   const nmrr           = Number(metricas.nmrr)           || 0
 
+  // Fontes e fórmulas — inalteradas em relação à primeira versão do Funil Principal.
   const pct = (num, den) => den > 0 ? (num / den) * 100 : null
   const fmtTaxa = (v) => v === null ? '—' : fmtPct(v)
-  const taxaColor = (v) => v === null ? 'var(--text-muted)' : v > 100 ? '#f97316' : '#94a3b8'
+  // Sempre um hex literal (nunca var(--...)) — precisa ser concatenável com sufixo de alpha
+  // (ex.: "1a") para tingir o fundo/borda do badge sem gerar CSS inválido.
+  const taxaColor = (v, fallback) => v === null ? '#94a3b8' : v > 100 ? '#f97316' : fallback
 
   const t1 = pct(agendamentos, leads)
   const t2 = pct(realizadas, agendamentos)
   const t3 = pct(contratosPagos, realizadas)
   const tTotal = pct(contratosPagos, leads)
 
+  // Largura visual de cada faixa do funil — puramente estética, nunca usada em nenhuma
+  // conversão exibida. Representa o volume da etapa em relação a Leads (100%), com piso
+  // mínimo para o texto continuar legível e sem nunca alargar de uma etapa pra outra
+  // (mesmo se o dado da planilha vier fora de ordem).
+  const WIDTH_MIN = 42
+  const stageWidth = (valor, prevWidth) =>
+    leads > 0 ? Math.min(prevWidth, Math.max(WIDTH_MIN, (valor / leads) * 100)) : WIDTH_MIN
+
+  const wLeads        = 100
+  const wAgendamentos = stageWidth(agendamentos, wLeads)
+  const wRealizadas   = stageWidth(realizadas, wAgendamentos)
+  const wContratos    = stageWidth(contratosPagos, wRealizadas)
+
   const ETAPAS = [
-    { label: 'Leads',           valor: fmt(leads),          color: '#3b82f6', taxa: t1 },
-    { label: 'Agendamentos',    valor: fmt(agendamentos),   color: '#6366f1', taxa: t2 },
-    { label: 'Realizadas',      valor: fmt(realizadas),     color: '#14b8a6', taxa: t3 },
-    { label: 'Contratos Pagos', valor: fmt(contratosPagos), color: '#10b981', taxa: null },
+    { key: 'leads',        label: 'Leads',          valor: fmt(leads),          color: '#3b82f6', width: wLeads,        taxa: null },
+    { key: 'agendamentos', label: 'Agendamentos',   valor: fmt(agendamentos),   color: '#6366f1', width: wAgendamentos, taxa: t1 },
+    { key: 'realizadas',   label: 'Realizadas',     valor: fmt(realizadas),     color: '#14b8a6', width: wRealizadas,   taxa: t2 },
+    { key: 'pagos',        label: 'Contratos Pagos', valor: fmt(contratosPagos), color: '#10b981', width: wContratos,    taxa: t3 },
   ]
 
   return (
-    <div style={{ marginTop: 32, marginBottom: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 14 }}>Funil Principal</div>
-      <div className="chart-card" style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ width: '100%', maxWidth: 560 }}>
+    <div className="funil-wrap">
+      <div className="funil-header">
+        <div className="funil-title">Funil Principal</div>
+        <div className="funil-subtitle">Leads → Agendamentos → Realizadas → Contratos Pagos → NMRR</div>
+      </div>
+
+      <div className="chart-card funil-card">
+        <div className="funil-track">
           {ETAPAS.map((e, i) => (
-            <div key={e.label}>
-              {/* Etapa */}
-              <div style={{
-                background: 'var(--bg-secondary, rgba(148,163,184,0.07))',
-                border: `1.5px solid ${e.color}22`,
-                borderLeft: `4px solid ${e.color}`,
-                borderRadius: 10,
-                padding: '14px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{e.label}</span>
-                <span style={{ fontSize: 26, fontWeight: 700, color: e.color, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{e.valor}</span>
+            <div className="funil-row" key={e.key}>
+              <div className="funil-stage-col">
+                <div
+                  className="funil-stage"
+                  style={{ width: `${e.width}%`, background: `linear-gradient(135deg, ${e.color} 0%, ${e.color}cc 100%)` }}
+                >
+                  <span className="funil-stage-label">{e.label}</span>
+                  <span className="funil-stage-value">{e.valor}</span>
+                </div>
+                {i < ETAPAS.length - 1 && <div className="funil-connector" />}
               </div>
-              {/* Seta + taxa */}
-              {e.taxa !== undefined && e.taxa !== null || (e.taxa === null && i < ETAPAS.length - 1) ? (
-                i < ETAPAS.length - 1 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 0' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: taxaColor(e.taxa), marginBottom: 1 }}>{fmtTaxa(e.taxa)}</span>
-                    <span style={{ fontSize: 18, color: 'var(--text-muted)', lineHeight: 1 }}>↓</span>
+              <div className="funil-badge-col">
+                {/* Leads (i===0) não tem conversão de entrada — as demais sempre mostram um
+                    badge, com "—" quando o denominador da etapa anterior for zero. */}
+                {i > 0 && (
+                  <div className="funil-badge" style={{ background: `${taxaColor(e.taxa, e.color)}1a`, borderColor: `${taxaColor(e.taxa, e.color)}55`, color: taxaColor(e.taxa, e.color) }}>
+                    <span className="funil-badge-value">{fmtTaxa(e.taxa)}</span>
+                    <span className="funil-badge-caption">conversão</span>
                   </div>
-                )
-              ) : null}
+                )}
+              </div>
             </div>
           ))}
 
-          {/* NMRR — resultado financeiro final */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 0' }}>
-            <span style={{ fontSize: 18, color: 'var(--text-muted)', lineHeight: 1 }}>↓</span>
-          </div>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 100%)',
-            border: '1.5px solid rgba(245,158,11,0.35)',
-            borderLeft: '4px solid #f59e0b',
-            borderRadius: 10,
-            padding: '14px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>NMRR</span>
-            <span style={{ fontSize: 26, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{nmrr > 0 ? fmtR1(nmrr) : '—'}</span>
-          </div>
-
-          {/* Rodapé: conversão total */}
-          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
-            Conversão total do funil:&nbsp;
-            <strong style={{ color: tTotal !== null ? '#10b981' : 'var(--text-muted)' }}>
-              {fmtTaxa(tTotal)}
-            </strong>
-            <span style={{ marginLeft: 8, opacity: 0.6 }}>Contratos Pagos ÷ Leads</span>
+          {/* NMRR — resultado financeiro final; fecha o funil como base de destaque, sem
+              seguir o afunilamento das etapas de contagem acima. */}
+          <div className="funil-connector funil-connector-nmrr" />
+          <div className="funil-nmrr">
+            <span className="funil-nmrr-label">NMRR · resultado do mês</span>
+            <span className="funil-nmrr-value">{nmrr > 0 ? fmtR1(nmrr) : '—'}</span>
           </div>
         </div>
+
+        <div className="funil-footer">
+          <span>Conversão total do funil</span>
+          <strong style={{ color: tTotal !== null ? '#10b981' : 'var(--text-muted)' }}>{fmtTaxa(tTotal)}</strong>
+          <span className="funil-footer-note">Contratos Pagos ÷ Leads</span>
+        </div>
       </div>
+
+      <style>{`
+        .funil-wrap { margin-top: 32px; margin-bottom: 8px; }
+        .funil-header { margin-bottom: 14px; }
+        .funil-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+        .funil-subtitle { font-size: 11px; color: var(--text-muted); opacity: 0.7; margin-top: 3px; }
+
+        .funil-card { padding: 32px 28px 24px; display: flex; flex-direction: column; align-items: center; }
+        .funil-track { width: 100%; max-width: 640px; }
+
+        .funil-row { display: flex; align-items: center; gap: 16px; }
+        .funil-stage-col { flex: 1; min-width: 0; }
+        .funil-badge-col { width: 92px; flex-shrink: 0; display: flex; justify-content: center; }
+
+        .funil-stage {
+          margin: 0 auto;
+          min-width: 190px;
+          height: 60px;
+          clip-path: polygon(5% 0, 95% 0, 100% 100%, 0% 100%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+          transition: width 0.3s ease;
+        }
+        .funil-stage-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.88); }
+        .funil-stage-value { font-size: 24px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.25; }
+
+        .funil-connector { width: 2px; height: 10px; background: var(--border-strong); margin: 2px auto 0; }
+        .funil-connector-nmrr { margin: 2px auto 0; }
+
+        .funil-badge {
+          display: flex; flex-direction: column; align-items: center;
+          border: 1.5px solid; border-radius: 10px;
+          padding: 6px 10px 5px;
+          min-width: 76px;
+        }
+        .funil-badge-value { font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+        .funil-badge-caption { font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+
+        .funil-nmrr {
+          width: 100%; margin: 0 auto; box-sizing: border-box;
+          background: linear-gradient(135deg, rgba(245,158,11,0.16) 0%, rgba(245,158,11,0.05) 100%);
+          border: 1.5px solid rgba(245,158,11,0.4);
+          border-radius: 12px;
+          padding: 16px 22px;
+          display: flex; align-items: center; justify-content: space-between;
+        }
+        .funil-nmrr-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+        .funil-nmrr-value { font-size: 28px; font-weight: 800; color: #f59e0b; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+        .funil-footer {
+          margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+          width: 100%; max-width: 640px; box-sizing: border-box;
+          display: flex; align-items: baseline; justify-content: center; gap: 8px;
+          font-size: 12px; color: var(--text-muted);
+        }
+        .funil-footer strong { font-size: 15px; }
+        .funil-footer-note { opacity: 0.65; }
+
+        @media (max-width: 640px) {
+          .funil-card { padding: 22px 14px 18px; }
+          .funil-row { gap: 8px; }
+          .funil-badge-col { width: 64px; }
+          .funil-stage { min-width: 0; height: 52px; }
+          .funil-stage-value { font-size: 19px; }
+          .funil-badge { padding: 5px 6px 4px; min-width: 0; }
+          .funil-badge-value { font-size: 16px; }
+          .funil-nmrr { padding: 13px 16px; }
+          .funil-nmrr-value { font-size: 22px; }
+        }
+      `}</style>
     </div>
   )
 }
