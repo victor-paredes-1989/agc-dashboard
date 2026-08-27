@@ -1560,7 +1560,8 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
   // por parsePerformanceOrigem em lib/sheets.js) quando disponível; se a aba
   // PERFORMANCE_ORIGEM só chegar com valores já agrupados (ex.: "IB") na fonte,
   // origemRaw será igual a esse valor agrupado e a separação real depende de a
-  // planilha ter linhas próprias por origem — nada aqui inventa dado.
+  // planilha ter linhas próprias por origem — nada aqui inventa dado. Situação
+  // atual auditada e cenários de desbloqueio: docs/metas-origem-mql-fmql.md.
   const normalizarOrigem = (v) => normalizarOrigemGranular(v)
 
   // Soma real/meta de um grupo de linhas de PERFORMANCE_ORIGEM e recalcula gap/% — mesma
