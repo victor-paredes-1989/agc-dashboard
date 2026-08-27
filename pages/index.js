@@ -1866,7 +1866,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
           /* Depth 2.0 §11: hierarquia Resumo > Origem > Tabela — este card fica um
              degrau abaixo dos cards de Resumo (.card, shadow-md), por isso usa
              shadow-sm como base; hover sobe até shadow-md, nunca ultrapassa o Resumo. */
-          background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+          background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
           border: 1px solid var(--border-default);
           border-radius: var(--radius-card);
           box-shadow: var(--shadow-sm), var(--card-highlight-sm);
@@ -2699,7 +2699,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           padding: 20px 20px 16px;
           border-radius: 12px;
           border: 1px solid var(--border-default);
-          background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+          background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
           min-height: 172px;
           box-shadow: var(--shadow-md), var(--card-highlight);
           transition: box-shadow var(--duration-fast) var(--ease-standard),

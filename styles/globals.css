@@ -61,26 +61,30 @@
   --red-glow:        rgba(239,68,68,0.35);
   --card-gradient-base: #131727; /* acompanha --bg-card */
 
-  /* PR F.1 (feedback pós-review): dark subiu mais ~12% de intensidade sobre
-     o PR F original (opacidade e alcance das 3 camadas), a pedido explícito
-     do usuário ("subir levemente, +10-15%, não exagerar"). shadow-card-hover
-     soma alcance/opacidade para o lift de hover ficar claramente perceptível.
-     shadow-card-xl é reservada ao nível mais alto da página (Hero, §8). */
-  --shadow-card:     0 1px 2px rgba(0,0,0,0.33), 0 9px 22px rgba(0,0,0,0.38), 0 24px 55px rgba(0,0,0,0.29);
-  --shadow-card-hover: 0 3px 7px rgba(0,0,0,0.40), 0 18px 38px rgba(0,0,0,0.46), 0 40px 84px rgba(0,0,0,0.35);
-  --shadow-card-xl:  0 4px 11px rgba(0,0,0,0.42), 0 24px 50px rgba(0,0,0,0.50), 0 56px 108px rgba(0,0,0,0.37);
-  --shadow-nav:      0 1px 0 rgba(255,255,255,0.08), 0 4px 15px rgba(0,0,0,0.27);
+  /* PR F.2 (luz top-left): sombra externa ganhou um deslocamento horizontal
+     positivo — cada camada desloca um pouco mais que a anterior (contato →
+     elevação → difusão), simulando volume caindo para baixo-direita, como
+     se a luz viesse de cima-esquerda. Opacidade/alcance verticais mantidos
+     do PR F.1 (dark +12% sobre o PR F original). shadow-card-xl reservada
+     ao nível mais alto da página (Hero, §8). */
+  --shadow-card:     1px 2px 2px rgba(0,0,0,0.33), 4px 10px 22px rgba(0,0,0,0.38), 10px 26px 55px rgba(0,0,0,0.29);
+  --shadow-card-hover: 2px 4px 7px rgba(0,0,0,0.40), 7px 19px 38px rgba(0,0,0,0.46), 16px 42px 84px rgba(0,0,0,0.35);
+  --shadow-card-xl:  2px 5px 11px rgba(0,0,0,0.42), 9px 25px 50px rgba(0,0,0,0.50), 20px 58px 108px rgba(0,0,0,0.37);
+  --shadow-nav:      0 1px 0 rgba(255,255,255,0.08), 3px 4px 15px rgba(0,0,0,0.27);
   --radius-card:     14px;
   --radius-btn:      9px;
 
-  /* PR F.1: realce interno superior — theme-aware (era literal rgba(255,255,255,X)
+  /* PR F.1: realce interno — theme-aware (era literal rgba(255,255,255,X)
      direto em cada regra; no light isso ficava sempre igual ao dark, branco sobre
      quase-branco "estourando"). Dark mantém evidente; light fica muito mais sutil
      (override abaixo). 3 níveis: -sm (mo-perf-card), padrão (card/chart-card/
-     ind-card/concept-block), -hover (estado de hover + hero-elevated). */
-  --card-highlight-sm:     inset 0 1px 0 rgba(255,255,255,0.07);
-  --card-highlight:        inset 0 1px 0 rgba(255,255,255,0.09);
-  --card-highlight-hover:  inset 0 1px 0 rgba(255,255,255,0.13);
+     ind-card/concept-block), -hover (estado de hover + hero-elevated).
+     PR F.2: cada nível ganhou uma 2ª camada — realce na borda ESQUERDA, mais
+     discreto que o do topo (luz batendo mais de cima que de lado) — para a
+     "placa elevada" comunicar volume em 2 eixos, não só um brilho no topo. */
+  --card-highlight-sm:     inset 0 1px 0 rgba(255,255,255,0.07), inset 1px 0 0 rgba(255,255,255,0.04);
+  --card-highlight:        inset 0 1px 0 rgba(255,255,255,0.09), inset 1px 0 0 rgba(255,255,255,0.05);
+  --card-highlight-hover:  inset 0 1px 0 rgba(255,255,255,0.13), inset 1px 0 0 rgba(255,255,255,0.08);
 }
 
 /* ── Light theme ─────────────────────────────────────────── */
@@ -153,18 +157,22 @@
   /* §Shadow — light: precisa "aparecer mais" (feedback explícito) — base
      neutra quente (45,38,28) em vez de slate azulado, opacidade e alcance
      sensivelmente maiores que o PR F original. Sensação de card físico
-     elevado sobre o marfim, sem neumorphism (nunca duas sombras opostas). */
-  --shadow-card:     0 1px 2px rgba(45,38,28,0.10), 0 10px 24px rgba(45,38,28,0.13), 0 26px 52px rgba(45,38,28,0.11);
-  --shadow-card-hover: 0 3px 7px rgba(45,38,28,0.13), 0 16px 34px rgba(45,38,28,0.17), 0 36px 72px rgba(45,38,28,0.15);
-  --shadow-card-xl:  0 4px 12px rgba(45,38,28,0.15), 0 22px 44px rgba(45,38,28,0.20), 0 48px 92px rgba(45,38,28,0.17);
-  --shadow-nav:      0 1px 0 rgba(45,38,28,0.12), 0 4px 14px rgba(45,38,28,0.08);
+     elevado sobre o marfim, sem neumorphism (nunca duas sombras opostas).
+     PR F.2: mesmo deslocamento horizontal (luz top-left) do dark, mantendo
+     a proporção de opacidade/alcance já calibrada para o fundo marfim. */
+  --shadow-card:     1px 2px 2px rgba(45,38,28,0.10), 4px 11px 24px rgba(45,38,28,0.13), 10px 28px 54px rgba(45,38,28,0.11);
+  --shadow-card-hover: 2px 4px 7px rgba(45,38,28,0.13), 7px 17px 36px rgba(45,38,28,0.17), 16px 39px 76px rgba(45,38,28,0.15);
+  --shadow-card-xl:  2px 5px 12px rgba(45,38,28,0.15), 9px 24px 46px rgba(45,38,28,0.20), 20px 52px 96px rgba(45,38,28,0.17);
+  --shadow-nav:      0 1px 0 rgba(45,38,28,0.12), 3px 4px 14px rgba(45,38,28,0.08);
 
   /* §Highlight — light: branco sobre um card já quase-branco satura fácil,
      por isso a opacidade cai bastante em relação ao dark (continua > 0 só
-     para manter a textura de "material", nunca lê como estourado). */
-  --card-highlight-sm:     inset 0 1px 0 rgba(255,255,255,0.35);
-  --card-highlight:        inset 0 1px 0 rgba(255,255,255,0.45);
-  --card-highlight-hover:  inset 0 1px 0 rgba(255,255,255,0.55);
+     para manter a textura de "material", nunca lê como estourado). PR F.2:
+     2ª camada (borda esquerda) na mesma proporção do dark, mais discreta
+     que o realce do topo. */
+  --card-highlight-sm:     inset 0 1px 0 rgba(255,255,255,0.35), inset 1px 0 0 rgba(255,255,255,0.20);
+  --card-highlight:        inset 0 1px 0 rgba(255,255,255,0.45), inset 1px 0 0 rgba(255,255,255,0.25);
+  --card-highlight-hover:  inset 0 1px 0 rgba(255,255,255,0.55), inset 1px 0 0 rgba(255,255,255,0.32);
 }
 
 /* ── Base ─────────────────────────────────────────────────── */
@@ -445,7 +453,7 @@ body {
      --shadow-md agora é composta em 3 camadas (ver :root) e o realce interno
      superior ficou mais visível (0.05→0.09), lendo como "material" em vez de
      só um contorno mais claro. */
-  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+  background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
   border: 1px solid var(--border-default);
   box-shadow: var(--shadow-md), var(--card-highlight);
   border-radius: var(--radius-lg);
@@ -543,23 +551,23 @@ body {
    accent strip do topo (offset vertical negativo + spread negativo mantêm o
    brilho colado à borda, sem iluminar o card inteiro). Redeclara o mesmo
    box-shadow do .card/.card:hover só para acrescentar essa 3ª camada. */
-.card.green  { border-top: 2.5px solid var(--green);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(16,185,129,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), 0 -10px 22px -14px var(--green-glow); }
-.card.green:hover  { box-shadow: var(--shadow-lg), var(--card-highlight-hover), 0 -12px 28px -12px var(--green-glow); }
+.card.green  { border-top: 2.5px solid var(--green);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(16,185,129,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--green-glow); }
+.card.green:hover  { box-shadow: var(--shadow-lg), var(--card-highlight-hover), -5px -12px 28px -12px var(--green-glow); }
 .card.green  .card-value { color: var(--green); }
-.card.purple { border-top: 2.5px solid var(--purple); background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(139,92,246,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), 0 -10px 22px -14px var(--purple-glow); }
-.card.purple:hover { box-shadow: var(--shadow-lg), var(--card-highlight-hover), 0 -12px 28px -12px var(--purple-glow); }
+.card.purple { border-top: 2.5px solid var(--purple); background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(139,92,246,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--purple-glow); }
+.card.purple:hover { box-shadow: var(--shadow-lg), var(--card-highlight-hover), -5px -12px 28px -12px var(--purple-glow); }
 .card.purple .card-value { color: var(--purple); }
-.card.amber  { border-top: 2.5px solid var(--amber);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(245,158,11,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), 0 -10px 22px -14px var(--amber-glow); }
-.card.amber:hover  { box-shadow: var(--shadow-lg), var(--card-highlight-hover), 0 -12px 28px -12px var(--amber-glow); }
+.card.amber  { border-top: 2.5px solid var(--amber);  background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(245,158,11,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--amber-glow); }
+.card.amber:hover  { box-shadow: var(--shadow-lg), var(--card-highlight-hover), -5px -12px 28px -12px var(--amber-glow); }
 .card.amber  .card-value { color: var(--amber); }
-.card.blue   { border-top: 2.5px solid var(--blue);   background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(59,130,246,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), 0 -10px 22px -14px var(--blue-glow); }
-.card.blue:hover   { box-shadow: var(--shadow-lg), var(--card-highlight-hover), 0 -12px 28px -12px var(--blue-glow); }
+.card.blue   { border-top: 2.5px solid var(--blue);   background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(59,130,246,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--blue-glow); }
+.card.blue:hover   { box-shadow: var(--shadow-lg), var(--card-highlight-hover), -5px -12px 28px -12px var(--blue-glow); }
 .card.blue   .card-value { color: var(--blue); }
-.card.teal   { border-top: 2.5px solid var(--teal);   background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(20,184,166,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), 0 -10px 22px -14px var(--teal-glow); }
-.card.teal:hover   { box-shadow: var(--shadow-lg), var(--card-highlight-hover), 0 -12px 28px -12px var(--teal-glow); }
+.card.teal   { border-top: 2.5px solid var(--teal);   background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(20,184,166,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--teal-glow); }
+.card.teal:hover   { box-shadow: var(--shadow-lg), var(--card-highlight-hover), -5px -12px 28px -12px var(--teal-glow); }
 .card.teal   .card-value { color: var(--teal); }
-.card.red    { border-top: 2.5px solid var(--red);    background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(239,68,68,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), 0 -10px 22px -14px var(--red-glow); }
-.card.red:hover    { box-shadow: var(--shadow-lg), var(--card-highlight-hover), 0 -12px 28px -12px var(--red-glow); }
+.card.red    { border-top: 2.5px solid var(--red);    background: linear-gradient(135deg, var(--card-gradient-base) 0%, rgba(239,68,68,0.06) 100%); box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--red-glow); }
+.card.red:hover    { box-shadow: var(--shadow-lg), var(--card-highlight-hover), -5px -12px 28px -12px var(--red-glow); }
 .card.red    .card-value { color: var(--red); }
 
 /* ── Charts ──────────────────────────────────────────────── */
@@ -575,7 +583,7 @@ body {
 .chart-card {
   /* Mesmo tratamento de superfície do .card (§9 do briefing: só o container
      externo, nunca o SVG/legendas/tooltip internos, que ficam intocados). */
-  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+  background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
   border: 1px solid var(--border-default);
   box-shadow: var(--shadow-md), var(--card-highlight);
   border-radius: var(--radius-lg);
@@ -1388,7 +1396,7 @@ select.field-input {
    discreta, sem pintar o card inteiro. */
 .concept-block {
   position: relative;
-  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 60%);
+  background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 60%);
   border: 1px solid var(--border-default);
   border-top: 2.5px solid var(--concept-color, var(--accent));
   border-radius: var(--radius-lg);
@@ -1396,7 +1404,7 @@ select.field-input {
      --concept-glow é setado inline pelo Block junto com --concept-color
      (par de custom properties: cor sólida da borda + rgba correspondente
      para o glow). Cai para transparent se algum uso futuro não setar. */
-  box-shadow: var(--shadow-md), var(--card-highlight), 0 -10px 22px -14px var(--concept-glow, transparent);
+  box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--concept-glow, transparent);
   transition: box-shadow var(--duration-fast) var(--ease-standard),
               border-color var(--duration-fast) var(--ease-standard);
 }
@@ -1406,10 +1414,10 @@ select.field-input {
    nível) + accent glow + borda de topo mais espessa, para ficar claramente
    acima dos .concept-block internos (Marketing/Comercial/Resultado). */
 .hero-elevated {
-  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 78%);
+  background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 78%);
   border: 1px solid var(--border-default);
   border-top: 3px solid var(--accent-border);
-  box-shadow: var(--shadow-xl), var(--card-highlight-hover), 0 -12px 26px -14px var(--accent-glow);
+  box-shadow: var(--shadow-xl), var(--card-highlight-hover), -5px -12px 26px -14px var(--accent-glow);
 }
 
 /* PR F (Depth 2.0), §15: em telas estreitas, viewport curta e cards que
@@ -1418,13 +1426,13 @@ select.field-input {
    camada mais externa — a profundidade continua clara, só menos "pesada". */
 @media (max-width: 640px) {
   :root {
-    --shadow-card:       0 1px 2px rgba(0,0,0,0.30), 0 7px 16px rgba(0,0,0,0.33), 0 16px 34px rgba(0,0,0,0.20);
-    --shadow-card-hover: 0 3px 6px rgba(0,0,0,0.35), 0 11px 24px rgba(0,0,0,0.39), 0 25px 50px rgba(0,0,0,0.24);
-    --shadow-card-xl:    0 3px 9px rgba(0,0,0,0.37), 0 16px 34px rgba(0,0,0,0.41), 0 34px 66px rgba(0,0,0,0.26);
+    --shadow-card:       1px 1px 2px rgba(0,0,0,0.30), 3px 8px 16px rgba(0,0,0,0.33), 6px 17px 34px rgba(0,0,0,0.20);
+    --shadow-card-hover: 1px 3px 6px rgba(0,0,0,0.35), 5px 12px 24px rgba(0,0,0,0.39), 10px 26px 50px rgba(0,0,0,0.24);
+    --shadow-card-xl:    2px 3px 9px rgba(0,0,0,0.37), 6px 17px 34px rgba(0,0,0,0.41), 13px 35px 66px rgba(0,0,0,0.26);
   }
   [data-theme="light"] {
-    --shadow-card:       0 1px 2px rgba(45,38,28,0.08), 0 7px 15px rgba(45,38,28,0.10), 0 16px 32px rgba(45,38,28,0.08);
-    --shadow-card-hover: 0 2px 6px rgba(45,38,28,0.10), 0 11px 22px rgba(45,38,28,0.13), 0 24px 46px rgba(45,38,28,0.11);
-    --shadow-card-xl:    0 3px 9px rgba(45,38,28,0.12), 0 16px 30px rgba(45,38,28,0.15), 0 30px 56px rgba(45,38,28,0.12);
+    --shadow-card:       1px 1px 2px rgba(45,38,28,0.08), 3px 8px 15px rgba(45,38,28,0.10), 6px 17px 32px rgba(45,38,28,0.08);
+    --shadow-card-hover: 1px 2px 6px rgba(45,38,28,0.10), 5px 12px 22px rgba(45,38,28,0.13), 10px 26px 46px rgba(45,38,28,0.11);
+    --shadow-card-xl:    1px 3px 9px rgba(45,38,28,0.12), 6px 17px 30px rgba(45,38,28,0.15), 13px 33px 56px rgba(45,38,28,0.12);
   }
 }
