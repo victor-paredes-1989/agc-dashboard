@@ -1869,11 +1869,11 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
           background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
           border: 1px solid var(--border-default);
           border-radius: var(--radius-card);
-          box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.07);
+          box-shadow: var(--shadow-sm), var(--card-highlight-sm);
           padding: 16px 18px;
           transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
         }
-        .mo-perf-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.10); }
+        .mo-perf-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md), var(--card-highlight); }
         .mo-perf-card-outras { border-style: dashed; }
         .mo-perf-outras-tag { font-size: 9.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 6px; }
         .mo-perf-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
@@ -2701,7 +2701,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           border: 1px solid var(--border-default);
           background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
           min-height: 172px;
-          box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.09);
+          box-shadow: var(--shadow-md), var(--card-highlight);
           transition: box-shadow var(--duration-fast) var(--ease-standard),
                       border-color var(--duration-fast) var(--ease-standard),
                       transform 220ms var(--ease-standard);
@@ -2709,7 +2709,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
         }
         .ind-card:hover {
           border-color: var(--border-strong);
-          box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.13);
+          box-shadow: var(--shadow-lg), var(--card-highlight-hover);
           transform: translateY(-3px);
         }
       `}</style>
