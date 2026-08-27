@@ -466,6 +466,9 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const m  = periodoData.metricas || {}
   const c  = periodoData.reunioes?.cards || {}
   const gf = periodoData.reunioes?.graficos || {}
+  // Regra granular de Origem (MQL/FMQL separados) — usada só nos blocos "por Origem"
+  // abaixo. Painel Geral não é a Visão do Mês, então não usa o agrupamento em "IB".
+  const gfGranular = periodoData.reunioes?.graficosGranular || {}
   const mesLabel = periodoAtivo?.label || ''
 
   // helpers
@@ -475,8 +478,8 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const pct = (n) => { const x = Number(n); return isNaN(x) ? '-' : `${x.toFixed(1)}%` }
 
   // ── Tops — corrigido: campo é .nome, não .label ──
-  const origemReunioes = (gf.reunioesPorOrigem  || []).filter(o => o.nome).sort((a,b) => (b.qtd||0)-(a.qtd||0))[0]
-  const origemNmrr     = (gf.valorPagoPorOrigem || []).filter(o => o.nome).sort((a,b) => (b.valor||0)-(a.valor||0))[0]
+  const origemReunioes = (gfGranular.reunioesPorOrigem  || []).filter(o => o.nome).sort((a,b) => (b.qtd||0)-(a.qtd||0))[0]
+  const origemNmrr     = (gfGranular.valorPagoPorOrigem || []).filter(o => o.nome).sort((a,b) => (b.valor||0)-(a.valor||0))[0]
   const melhorCloserV  = (gf.valorPorCloser     || []).filter(o => o.nome).sort((a,b) => (b.valor||0)-(a.valor||0))[0]
   const melhorSdr      = (gf.contratosPorSdr    || []).filter(o => o.nome).sort((a,b) => (b.pagos||0)-(a.pagos||0))[0]
 
@@ -517,10 +520,10 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const temPace = Object.values(pace).some(Boolean)
 
   // ── Performance por Origem — corrigido: .nome em vez de .label ──
-  const origemRows = (gf.valorPagoPorOrigem || [])
+  const origemRows = (gfGranular.valorPagoPorOrigem || [])
     .filter(o => o.nome && o.nome !== 'SEM ORIGEM')
     .map(o => {
-      const reus = (gf.reunioesPorOrigem || []).find(r => r.nome === o.nome)
+      const reus = (gfGranular.reunioesPorOrigem || []).find(r => r.nome === o.nome)
       return { origem: o.nome, reunioes: reus?.qtd || 0, pagos: o.qtd || 0, nmrr: o.valor || 0 }
     })
     .sort((a, b) => b.nmrr - a.nmrr)
@@ -1015,7 +1018,9 @@ const COMPARATIVO_POSICOES = [
 ]
 
 function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
-  const rows = registros || []
+  // Origem granular (MQL/FMQL separados) — Comparativo Mensal não é a Visão do Mês,
+  // então não usa o agrupamento em "IB". Reaplica sobre origemRaw.
+  const rows = (registros || []).map(r => ({ ...r, origem: normalizarOrigemGranular(r.origemRaw || r.origem) }))
   const norm = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
   const [empresaSel, setEmpresaSel] = useState('')
@@ -1183,7 +1188,10 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
     }))
   }, [empresaAtiva, periodoAtivo?.key])
 
-  const rows = registros || []
+  // Origem granular (MQL/FMQL separados) — Dados Específicos não é a Visão do Mês,
+  // então não usa o agrupamento em "IB". Reaplica sobre origemRaw, sem alterar
+  // nenhum outro campo do registro.
+  const rows = (registros || []).map(r => ({ ...r, origem: normalizarOrigemGranular(r.origemRaw || r.origem) }))
   const setFiltro = (key, value) => setFiltros(prev => ({ ...prev, [key]: value }))
 
   // Paginação da tabela de registros filtrados — volta para a página 1 sempre
@@ -1208,11 +1216,13 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
 
+  // Nota: origem já chega granular (MQL/FMQL separados) via o remap de `rows` acima,
+  // então canonical() não reagrupa Origem em "IB" — só RECUPERACAO/INDICACAO/status,
+  // que não mudaram.
   const canonical = (key, value) => {
     const v = norm(value)
     if (!v) return ''
     if (key === 'origem') {
-      if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(v)) return 'IB'
       if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(v)) return 'RECUPERACAO'
       if (['INDIC', 'INDICACAO'].includes(v)) return 'INDICACAO'
     }
@@ -1526,11 +1536,13 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
   const clean = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   const norm = (v) => String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
+  // Nota: origem já chega granular (MQL/FMQL separados) via normalizarOrigem() abaixo
+  // (usa origemRaw), então canonical() não reagrupa Origem em "IB" — só
+  // RECUPERACAO/INDICACAO/status, que não mudaram.
   const canonical = (key, value) => {
     const v = norm(value)
     if (!v) return ''
     if (key === 'origem') {
-      if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(v)) return 'IB'
       if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(v)) return 'RECUPERACAO'
       if (['INDIC', 'INDICACAO'].includes(v)) return 'INDICACAO'
     }
@@ -1542,14 +1554,14 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
     return v
   }
 
-  const normalizarOrigem = (v) => {
-    const o = clean(v)
-    if (!o) return 'SEM ORIGEM'
-    if (['MQL', 'F/MQL', 'FMQL', 'F MQL'].includes(o)) return 'IB'
-    if (['RECUP', 'RECUPERACAO', 'MES PAS', 'MES PASSADO'].includes(o)) return 'RECUPERAÇÃO'
-    if (['INDIC', 'INDICACAO'].includes(o)) return 'INDICAÇÃO'
-    return norm(v)
-  }
+  // Metas por Origem não é a Visão do Mês — regra granular (MQL/FMQL separados),
+  // via a mesma normalizarOrigemGranular() usada nas demais views (função de
+  // módulo, definida perto de normalizarOrigemForecast). Usa origemRaw (preservado
+  // por parsePerformanceOrigem em lib/sheets.js) quando disponível; se a aba
+  // PERFORMANCE_ORIGEM só chegar com valores já agrupados (ex.: "IB") na fonte,
+  // origemRaw será igual a esse valor agrupado e a separação real depende de a
+  // planilha ter linhas próprias por origem — nada aqui inventa dado.
+  const normalizarOrigem = (v) => normalizarOrigemGranular(v)
 
   // Soma real/meta de um grupo de linhas de PERFORMANCE_ORIGEM e recalcula gap/% — mesma
   // fórmula de sempre (real-meta; real/meta*100 quando meta>0), só reaproveitada tanto para
@@ -1570,7 +1582,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
     const empresa = norm(r.empresa)
     const ano = String(r.ano || '').trim()
     const mes = norm(r.mes)
-    const origem = normalizarOrigem(r.origem)
+    const origem = normalizarOrigem(r.origemRaw || r.origem)
     if (!empresa || !ano || !mes || !origem) return acc
     const key = `${empresa}|${ano}|${mes}|${origem}`
     if (!acc[key]) {
@@ -2220,6 +2232,24 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
       </div>
     </div>
   )
+}
+
+// ── Normalização de Origem — regra granular (MQL e FMQL separados) ──────────
+// Usada em todas as views EXCETO Visão do Mês (que mantém MQL+FMQL agrupados em
+// "IB" via normalizeOrigem, em lib/sheets.js). Idêntica à regra agrupada, exceto
+// que MQL vira "MQL" e as variantes de FMQL viram "FMQL". RECUPERAÇÃO e INDICAÇÃO
+// permanecem exatamente como na regra agrupada — só a separação MQL/FMQL muda.
+// Não confundir com normalizarOrigemForecast() abaixo: aquela função também separa
+// "MÊS PAS" de "RECUPERAÇÃO", uma regra própria do Forecast/Evolução Mensal que
+// não deve se espalhar para as demais views.
+function normalizarOrigemGranular(v) {
+  const s = String(v || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  if (!s) return 'SEM ORIGEM'
+  if (s === 'MQL') return 'MQL'
+  if (['FMQL', 'F/MQL', 'F MQL'].includes(s)) return 'FMQL'
+  if (['RECUP', 'RECUPERACAO', 'REC. BASE', 'MES PAS', 'MES PASSADO'].includes(s)) return 'RECUPERAÇÃO'
+  if (['INDIC', 'INDICACAO'].includes(s)) return 'INDICAÇÃO'
+  return s || 'SEM ORIGEM'
 }
 
 // ── Normalização de origem específica do Forecast mensal ──────
