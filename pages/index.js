@@ -742,8 +742,8 @@ function MetricCards({ metricas }) {
   const gapPositive = gapNumber < 0
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Métricas do Mês</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 20 }}>Métricas do Mês</div>
+      <div className="cards-grid">
         {[
           { label: 'Leads', value: fmt(metricas.leads), sub: `MQL: ${fmtPct(metricas.mql)}`, color: 'blue' },
           { label: 'Agendamentos', value: fmt(metricas.agendamentos), sub: `Taxa: ${fmtPct(metricas.taxaAgendamento)}`, color: 'blue' },
@@ -776,8 +776,8 @@ function ReuniaoCards({ cards, empresa, graficos }) {
     .reduce((s, p) => s + (p.valor || 0), 0)
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, marginTop: 32 }}>Resumo das Reuniões</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 20, marginTop: 40 }}>Resumo das Reuniões</div>
+      <div className="cards-grid">
         <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value">{fmt(cards.total)}</div></div>
         <div className="card green"><div className="card-label">Fechamentos (PAGO)</div><div className="card-value">{fmt(cards.pagos)}</div><div className="card-sub">Taxa: {fmtPct(cards.taxa)}</div></div>
         <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value">{fmtR1(cards.valorTotal)}</div></div>
@@ -883,7 +883,7 @@ function FunilPrincipal({ metricas }) {
       </div>
 
       <style>{`
-        .funil-wrap { margin-top: 32px; margin-bottom: 8px; }
+        .funil-wrap { margin-top: 40px; margin-bottom: 8px; }
         .funil-header { margin-bottom: 16px; }
         .funil-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
         .funil-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
@@ -959,7 +959,7 @@ function ReuniaoGraficos({ graficos }) {
   if (!graficos) return null
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, marginTop: 32 }}>Análise das Reuniões</div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 20, marginTop: 40 }}>Análise das Reuniões</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <div className="chart-card"><div className="chart-title">Valor Pago por Origem (R$)</div>
           <BarChart data={graficos.valorPagoPorOrigem} valueKey="valor" conceptColor formatVal={v=>`R$${(v/1000).toFixed(1).replace('.', ',')}k`} showPct /></div>

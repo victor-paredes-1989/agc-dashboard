@@ -440,11 +440,23 @@ body {
 .section-title:first-child { margin-top: 0; }
 
 /* ── Cards ───────────────────────────────────────────────── */
+/* PR G (respiração/composição): classe existia mas não tinha uso em nenhuma
+   view — reaproveitada para os grids de KPI da Visão do Mês (Métricas do Mês,
+   Resumo das Reuniões), que antes usavam grid inline auto-fit/minmax(150px)
+   e acabavam enfileirando 7–8 cards numa única faixa horizontal apertada.
+   4 colunas fixas no desktop (8 cards → 2 fileiras de 4; 7 cards → 4+3) —
+   nunca mais uma faixa só, com mais espaço entre cards (--space-16→20). */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--space-16); /* PR C: 12→16px — cards menos "grudados" */
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-20);
   margin-bottom: var(--space-8);
+}
+@media (max-width: 900px) {
+  .cards-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .cards-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-16); }
 }
 
 .card {
@@ -452,12 +464,15 @@ body {
      vertical sutil (--surface-2 no topo → --surface-1) permanece, mas
      --shadow-md agora é composta em 3 camadas (ver :root) e o realce interno
      superior ficou mais visível (0.05→0.09), lendo como "material" em vez de
-     só um contorno mais claro. */
+     só um contorno mais claro.
+     PR G: padding vertical 20→16px — footprint um pouco mais contraído,
+     sem reduzir fonte de valor/label (legibilidade preservada), para o
+     grid como um todo respirar melhor sem esticar a página. */
   background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
   border: 1px solid var(--border-default);
   box-shadow: var(--shadow-md), var(--card-highlight);
   border-radius: var(--radius-lg);
-  padding: var(--space-20) var(--space-12);
+  padding: var(--space-16) var(--space-12);
   transition: background var(--duration-fast) var(--ease-standard),
               box-shadow var(--duration-fast) var(--ease-standard),
               border-color var(--duration-fast) var(--ease-standard);
