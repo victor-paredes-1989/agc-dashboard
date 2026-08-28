@@ -10,6 +10,28 @@ const fmtR1 = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleStri
 const fmtNum1 = (n) => { const num = Number(n) || 0; return num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }
 const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`
 
+// ── Motion: trigger de animação por viewport ───────────────────────────────
+// Observa se um elemento está visível na tela agora, via IntersectionObserver
+// — usado pelos componentes de barra abaixo pra só disparar a animação quando
+// o gráfico entra em tela, em vez de "gastar" a animação enquanto ainda está
+// fora de tela (abas com blocos/gráficos abaixo da dobra). Reflete a
+// visibilidade ATUAL (não só "já viu uma vez"): se o elemento sai de tela e
+// os dados mudam (troca de filtro) enquanto ele está fora, a barra some da
+// tela sem animar e retoma a animação (do valor antigo pro novo) quando volta
+// a ficar visível. Sem IntersectionObserver no ambiente, assume sempre
+// visível (mesmo comportamento de antes).
+function useInView(ref) {
+  const [inView, setInView] = useState(typeof IntersectionObserver === 'undefined')
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const obs = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold: 0 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [ref])
+  return inView
+}
+
 // ── Motion: count-up de KPIs (PR H) ───────────────────────────────────────
 // Anima um valor numérico bruto de 0 (na primeira montagem) — ou do valor
 // exibido anteriormente, em trocas de filtro — até o valor final, via
@@ -18,8 +40,11 @@ const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`
 // forma que o valor final exibido é sempre idêntico ao estático de antes — só
 // os quadros de transição mudam, nenhuma regra de cálculo/formatação é
 // duplicada ou alterada. Respeita prefers-reduced-motion (pula a animação,
-// mostra o valor final direto, sem nenhum rAF rodando).
-function useAnimatedNumber(target, duration = 350) {
+// mostra o valor final direto, sem nenhum rAF rodando, independente de
+// `active`). `active` (default true — usado pelos componentes de barra via
+// useInView) trava o disparo da animação enquanto false: o valor fica
+// congelado no último exibido até virar true.
+function useAnimatedNumber(target, duration = 350, active = true) {
   const safeTarget = Number.isFinite(target) ? target : 0
   const [display, setDisplay] = useState(0)
   const displayRef = useRef(0)
@@ -33,6 +58,7 @@ function useAnimatedNumber(target, duration = 350) {
       setDisplay(safeTarget)
       return
     }
+    if (!active) return
     const from = displayRef.current
     if (from === safeTarget) return
     let start = null
@@ -48,7 +74,7 @@ function useAnimatedNumber(target, duration = 350) {
     rafRef.current = requestAnimationFrame(step)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safeTarget, duration])
+  }, [safeTarget, duration, active])
   return display
 }
 
@@ -69,10 +95,12 @@ function AnimatedNumber({ value, format = fmt, duration }) {
 // nenhum cálculo: quem chama continua responsável por calcular pct/status,
 // este componente só recebe o valor já pronto (0–100) e anima a largura.
 function AnimatedBar({ pct, statusClass, small, style, fillStyle }) {
+  const ref = useRef(null)
+  const inView = useInView(ref)
   const clamped = Math.min(Math.max(Number(pct) || 0, 0), 100)
-  const animated = useAnimatedNumber(clamped)
+  const animated = useAnimatedNumber(clamped, undefined, inView)
   return (
-    <div className={`metric-progress${small ? ' metric-progress-sm' : ''}`} style={style}>
+    <div ref={ref} className={`metric-progress${small ? ' metric-progress-sm' : ''}`} style={style}>
       <div className={`metric-progress-fill${statusClass ? ` ${statusClass}` : ''}`} style={{ width: `${animated}%`, ...fillStyle }} />
     </div>
   )
@@ -81,30 +109,60 @@ function AnimatedBar({ pct, statusClass, small, style, fillStyle }) {
 // Preenchimento horizontal animado (0→valor) para os mini-gráficos de barra
 // simples (BarChart, ProgressByOriginChart, AdditionalOriginChart) — mesmo
 // hook de count-up dos KPIs/AnimatedBar; cresce tanto no mount quanto em
-// qualquer troca de filtro/dado que mude o percentual.
+// qualquer troca de filtro/dado que mude o percentual, mas só dispara quando
+// visível na tela (useInView). O wrapper (ref) tem sempre 100% do tamanho do
+// track do chamador, independente da largura animada — mira estável pro
+// IntersectionObserver, já que a barra em si começa com largura 0.
 function AnimatedFillDiv({ pct, color, style }) {
+  const ref = useRef(null)
+  const inView = useInView(ref)
   const clamped = Math.min(Math.max(Number(pct) || 0, 0), 100)
-  const animated = useAnimatedNumber(clamped)
-  return <div style={{ width: `${animated}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, ...style }} />
+  const animated = useAnimatedNumber(clamped, undefined, inView)
+  return (
+    <div ref={ref} style={{ width: '100%', height: '100%' }}>
+      <div style={{ width: `${animated}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, ...style }} />
+    </div>
+  )
 }
 
 // Equivalente vertical do AnimatedFillDiv, para colunas (VerticalBarChart).
+// Diferente do AnimatedFillDiv, aqui o tamanho do wrapper participa do layout
+// do chamador (coluna flex com os rótulos empilhados por cima) — por isso o
+// wrapper usa a altura FINAL (clamped%, igual ao valor final não-animado),
+// preservando exatamente a mesma altura total de conteúdo de antes. Dentro
+// dele, um <div> invisível (inset:0, alvo estável pro IntersectionObserver) e
+// a barra visível (absoluta, ancorada embaixo, altura normalizada em relação
+// ao próprio wrapper) crescem sem alterar o tamanho do wrapper.
 function AnimatedColumnFill({ pct, color, style }) {
+  const ref = useRef(null)
+  const inView = useInView(ref)
   const clamped = Math.min(Math.max(Number(pct) || 0, 0), 100)
-  const animated = useAnimatedNumber(clamped)
-  return <div style={{ width: 34, height: `${animated}%`, borderRadius: '5px 5px 0 0', background: color, opacity: 0.85, ...style }} />
+  const animated = useAnimatedNumber(clamped, undefined, inView)
+  const innerPct = clamped > 0 ? (animated / clamped) * 100 : 0
+  return (
+    <div style={{ position: 'relative', width: 34, height: `${clamped}%` }}>
+      <div ref={ref} style={{ position: 'absolute', inset: 0 }} />
+      <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: `${innerPct}%`, borderRadius: '5px 5px 0 0', background: color, opacity: 0.85, ...style }} />
+    </div>
+  )
 }
 
 // Coluna de barra SVG animada, usada por VerticalBarChartMonths e
 // VerticalBarChartMonthsGeral — anima a altura via o mesmo hook de count-up;
 // a posição Y é derivada da altura animada, então a barra cresce a partir da
-// base do eixo (não do topo).
+// base do eixo (não do topo). Um <rect> invisível, com altura fixa (do topo
+// até a base do eixo — não muda com a animação), serve de alvo pro
+// IntersectionObserver, já que o <rect> visível some (altura 0) antes de
+// entrar em tela.
 function SvgBarColumn({ x, barW, chartBottom, targetH, rx, fill, opacity, value, formatVal, valFontSize, valDy, xFontSize, xLabel, xY, onMouseEnter, onMouseLeave }) {
-  const h = useAnimatedNumber(targetH)
+  const ref = useRef(null)
+  const inView = useInView(ref)
+  const h = useAnimatedNumber(targetH, undefined, inView)
   const y = chartBottom - h
   const cx = x + barW / 2
   return (
     <g style={{ cursor: 'pointer' }} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+      <rect ref={ref} x={x} y={0} width={barW} height={chartBottom} fill="transparent" pointerEvents="none" />
       <rect x={x} y={y} width={barW} height={h} rx={rx} fill={fill} opacity={opacity} />
       {h > 16 && <text x={cx} y={y - valDy} textAnchor="middle" fontSize={valFontSize} fill={fill} opacity="0.95" fontWeight="600">{formatVal(value)}</text>}
       <text x={cx} y={xY} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{xLabel}</text>
@@ -3865,7 +3923,6 @@ export default function Dashboard() {
               title={nome}
             >
               <span className="sidebar-icon">{codigo}</span>
-              <span className="sidebar-label">{nome.split(' ')[0]}</span>
             </button>
           ))}
 
