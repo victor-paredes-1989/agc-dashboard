@@ -9,6 +9,75 @@ const fmtR = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleStrin
 const fmtR1 = (n) => { const num = Number(n) || 0; return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` }
 const fmtNum1 = (n) => { const num = Number(n) || 0; return num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }
 const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`
+
+// ── Motion: count-up de KPIs (PR H) ───────────────────────────────────────
+// Anima um valor numérico bruto de 0 (na primeira montagem) — ou do valor
+// exibido anteriormente, em trocas de filtro — até o valor final, via
+// requestAnimationFrame com ease-out cúbica. Devolve só o número interpolado;
+// quem usa aplica o MESMO formatador já existente (fmt/fmtR1/fmtPct/...), de
+// forma que o valor final exibido é sempre idêntico ao estático de antes — só
+// os quadros de transição mudam, nenhuma regra de cálculo/formatação é
+// duplicada ou alterada. Respeita prefers-reduced-motion (pula a animação,
+// mostra o valor final direto, sem nenhum rAF rodando).
+function useAnimatedNumber(target, duration = 700) {
+  const safeTarget = Number.isFinite(target) ? target : 0
+  const [display, setDisplay] = useState(0)
+  const displayRef = useRef(0)
+  const rafRef = useRef(null)
+  useEffect(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    const reduceMotion = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduceMotion) {
+      displayRef.current = safeTarget
+      setDisplay(safeTarget)
+      return
+    }
+    const from = displayRef.current
+    if (from === safeTarget) return
+    let start = null
+    const step = (ts) => {
+      if (start === null) start = ts
+      const t = Math.min(1, (ts - start) / duration)
+      const eased = 1 - Math.pow(1 - t, 3)
+      const value = from + (safeTarget - from) * eased
+      displayRef.current = value
+      setDisplay(value)
+      if (t < 1) rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeTarget, duration])
+  return display
+}
+
+// Wrapper de exibição — recebe o valor BRUTO (não formatado) e a mesma função
+// de formatação já usada no resto da view (fmt/fmtR1/fmtR/fmtPct/fmtDec/
+// fmtNum1...). Nenhuma lógica de cálculo/formatação nova; só anima o número
+// que alimenta o formatador de sempre.
+function AnimatedNumber({ value, format = fmt, duration }) {
+  const animated = useAnimatedNumber(value, duration)
+  return format(animated)
+}
+
+// Barra de progresso animada (PR H — motion, §2) — mesmo visual de sempre
+// (.metric-progress/.metric-progress-fill), largura controlada pelo mesmo
+// hook de count-up dos KPIs (useAnimatedNumber) em vez do @keyframes CSS
+// que só animava no mount. Cresce 0→valor tanto na primeira renderização
+// quanto em qualquer troca de filtro que mude o percentual — sem duplicar
+// nenhum cálculo: quem chama continua responsável por calcular pct/status,
+// este componente só recebe o valor já pronto (0–100) e anima a largura.
+function AnimatedBar({ pct, statusClass, small, style, fillStyle }) {
+  const clamped = Math.min(Math.max(Number(pct) || 0, 0), 100)
+  const animated = useAnimatedNumber(clamped)
+  return (
+    <div className={`metric-progress${small ? ' metric-progress-sm' : ''}`} style={style}>
+      <div className={`metric-progress-fill${statusClass ? ` ${statusClass}` : ''}`} style={{ width: `${animated}%`, ...fillStyle }} />
+    </div>
+  )
+}
+
 const parseDisplayNumber = (value) => {
   if (value === null || value === undefined || value === '') return 0
   let s = String(value).trim()
@@ -530,10 +599,15 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
   const totalNmrrOrigem = origemRows.reduce((s, r) => s + r.nmrr, 0)
 
   // ── Componentes internos ──
-  const Stat = ({ label, value, color, big, sub }) => (
+  // raw/format (opcional) anima o número principal de cada bloco via AnimatedNumber;
+  // value (string já formatada, comportamento de sempre) continua funcionando igual
+  // para todo o resto — raw/format é só usado nos stats "big" desta view.
+  const Stat = ({ label, value, raw, format, color, big, sub }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ fontSize: big ? 22 : 15, fontWeight: 700, color: color || 'var(--text-primary)', lineHeight: 1.1 }}>{value}</span>
+      <span style={{ fontSize: big ? 22 : 15, fontWeight: 700, color: color || 'var(--text-primary)', lineHeight: 1.1 }}>
+        {raw !== undefined ? <AnimatedNumber value={raw} format={format} /> : value}
+      </span>
       {sub && <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', marginTop: 2 }}>{sub}</span>}
     </div>
   )
@@ -599,7 +673,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
         {/* Marketing */}
         <Block title="Marketing" color="#3b82f6">
           <Row2 items={[
-            { label: 'Investimento', value: r1(m.investimento), color: '#f97316', big: true },
+            { label: 'Investimento', raw: m.investimento, format: r1, color: '#f97316', big: true },
             { label: 'CPL',          value: r1(m.cpl) },
           ]} />
           <Divider />
@@ -626,12 +700,12 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
         {/* Comercial */}
         <Block title="Comercial" color="#10b981">
           <Row2 items={[
-            { label: `Agendamentos${m.taxaAgendamento ? ` (${pct(m.taxaAgendamento)})` : ''}`, value: f0(m.agendamentos), big: true },
+            { label: `Agendamentos${m.taxaAgendamento ? ` (${pct(m.taxaAgendamento)})` : ''}`, raw: m.agendamentos, format: f0, big: true },
             { label: `Realizadas${m.taxaRealizadas ? ` (${pct(m.taxaRealizadas)})` : ''}`,     value: f0(m.realizadas) },
           ]} />
           <Divider />
           <Row2 items={[
-            { label: `Pagos${c.taxa ? ` (${pct(c.taxa)} conv.)` : ''}`, value: f0(c.pagos), color: '#10b981', big: true },
+            { label: `Pagos${c.taxa ? ` (${pct(c.taxa)} conv.)` : ''}`, raw: c.pagos, format: f0, color: '#10b981', big: true },
             { label: 'Pipeline Ativo', value: valorNaMesa > 0 ? r1(valorNaMesa) : '-', sub: 'Valor na Mesa' },
           ]} />
           <Divider />
@@ -653,7 +727,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
         {/* Resultado */}
         <Block title="Resultado" color="#f59e0b">
           <Row2 items={[
-            { label: 'NMRR', value: r1(m.nmrr), color: '#f59e0b', big: true },
+            { label: 'NMRR', raw: m.nmrr, format: r1, color: '#f59e0b', big: true },
             { label: 'TKM',  value: r1(m.tkm) },
           ]} />
           <Divider />
@@ -666,9 +740,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
             },
           ]} />
           {pctMeta != null && (
-            <div className="metric-progress" style={{ marginTop: 8, '--progress-value': `${Math.min(pctMeta, 100)}%` }}>
-              <div className={`metric-progress-fill ${pctMeta >= 100 ? 'positive' : 'warning'}`} />
-            </div>
+            <AnimatedBar pct={pctMeta} statusClass={pctMeta >= 100 ? 'positive' : 'warning'} style={{ marginTop: 8 }} />
           )}
           {m.gap !== undefined && m.gap !== '' && <><Divider />
           <Stat label="Gap da Meta" value={v(m.gap)}
@@ -742,21 +814,21 @@ function MetricCards({ metricas }) {
   const gapPositive = gapNumber < 0
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Métricas do Mês</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 20 }}>Métricas do Mês</div>
+      <div className="cards-grid">
         {[
-          { label: 'Leads', value: fmt(metricas.leads), sub: `MQL: ${fmtPct(metricas.mql)}`, color: 'blue' },
-          { label: 'Agendamentos', value: fmt(metricas.agendamentos), sub: `Taxa: ${fmtPct(metricas.taxaAgendamento)}`, color: 'blue' },
-          { label: 'Realizadas', value: fmt(metricas.realizadas), sub: `Comparec.: ${fmtPct(metricas.taxaRealizadas)}`, color: '' },
-          { label: 'Contratos Pagos', value: fmt(metricas.contratosPagos), sub: `Vendidos: ${fmt(metricas.contratosVendidos)}`, color: 'green' },
-          { label: 'NMRR', value: fmtR1(metricas.nmrr), sub: `TKM: ${fmtR1(metricas.tkm)}`, color: 'amber' },
-          { label: 'Investimento', value: fmtR1(metricas.investimento), sub: `CPL: ${fmtR1(metricas.cpl)}`, color: 'purple' },
-          { label: 'CAC', value: fmtR1(metricas.cac), sub: `por contrato | TKM: ${fmtR1(metricas.tkm)}`, color: 'teal' },
+          { label: 'Leads', raw: metricas.leads, format: fmt, sub: `MQL: ${fmtPct(metricas.mql)}`, color: 'blue' },
+          { label: 'Agendamentos', raw: metricas.agendamentos, format: fmt, sub: `Taxa: ${fmtPct(metricas.taxaAgendamento)}`, color: 'blue' },
+          { label: 'Realizadas', raw: metricas.realizadas, format: fmt, sub: `Comparec.: ${fmtPct(metricas.taxaRealizadas)}`, color: '' },
+          { label: 'Contratos Pagos', raw: metricas.contratosPagos, format: fmt, sub: `Vendidos: ${fmt(metricas.contratosVendidos)}`, color: 'green' },
+          { label: 'NMRR', raw: metricas.nmrr, format: fmtR1, sub: `TKM: ${fmtR1(metricas.tkm)}`, color: 'amber' },
+          { label: 'Investimento', raw: metricas.investimento, format: fmtR1, sub: `CPL: ${fmtR1(metricas.cpl)}`, color: 'purple' },
+          { label: 'CAC', raw: metricas.cac, format: fmtR1, sub: `por contrato | TKM: ${fmtR1(metricas.tkm)}`, color: 'teal' },
           { label: 'Gap da Meta', value: gap, sub: gapPositive ? '✓ Meta ultrapassada' : '⚠ Abaixo da meta', color: gapPositive ? 'green' : 'red' },
         ].map((c, i) => (
           <div key={i} className={`card ${c.color}`}>
             <div className="card-label">{c.label}</div>
-            <div className="card-value">{c.value}</div>
+            <div className="card-value">{c.raw !== undefined ? <AnimatedNumber value={c.raw} format={c.format} /> : c.value}</div>
             <div className="card-sub">{c.sub}</div>
           </div>
         ))}
@@ -776,15 +848,15 @@ function ReuniaoCards({ cards, empresa, graficos }) {
     .reduce((s, p) => s + (p.valor || 0), 0)
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, marginTop: 32 }}>Resumo das Reuniões</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
-        <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value">{fmt(cards.total)}</div></div>
-        <div className="card green"><div className="card-label">Fechamentos (PAGO)</div><div className="card-value">{fmt(cards.pagos)}</div><div className="card-sub">Taxa: {fmtPct(cards.taxa)}</div></div>
-        <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value">{fmtR1(cards.valorTotal)}</div></div>
-        <div className="card amber"><div className="card-label">Pipeline Ativo</div><div className="card-value">{valorPipelineAtivo > 0 ? fmtR1(valorPipelineAtivo) : '-'}</div><div className="card-sub">Valor na Mesa</div></div>
-        <div className="card blue"><div className="card-label">{dsoLabel}</div><div className="card-value">{dsoValor > 0 ? fmtR1(dsoValor) : '-'}</div></div>
-        <div className="card"><div className="card-label">Fugiram</div><div className="card-value">{fmt(cards.fugiu)}</div></div>
-        <div className="card red"><div className="card-label">Perdidos (FORA)</div><div className="card-value">{fmt(cards.fora)}</div></div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 20, marginTop: 40 }}>Resumo das Reuniões</div>
+      <div className="cards-grid">
+        <div className="card"><div className="card-label">Total Reuniões</div><div className="card-value"><AnimatedNumber value={cards.total} format={fmt} /></div></div>
+        <div className="card green"><div className="card-label">Fechamentos (PAGO)</div><div className="card-value"><AnimatedNumber value={cards.pagos} format={fmt} /></div><div className="card-sub">Taxa: {fmtPct(cards.taxa)}</div></div>
+        <div className="card amber"><div className="card-label">Valor Total</div><div className="card-value"><AnimatedNumber value={cards.valorTotal} format={fmtR1} /></div></div>
+        <div className="card amber"><div className="card-label">Pipeline Ativo</div><div className="card-value">{valorPipelineAtivo > 0 ? <AnimatedNumber value={valorPipelineAtivo} format={fmtR1} /> : '-'}</div><div className="card-sub">Valor na Mesa</div></div>
+        <div className="card blue"><div className="card-label">{dsoLabel}</div><div className="card-value">{dsoValor > 0 ? <AnimatedNumber value={dsoValor} format={fmtR1} /> : '-'}</div></div>
+        <div className="card"><div className="card-label">Fugiram</div><div className="card-value"><AnimatedNumber value={cards.fugiu} format={fmt} /></div></div>
+        <div className="card red"><div className="card-label">Perdidos (FORA)</div><div className="card-value"><AnimatedNumber value={cards.fora} format={fmt} /></div></div>
       </div>
     </div>
   )
@@ -830,10 +902,10 @@ function FunilPrincipal({ metricas }) {
   // Topo/base de cada faixa: a base da faixa N é sempre igual ao topo da faixa N+1, então as
   // faixas se encaixam sem nenhuma emenda/gap — uma silhueta contínua de funil de verdade.
   const ETAPAS = [
-    { key: 'leads',        label: 'Leads',           valor: fmt(leads),          top: wLeads,        bottom: wAgendamentos, taxa: null },
-    { key: 'agendamentos', label: 'Agendamentos',    valor: fmt(agendamentos),   top: wAgendamentos, bottom: wRealizadas,   taxa: t1 },
-    { key: 'realizadas',   label: 'Realizadas',      valor: fmt(realizadas),     top: wRealizadas,   bottom: wContratos,    taxa: t2 },
-    { key: 'pagos',        label: 'Contratos Pagos', valor: fmt(contratosPagos), top: wContratos,    bottom: wFecho,        taxa: t3 },
+    { key: 'leads',        label: 'Leads',           raw: leads,          top: wLeads,        bottom: wAgendamentos, taxa: null },
+    { key: 'agendamentos', label: 'Agendamentos',    raw: agendamentos,   top: wAgendamentos, bottom: wRealizadas,   taxa: t1 },
+    { key: 'realizadas',   label: 'Realizadas',      raw: realizadas,     top: wRealizadas,   bottom: wContratos,    taxa: t2 },
+    { key: 'pagos',        label: 'Contratos Pagos', raw: contratosPagos, top: wContratos,    bottom: wFecho,        taxa: t3 },
   ]
   const clipFor = (top, bottom) => {
     const tl = (100 - top) / 2, tr = 100 - tl
@@ -854,7 +926,7 @@ function FunilPrincipal({ metricas }) {
             <div className="funil-grid-row" key={e.key} style={{ '--i': i }}>
               <div className="funil-label-cell">
                 <span className="funil-label-name">{e.label}</span>
-                <span className="funil-label-value">{e.valor}</span>
+                <span className="funil-label-value"><AnimatedNumber value={e.raw} format={fmt} /></span>
               </div>
               <div className="funil-shape-cell">
                 <div className="funil-band" style={{ clipPath: clipFor(e.top, e.bottom) }} />
@@ -872,7 +944,7 @@ function FunilPrincipal({ metricas }) {
             seguir o afunilamento das etapas de contagem acima. */}
         <div className="funil-nmrr">
           <span className="funil-nmrr-label">NMRR · resultado do mês</span>
-          <span className="funil-nmrr-value">{nmrr > 0 ? fmtR1(nmrr) : '—'}</span>
+          <span className="funil-nmrr-value">{nmrr > 0 ? <AnimatedNumber value={nmrr} format={fmtR1} /> : '—'}</span>
         </div>
 
         <div className="funil-footer">
@@ -883,7 +955,7 @@ function FunilPrincipal({ metricas }) {
       </div>
 
       <style>{`
-        .funil-wrap { margin-top: 32px; margin-bottom: 8px; }
+        .funil-wrap { margin-top: 40px; margin-bottom: 8px; }
         .funil-header { margin-bottom: 16px; }
         .funil-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
         .funil-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
@@ -959,7 +1031,7 @@ function ReuniaoGraficos({ graficos }) {
   if (!graficos) return null
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16, marginTop: 32 }}>Análise das Reuniões</div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 20, marginTop: 40 }}>Análise das Reuniões</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <div className="chart-card"><div className="chart-title">Valor Pago por Origem (R$)</div>
           <BarChart data={graficos.valorPagoPorOrigem} valueKey="valor" conceptColor formatVal={v=>`R$${(v/1000).toFixed(1).replace('.', ',')}k`} showPct /></div>
@@ -1435,19 +1507,19 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Resumo filtrado</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 32 }}>
-        <div className="card"><div className="card-label">Total de Reuniões</div><div className="card-value">{fmt(total)}</div></div>
-        <div className="card green"><div className="card-label">Contratos Pagos</div><div className="card-value">{fmt(pagos.length)}</div><div className="card-sub">Taxa de conversão: {fmtPct(taxa)}</div></div>
-        <div className="card amber"><div className="card-label">Valor Pago Total</div><div className="card-value">{fmtR(sum(pagos))}</div></div>
-        <div className="card amber"><div className="card-label">NMRR</div><div className="card-value">{fmtR(nmrr)}</div><div className="card-sub">TKM: {fmtR(tkm)}</div></div>
-        <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value">{fmtR(sum(dsvDso))}</div><div className="card-sub">{fmt(dsvDso.length)} contratos</div></div>
-        <div className="card blue"><div className="card-label">Pipeline Ativo</div><div className="card-value">{fmt(pipelineRows.length)}</div></div>
-        <div className="card purple"><div className="card-label">Valor Pipeline</div><div className="card-value">{fmtR(sum(pipelineRows))}</div><div className="card-sub">{fmt(pipelineRows.length)} oportunidades</div></div>
-        <div className="card red"><div className="card-label">Perdidos/Fugiram</div><div className="card-value">{fmt(filtrados.filter(r => ['FORA','FUGIU'].includes(norm(r.status))).length)}</div></div>
+      <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 32 }}>
+        <div className="card"><div className="card-label">Total de Reuniões</div><div className="card-value"><AnimatedNumber value={total} format={fmt} /></div></div>
+        <div className="card green"><div className="card-label">Contratos Pagos</div><div className="card-value"><AnimatedNumber value={pagos.length} format={fmt} /></div><div className="card-sub">Taxa de conversão: {fmtPct(taxa)}</div></div>
+        <div className="card amber"><div className="card-label">Valor Pago Total</div><div className="card-value"><AnimatedNumber value={sum(pagos)} format={fmtR} /></div></div>
+        <div className="card amber"><div className="card-label">NMRR</div><div className="card-value"><AnimatedNumber value={nmrr} format={fmtR} /></div><div className="card-sub">TKM: {fmtR(tkm)}</div></div>
+        <div className="card blue"><div className="card-label">DSV / DSO</div><div className="card-value"><AnimatedNumber value={sum(dsvDso)} format={fmtR} /></div><div className="card-sub">{fmt(dsvDso.length)} contratos</div></div>
+        <div className="card blue"><div className="card-label">Pipeline Ativo</div><div className="card-value"><AnimatedNumber value={pipelineRows.length} format={fmt} /></div></div>
+        <div className="card purple"><div className="card-label">Valor Pipeline</div><div className="card-value"><AnimatedNumber value={sum(pipelineRows)} format={fmtR} /></div><div className="card-sub">{fmt(pipelineRows.length)} oportunidades</div></div>
+        <div className="card red"><div className="card-label">Perdidos/Fugiram</div><div className="card-value"><AnimatedNumber value={filtrados.filter(r => ['FORA','FUGIU'].includes(norm(r.status))).length} format={fmt} /></div></div>
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Gráficos filtrados</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+      <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
         <div className="chart-card"><div className="chart-title">Reuniões por Origem</div><BarChart data={countBy(filtrados, 'origem')} valueKey="qtd" conceptColor showPct /></div>
         <div className="chart-card"><div className="chart-title">Pagos por Origem</div><BarChart data={countBy(pagos, 'origem')} valueKey="qtd" conceptColor showPct /></div>
         <div className="chart-card"><div className="chart-title">Valor Pago por Origem</div><BarChart data={valueBy(pagos, 'origem')} valueKey="valor" conceptColor formatVal={v=>fmtR1(v)} showPct /></div>
@@ -1724,14 +1796,12 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
   const ResumoCard = ({ label, real, meta, gap, pctVal, fmtFn }) => (
     <div className={`card ${cardClass(real, meta)}`}>
       <div className="card-label">{label}</div>
-      <div className="card-value">{fmtFn(real)}</div>
+      <div className="card-value"><AnimatedNumber value={real} format={fmtFn} /></div>
       {meta > 0 ? (
         <>
           <div className="card-sub">Meta: {fmtFn(meta)}</div>
           <div className="card-sub" style={{ color: gapColor(gap) }}>Gap: {fmtGap(gap, fmtFn)} · {fmtPct(pctVal)} da meta</div>
-          <div className="metric-progress" style={{ marginTop: 8, '--progress-value': `${Math.min(Math.max(pctVal, 0), 100)}%` }}>
-            <div className={`metric-progress-fill ${real >= meta ? 'positive' : 'negative'}`} />
-          </div>
+          <AnimatedBar pct={pctVal} statusClass={real >= meta ? 'positive' : 'negative'} style={{ marginTop: 8 }} />
         </>
       ) : (
         <div className="card-sub">Meta não configurada</div>
@@ -1750,9 +1820,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
         <span className="mo-metric-values">{fmtFn(real)} / {meta > 0 ? fmtFn(meta) : '—'}</span>
         <span className={`mo-metric-pct ${status}`}>{meta > 0 ? fmtPct(pctVal) : '—'}</span>
         {meta > 0 && (
-          <div className="metric-progress metric-progress-sm" style={{ '--progress-value': `${Math.min(Math.max(pctVal, 0), 100)}%` }}>
-            <div className={`metric-progress-fill ${status}`} />
-          </div>
+          <AnimatedBar pct={pctVal} statusClass={status} small />
         )}
       </div>
     )
@@ -1789,7 +1857,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
       {performancePorOrigem.length === 0 && !temOutras ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>Nenhuma origem com meta configurada para os filtros atuais.</div>
       ) : (
-        <div className="mo-perf-grid" style={{ marginBottom: 32 }}>
+        <div className="mo-perf-grid stagger-children" style={{ marginBottom: 32 }}>
           {performancePorOrigem.map(r => (
             <div className="mo-perf-card" key={r.origem}>
               <div className="mo-perf-title">{r.origem}</div>
@@ -1872,6 +1940,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
           box-shadow: var(--shadow-sm), var(--card-highlight-sm);
           padding: 16px 18px;
           transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+          animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
         }
         .mo-perf-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md), var(--card-highlight); }
         .mo-perf-card-outras { border-style: dashed; }
@@ -2713,7 +2782,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           transform: translateY(-3px);
         }
       `}</style>
-      <div className="ind-grid">
+      <div className="ind-grid stagger-children">
         {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta }) => (
           <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
         ))}
@@ -2776,7 +2845,7 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
           <>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Forecast</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.05, letterSpacing: '-0.01em' }}>
-              {fmtVal(Math.round(projecao))}
+              <AnimatedNumber value={Math.round(projecao)} format={fmtVal} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
               {fmtMedia(mediaDia)}/{dayMode === 'calendar' ? 'dia' : 'dia útil'}
@@ -2784,7 +2853,7 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
           </>
         ) : isCurrent ? (
           <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.05 }}>
-            {fmtVal(realizado)}
+            <AnimatedNumber value={realizado} format={fmtVal} />
           </div>
         ) : (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>—</div>
@@ -2804,9 +2873,7 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
               )}
             </div>
             {pctMeta !== null && (
-              <div className="metric-progress metric-progress-sm" style={{ '--progress-value': `${Math.min(Math.max(pctMeta, 0), 100)}%` }}>
-                <div className={`metric-progress-fill ${pctMeta >= 100 ? 'positive' : pctMeta >= 80 ? 'warning' : 'negative'}`} />
-              </div>
+              <AnimatedBar pct={pctMeta} statusClass={pctMeta >= 100 ? 'positive' : pctMeta >= 80 ? 'warning' : 'negative'} small />
             )}
           </>
         )}
@@ -2917,9 +2984,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
             <div>
               <div className="card-label">Objetivo do mês</div>
               <div className="card-value">{valorFmt(metaGrafico)}</div>
-              <div className="metric-progress" style={{ margin: '8px 0', '--progress-value': `${Math.min(Math.max(dadosGrafico.pctMeta, 0), 100)}%` }}>
-                <div className="metric-progress-fill" style={{ background: 'var(--purple)' }} />
-              </div>
+              <AnimatedBar pct={dadosGrafico.pctMeta} style={{ margin: '8px 0' }} fillStyle={{ background: 'var(--purple)' }} />
               <div className="card-sub">{fmtPct(dadosGrafico.pctMeta)} realizado</div>
             </div>
             {supermetaGrafico > 0 && (
@@ -3908,7 +3973,7 @@ export default function Dashboard() {
           {error && <div className="error" style={{ margin: 24 }}>Erro ao carregar: {error}</div>}
           {!loading && !error && data && (
             <div className="page">
-              {periodo==='PAINEL' ? <PainelGeralView periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
+              {periodo==='PAINEL' ? <PainelGeralView key={`painel-${empresa}-${periodoAtivo?.key}`} periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
                periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
@@ -3916,12 +3981,18 @@ export default function Dashboard() {
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} registros={data?.GERAL} /> :
-               periodoData ? <>
-                 <MetricCards metricas={periodoData.metricas} />
-                 <ReuniaoCards cards={periodoData.reunioes?.cards} empresa={empresa} graficos={periodoData.reunioes?.graficos} />
-                 <FunilPrincipal metricas={periodoData.metricas} />
-                 <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
-               </> : <div className="loading">Sem dados para este período</div>}
+               periodoData ? (
+                 // key troca a cada empresa/mês — remonta este bloco (nenhum dos 4
+                 // componentes abaixo guarda estado local próprio) só para retrigar o
+                 // fadeIn/stagger já existente nos cards, dando uma transição suave de
+                 // conteúdo ao trocar os filtros principais (PR H — motion, §5).
+                 <div key={`visao-mes-${empresa}-${periodoAtivo?.key}`}>
+                   <MetricCards metricas={periodoData.metricas} />
+                   <ReuniaoCards cards={periodoData.reunioes?.cards} empresa={empresa} graficos={periodoData.reunioes?.graficos} />
+                   <FunilPrincipal metricas={periodoData.metricas} />
+                   <ReuniaoGraficos graficos={periodoData.reunioes?.graficos} />
+                 </div>
+               ) : <div className="loading">Sem dados para este período</div>}
             </div>
           )}
         </div>

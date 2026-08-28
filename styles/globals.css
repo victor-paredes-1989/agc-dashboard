@@ -440,11 +440,23 @@ body {
 .section-title:first-child { margin-top: 0; }
 
 /* ── Cards ───────────────────────────────────────────────── */
+/* PR G (respiração/composição): classe existia mas não tinha uso em nenhuma
+   view — reaproveitada para os grids de KPI da Visão do Mês (Métricas do Mês,
+   Resumo das Reuniões), que antes usavam grid inline auto-fit/minmax(150px)
+   e acabavam enfileirando 7–8 cards numa única faixa horizontal apertada.
+   4 colunas fixas no desktop (8 cards → 2 fileiras de 4; 7 cards → 4+3) —
+   nunca mais uma faixa só, com mais espaço entre cards (--space-16→20). */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--space-16); /* PR C: 12→16px — cards menos "grudados" */
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-20);
   margin-bottom: var(--space-8);
+}
+@media (max-width: 900px) {
+  .cards-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .cards-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-16); }
 }
 
 .card {
@@ -452,12 +464,15 @@ body {
      vertical sutil (--surface-2 no topo → --surface-1) permanece, mas
      --shadow-md agora é composta em 3 camadas (ver :root) e o realce interno
      superior ficou mais visível (0.05→0.09), lendo como "material" em vez de
-     só um contorno mais claro. */
+     só um contorno mais claro.
+     PR G: padding vertical 20→16px — footprint um pouco mais contraído,
+     sem reduzir fonte de valor/label (legibilidade preservada), para o
+     grid como um todo respirar melhor sem esticar a página. */
   background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
   border: 1px solid var(--border-default);
   box-shadow: var(--shadow-md), var(--card-highlight);
   border-radius: var(--radius-lg);
-  padding: var(--space-20) var(--space-12);
+  padding: var(--space-16) var(--space-12);
   transition: background var(--duration-fast) var(--ease-standard),
               box-shadow var(--duration-fast) var(--ease-standard),
               border-color var(--duration-fast) var(--ease-standard);
@@ -477,15 +492,18 @@ body {
   box-shadow: var(--shadow-lg), var(--card-highlight-hover);
 }
 
-/* Stagger de entrada — só nos grids de KPI/resumo (§6): cada card aparece
-   um pouco depois do anterior. Cap em 6 para não acumular atraso perceptível
-   em grids maiores; do 7º em diante, mesmo delay do 6º. */
-.cards-grid > *:nth-child(1), .painel-blocos-grid > *:nth-child(1) { animation-delay: 0ms; }
-.cards-grid > *:nth-child(2), .painel-blocos-grid > *:nth-child(2) { animation-delay: 40ms; }
-.cards-grid > *:nth-child(3), .painel-blocos-grid > *:nth-child(3) { animation-delay: 80ms; }
-.cards-grid > *:nth-child(4) { animation-delay: 120ms; }
-.cards-grid > *:nth-child(5) { animation-delay: 160ms; }
-.cards-grid > *:nth-child(n+6) { animation-delay: 200ms; }
+/* Stagger de entrada — grids de KPI/resumo/gráficos/blocos (§6, PR H — motion):
+   cada card aparece um pouco depois do anterior. Cap em 6 para não acumular
+   atraso perceptível em grids maiores; do 7º em diante, mesmo delay do 6º.
+   .stagger-children é a versão utilitária/reutilizável — mesma cadência,
+   para aplicar em grids que não podem trocar de layout (ex.: grids inline
+   com colunas específicas por view), sem duplicar os valores de delay. */
+.cards-grid > *:nth-child(1), .painel-blocos-grid > *:nth-child(1), .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.cards-grid > *:nth-child(2), .painel-blocos-grid > *:nth-child(2), .stagger-children > *:nth-child(2) { animation-delay: 40ms; }
+.cards-grid > *:nth-child(3), .painel-blocos-grid > *:nth-child(3), .stagger-children > *:nth-child(3) { animation-delay: 80ms; }
+.cards-grid > *:nth-child(4), .stagger-children > *:nth-child(4) { animation-delay: 120ms; }
+.cards-grid > *:nth-child(5), .stagger-children > *:nth-child(5) { animation-delay: 160ms; }
+.cards-grid > *:nth-child(n+6), .stagger-children > *:nth-child(n+6) { animation-delay: 200ms; }
 
 /* Variante opcional para cards genuinamente clicáveis (nenhum uso ainda —
    infraestrutura para PRs futuros). Soma o lift ao hover padrão acima. */
@@ -1361,14 +1379,13 @@ select.field-input {
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ── Progress bar — só onde já existe real/meta ou um percentual explícito
-   (§4). Track discreto + fill semântico + preenchimento animado 0%→valor
-   real via CSS puro (custom property --progress-value setada inline pelo
-   componente). Nunca decide o que é "meta" — só desenha o valor que a view
-   já calculava. */
-@keyframes progress-fill {
-  from { width: 0%; }
-  to   { width: var(--progress-value, 0%); }
-}
+   (§4). Track discreto + fill semântico. PR H (motion): o preenchimento
+   0%→valor deixou de ser um @keyframes CSS de mount único (não retrigava em
+   trocas de filtro) e passou a ser controlado via largura inline por
+   AnimatedBar (JS, mesmo hook de count-up dos KPIs) — anima tanto na
+   primeira montagem quanto em qualquer atualização do valor. width aqui
+   é só o estado inerte (0%) para o raríssimo caso de algum uso não migrado;
+   nunca decide o que é "meta" — só desenha o valor que a view já calculava. */
 .metric-progress {
   width: 100%;
   height: 6px;
@@ -1381,8 +1398,7 @@ select.field-input {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
-  width: var(--progress-value, 0%);
-  animation: progress-fill var(--duration-slow) var(--ease-standard) both;
+  width: 0%;
 }
 .metric-progress-fill.positive { background: var(--positive); }
 .metric-progress-fill.negative { background: var(--negative); }
@@ -1407,6 +1423,7 @@ select.field-input {
   box-shadow: var(--shadow-md), var(--card-highlight), -4px -10px 22px -14px var(--concept-glow, transparent);
   transition: box-shadow var(--duration-fast) var(--ease-standard),
               border-color var(--duration-fast) var(--ease-standard);
+  animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
 }
 
 /* ── Hero/cabeçalho do Painel Geral — o nível mais elevado da página (§8):
@@ -1418,6 +1435,7 @@ select.field-input {
   border: 1px solid var(--border-default);
   border-top: 3px solid var(--accent-border);
   box-shadow: var(--shadow-xl), var(--card-highlight-hover), -5px -12px 26px -14px var(--accent-glow);
+  animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
 }
 
 /* PR F (Depth 2.0), §15: em telas estreitas, viewport curta e cards que
