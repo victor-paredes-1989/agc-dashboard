@@ -198,7 +198,7 @@ export default function AdminUsuarios() {
 
   return (
     <>
-      <Head><title>Admin · Usuários</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+      <Head><title>Admin · Usuários</title></Head>
 
       <div className="u-shell">
         <header className="top-bar">

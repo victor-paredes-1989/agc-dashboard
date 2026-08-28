@@ -3149,12 +3149,12 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
       </div>
 
       <div className="chart-card" style={{ marginBottom: 32 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 0.75fr)', gap: 18, alignItems: 'stretch' }}>
+        <div className="forecast-chart-grid">
           <div>
             <div className="chart-title">Evolução do Forecast — {tipoVisao === 'GERAL' ? empresaSelecionada : nomeAtivo} · {mesAtivo} {anoAtivo}</div>
             <ForecastCurveChart dados={dadosGrafico} tipo={tipoVisao} />
           </div>
-          <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 18, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 22 }}>
+          <div className="forecast-chart-side" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 22 }}>
             <div>
               <div className="card-label">Realizado no mês</div>
               <div className="card-value">{valorFmt(dadosGrafico.realizado)}</div>
@@ -3995,7 +3995,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <Head><title>{dashboardNome}</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+      <Head><title>{dashboardNome}</title></Head>
 
       <div className="app-layout">
         {/* ── Sidebar ── */}
@@ -4037,7 +4037,7 @@ export default function Dashboard() {
           {/* Top bar */}
           <header className="top-bar">
             {/* Esquerda: identidade da empresa + seletor de mês */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 0 }}>
+            <div className="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 0 }}>
               <div className="topbar-brand">
                 <span className="topbar-brand-mark">◆</span>
                 <span className="topbar-brand-name">{nomeEmpresa}</span>
@@ -4064,7 +4064,7 @@ export default function Dashboard() {
             <div className="topbar-divider" />
 
             {/* Centro: dropdown de análises */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 12px', gap: 8 }}>
+            <div className="topbar-center" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 12px', gap: 8 }}>
               <select
                 className={`period-select${isSpecialView ? ' has-selection' : ''}`}
                 value={isSpecialView ? periodo : ''}
@@ -4086,7 +4086,7 @@ export default function Dashboard() {
             </div>
 
             {/* Direita: sync + tema */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               {lastSync && !syncing && <span className="last-sync" style={{ fontSize: 10 }}>Às {lastSync}</span>}
               <div className="topbar-actions">
                 <button className="sidebar-action" onClick={() => fetchData.current(true)} disabled={syncing} title={syncing ? 'Sincronizando…' : 'Sincronizar'}>
