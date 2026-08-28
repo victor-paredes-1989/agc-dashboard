@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
@@ -120,7 +120,7 @@ function AnimatedFillDiv({ pct, color, style }) {
   const animated = useAnimatedNumber(clamped, undefined, inView)
   return (
     <div ref={ref} style={{ width: '100%', height: '100%' }}>
-      <div style={{ width: `${animated}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, ...style }} />
+      <div style={{ width: `${animated}%`, height: '100%', borderRadius: 5, background: color, opacity: 0.85, ...style }} />
     </div>
   )
 }
@@ -165,8 +165,68 @@ function SvgBarColumn({ x, barW, chartBottom, targetH, rx, fill, opacity, value,
       <rect ref={ref} x={x} y={0} width={barW} height={chartBottom} fill="transparent" pointerEvents="none" />
       <rect x={x} y={y} width={barW} height={h} rx={rx} fill={fill} opacity={opacity} />
       {h > 16 && <text x={cx} y={y - valDy} textAnchor="middle" fontSize={valFontSize} fill={fill} opacity="0.95" fontWeight="600">{formatVal(value)}</text>}
-      <text x={cx} y={xY} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{xLabel}</text>
+      <text x={cx} y={xY} textAnchor="middle" fontSize={xFontSize} fill="var(--text-muted)">{xLabel}</text>
     </g>
+  )
+}
+
+// ── Charts 2.0: motion para gráficos de linha ──────────────────────────────
+function usePrefersReducedMotion() {
+  const [reduce, setReduce] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReduce(mq.matches)
+    const onChange = () => setReduce(mq.matches)
+    mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange)
+    return () => { mq.removeEventListener ? mq.removeEventListener('change', onChange) : mq.removeListener(onChange) }
+  }, [])
+  return reduce
+}
+
+// Revela um grupo de elementos SVG (linhas + marcadores) progressivamente da
+// esquerda pra direita via clip-path animado — cresce de largura 0 até a
+// largura total do gráfico, dando o efeito de "a linha nasce do primeiro
+// ponto e se desenha até o último" pedido no briefing. Deliberadamente NÃO
+// usa stroke-dasharray na própria linha (a técnica mais comum pra isso):
+// aqui várias linhas já usam stroke-dasharray como PADRÃO VISUAL (Meta/
+// Supermeta/Forecast tracejados vs. Real sólido) — usar a mesma propriedade
+// pra animação colidiria com esse padrão. O clip-path revela todas as séries
+// em sincronia sem tocar no dasharray de nenhuma. Só dispara quando `active`
+// (via useInView do gráfico-pai); com prefers-reduced-motion, revela tudo
+// de uma vez, sem transição.
+function ChartDrawReveal({ width, height, active, duration = 550, children }) {
+  const clipId = useId()
+  const rectRef = useRef(null)
+  const reduceMotion = usePrefersReducedMotion()
+  useEffect(() => {
+    const el = rectRef.current
+    if (!el) return
+    if (reduceMotion) {
+      el.style.transition = 'none'
+      el.style.width = `${width}px`
+      return
+    }
+    if (!active) {
+      el.style.transition = 'none'
+      el.style.width = '0px'
+      return
+    }
+    el.style.transition = 'none'
+    el.style.width = '0px'
+    // Força o browser a "commitar" a largura 0 antes de animar — senão as duas
+    // mudanças de estilo colapsam num único frame e a linha aparece pronta.
+    void el.getBoundingClientRect()
+    el.style.transition = `width ${duration}ms var(--ease-standard, cubic-bezier(0.4,0,0.2,1))`
+    el.style.width = `${width}px`
+  }, [width, active, duration, reduceMotion])
+  return (
+    <>
+      <clipPath id={clipId}>
+        <rect ref={rectRef} x={0} y={0} width={reduceMotion ? width : 0} height={height} />
+      </clipPath>
+      <g clipPath={`url(#${clipId})`}>{children}</g>
+    </>
   )
 }
 
@@ -268,7 +328,7 @@ function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, 
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 80, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d[labelKey]}>{d[labelKey]}</div>
-            <div style={{ flex: 1, background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+            <div style={{ flex: 1, background: 'var(--bar-track)', borderRadius: 5, height: 18, overflow: 'hidden' }}>
               <AnimatedFillDiv pct={pct} color={color} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: extraValueKey ? 150 : (showPct ? 90 : 36), textAlign: 'right', flexShrink: 0 }}>
@@ -295,7 +355,7 @@ function ProgressByOriginChart({ data, emptyLabel = 'Sem dados' }) {
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
-            <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+            <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 5, height: 18, overflow: 'hidden' }}>
               <AnimatedFillDiv pct={barPct} color={color} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
@@ -332,7 +392,7 @@ function AdditionalOriginChart({ data }) {
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
-            <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
+            <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 5, height: 18, overflow: 'hidden' }}>
               <AnimatedFillDiv pct={barPct} color={color} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
@@ -381,6 +441,8 @@ function PieChart({ data }) {
 
 function LineChartWithTooltip({ data, color = '#14b8a6' }) {
   const [tooltip, setTooltip] = useState(null)
+  const wrapRef = useRef(null)
+  const inView = useInView(wrapRef)
   if (!data || data.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>Sem dados</div>
   const vals = data.map(d => d.qtd)
   const max = Math.max(...vals, 1)
@@ -392,14 +454,19 @@ function LineChartWithTooltip({ data, color = '#14b8a6' }) {
   }))
   const pts = points.map(p => `${p.x},${p.y}`).join(' ')
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={wrapRef} style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 80 }} preserveAspectRatio="none">
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="4" fill={color} style={{ cursor: 'pointer' }}
-            onMouseEnter={() => setTooltip({ x: p.x, y: p.y, label: p.data.data, qtd: p.data.qtd })}
-            onMouseLeave={() => setTooltip(null)} />
-        ))}
+        <ChartDrawReveal width={w} height={h} active={inView}>
+          <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          {points.map((p, i) => {
+            const isHovered = tooltip?.i === i
+            return (
+              <circle key={i} cx={p.x} cy={p.y} r={isHovered ? 6 : 3.5} fill={color} style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setTooltip({ x: p.x, y: p.y, label: p.data.data, qtd: p.data.qtd, i })}
+                onMouseLeave={() => setTooltip(null)} />
+            )
+          })}
+        </ChartDrawReveal>
       </svg>
       {tooltip && (
         <div className="tooltip-box" style={{ top: 0, left: '50%', transform: 'translateX(-50%)' }}>
@@ -2298,6 +2365,8 @@ function buildDailyForecast({ registros, empresa, mes, ano, tipo, nome, meta, su
 // Quando omitido, mantém comportamento original via `tipo`.
 function ForecastCurveChart({ dados, tipo, unidade }) {
   const [tooltip, setTooltip] = useState(null)
+  const wrapRef = useRef(null)
+  const inView = useInView(wrapRef)
 
   if (!dados) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sem dados</div>
 
@@ -2330,56 +2399,74 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
   const lastSuper = hasSuper ? dados.superLine[dados.superLine.length - 1] : null
   const lastPrevisao = dados.previsaoLine.length > 0 ? dados.previsaoLine[dados.previsaoLine.length - 1] : null
 
+  // Paleta semântica (Charts 2.0, §14/§5/§6): Real = accent (sólido, maior
+  // contraste, "cor principal"); Meta = neutro/teal discreto (tracejado —
+  // corrige o traço sólido de antes, que não distinguia Meta de Real por
+  // forma, só por cor); Supermeta = tratamento parecido com Meta mas
+  // visualmente distinguível (traço mais fechado); Forecast/Previsão = âmbar
+  // suave, tracejado. Real vs Forecast nunca dependem só da cor — sólido vs.
+  // tracejado já resolve isso (§27, acessibilidade).
+  const COLOR_REAL = 'var(--accent)'
+  const COLOR_META = 'var(--text-secondary)'
+  const COLOR_SUPER = 'var(--purple)'
+  const COLOR_FORECAST = 'var(--amber)'
+
   const endPoints = [
-    lastReal && { key: 'real', label: 'Realizado', color: '#ef4444', last: lastReal },
-    lastMeta && { key: 'meta', label: 'Meta', color: '#8b5cf6', last: lastMeta },
-    lastSuper && { key: 'super', label: 'Supermeta', color: '#f59e0b', last: lastSuper },
-    lastPrevisao && { key: 'prev', label: 'Previsão', color: '#94a3b8', last: lastPrevisao },
+    lastReal && { key: 'real', label: 'Realizado', color: COLOR_REAL, last: lastReal },
+    lastMeta && { key: 'meta', label: 'Meta', color: COLOR_META, last: lastMeta },
+    lastSuper && { key: 'super', label: 'Supermeta', color: COLOR_SUPER, last: lastSuper },
+    lastPrevisao && { key: 'prev', label: 'Previsão', color: COLOR_FORECAST, last: lastPrevisao },
   ].filter(Boolean)
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={wrapRef} style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 280 }} preserveAspectRatio="none">
-        {/* Grid */}
+        {/* Grid — suporte, nunca protagonista: opacity baixa, tokens de tema
+            (não hexadecimais fixos), então acompanha dark/light automaticamente. */}
         {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
           <g key={i}>
-            <line x1={padX} x2={w-padX} y1={padY + g*(h-padY*2)} y2={padY + g*(h-padY*2)} stroke="rgba(148,163,184,0.15)" />
-            <text x="4" y={padY + g*(h-padY*2) + 4} fill="#94a3b8" fontSize="10">{fmtAxis(max * (1-g))}</text>
+            <line x1={padX} x2={w-padX} y1={padY + g*(h-padY*2)} y2={padY + g*(h-padY*2)} stroke="var(--border-subtle)" />
+            <text x="4" y={padY + g*(h-padY*2) + 4} fill="var(--text-muted)" fontSize="10" fontVariantNumeric="tabular-nums">{fmtAxis(max * (1-g))}</text>
           </g>
         ))}
 
-        {/* Lines — somente séries com valor real */}
-        {hasMeta && <polyline points={line(dados.metaLine)} fill="none" stroke="#8b5cf6" strokeWidth="2" />}
-        {hasSuper && <polyline points={line(dados.superLine)} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="5 5" />}
-        {dados.previsaoLine.length > 1 && <polyline points={line(dados.previsaoLine)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 6" />}
-        {/* Realizado: para singlePoint somente o ponto; para séries diárias, linha até ultimoDiaComDado */}
-        {!dados.singlePoint && realSeries.length > 1 && <polyline points={line(realSeries)} fill="none" stroke="#ef4444" strokeWidth="3" />}
+        {/* Lines — somente séries com valor real; desenho animado (nasce do
+            primeiro ponto, "varre" até o último) via ChartDrawReveal, disparado
+            só quando o gráfico entra na viewport (useInView). */}
+        <ChartDrawReveal width={w} height={h} active={inView}>
+          {hasMeta && <polyline points={line(dados.metaLine)} fill="none" stroke={COLOR_META} strokeWidth="2" strokeDasharray="6 5" strokeLinecap="round" />}
+          {hasSuper && <polyline points={line(dados.superLine)} fill="none" stroke={COLOR_SUPER} strokeWidth="2" strokeDasharray="2 4" strokeLinecap="round" opacity="0.85" />}
+          {dados.previsaoLine.length > 1 && <polyline points={line(dados.previsaoLine)} fill="none" stroke={COLOR_FORECAST} strokeWidth="2" strokeDasharray="4 6" strokeLinecap="round" opacity="0.85" />}
+          {/* Realizado: para singlePoint somente o ponto; para séries diárias, linha até ultimoDiaComDado */}
+          {!dados.singlePoint && realSeries.length > 1 && <polyline points={line(realSeries)} fill="none" stroke={COLOR_REAL} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
 
-        {/* Pontos intermediários da série real */}
-        {!dados.singlePoint && realSeries.map((p, i) => i < realSeries.length - 1 && p.valor > 0 && (
-          <circle key={i} cx={xPos(p.dia)} cy={yPos(p.valor)} r="3" fill="#ef4444" />
-        ))}
+          {/* Pontos intermediários da série real — discretos (§11: não dezenas de
+              círculos enormes) */}
+          {!dados.singlePoint && realSeries.map((p, i) => i < realSeries.length - 1 && p.valor > 0 && (
+            <circle key={i} cx={xPos(p.dia)} cy={yPos(p.valor)} r="2.5" fill={COLOR_REAL} />
+          ))}
 
-        {/* Marcadores finais com hover */}
-        {endPoints.map((s) => {
-          const cx = xPos(s.last.dia)
-          const cy = yPos(s.last.valor)
-          const isHovered = tooltip?.key === s.key
-          return (
-            <g key={s.key}>
-              <circle cx={cx} cy={cy} r={isHovered ? 9 : 7} fill="none" stroke={s.color} strokeWidth="1.5" opacity={isHovered ? 0.8 : 0.45} />
-              <circle cx={cx} cy={cy} r={isHovered ? 6 : 5} fill={s.color}
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={() => setTooltip({ key: s.key, label: s.label, valor: s.last.valor, color: s.color, meta: dados.meta })}
-                onMouseLeave={() => setTooltip(null)}
-              />
-            </g>
-          )
-        })}
+          {/* Marcadores finais com hover — padrão discreto, mais evidente no hover */}
+          {endPoints.map((s) => {
+            const cx = xPos(s.last.dia)
+            const cy = yPos(s.last.valor)
+            const isHovered = tooltip?.key === s.key
+            return (
+              <g key={s.key}>
+                <circle cx={cx} cy={cy} r={isHovered ? 9 : 7} fill="none" stroke={s.color} strokeWidth="1.5" opacity={isHovered ? 0.8 : 0.45} />
+                <circle cx={cx} cy={cy} r={isHovered ? 6 : 5} fill={s.color}
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setTooltip({ key: s.key, label: s.label, valor: s.last.valor, color: s.color, meta: dados.meta })}
+                  onMouseLeave={() => setTooltip(null)}
+                />
+              </g>
+            )
+          })}
+        </ChartDrawReveal>
 
         {/* Rótulos de dia */}
         {[1, 5, 10, 15, 20, 25, dados.totalDias].filter((d, i, arr) => d <= dados.totalDias && arr.indexOf(d) === i).map(d => (
-          <text key={d} x={xPos(d)} y={h-4} fill="#94a3b8" fontSize="10" textAnchor="middle">{d}</text>
+          <text key={d} x={xPos(d)} y={h-4} fill="var(--text-muted)" fontSize="10" textAnchor="middle" fontVariantNumeric="tabular-nums">{d}</text>
         ))}
       </svg>
 
@@ -2400,10 +2487,10 @@ function ForecastCurveChart({ dados, tipo, unidade }) {
 
       {/* Legenda dinâmica — somente séries que realmente existem */}
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center', fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
-        {lastReal && <span><b style={{ color: '#ef4444' }}>●</b> Realizado</span>}
-        {lastMeta && <span><b style={{ color: '#8b5cf6' }}>—</b> Meta</span>}
-        {lastSuper && <span><b style={{ color: '#f59e0b' }}>--</b> Supermeta</span>}
-        {lastPrevisao && <span><b style={{ color: '#94a3b8' }}>--</b> Previsão</span>}
+        {lastReal && <span><b style={{ color: COLOR_REAL }}>●</b> Realizado</span>}
+        {lastMeta && <span><b style={{ color: COLOR_META }}>--</b> Meta</span>}
+        {lastSuper && <span><b style={{ color: COLOR_SUPER }}>··</b> Supermeta</span>}
+        {lastPrevisao && <span><b style={{ color: COLOR_FORECAST }}>--</b> Previsão</span>}
       </div>
     </div>
   )
@@ -3180,7 +3267,7 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 // estiver dessa largura real, menor a distorção de barras e texto.
 const EVOLUCAO_BAR_CHART = {
   W: 900, H: 220, padL: 20, padR: 20, padTop: 34, padBot: 40,
-  barWMax: 32, barWFrac: 0.5, gridOpacity: 0.08,
+  barWMax: 32, barWFrac: 0.5,
   valFontSize: 10, valDy: 8, xFontSize: 9, xDy: 8, rectRx: 4,
 }
 
@@ -3191,7 +3278,7 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
   }
   const vals = data.map(d => Number(d.valor) || 0)
   const max = Math.max(...vals, 1)
-  const { W, H, padL, padR, padTop, padBot, barWMax, barWFrac, gridOpacity, valFontSize, valDy, xFontSize, xDy, rectRx } = EVOLUCAO_BAR_CHART
+  const { W, H, padL, padR, padTop, padBot, barWMax, barWFrac, valFontSize, valDy, xFontSize, xDy, rectRx } = EVOLUCAO_BAR_CHART
   const chartW = W - padL - padR, chartH = H - padTop - padBot
   const n = data.length
   const slotW = chartW / n
@@ -3203,7 +3290,7 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
         {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
-          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke={`rgba(148,163,184,${gridOpacity})`} strokeWidth="1" />
+          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke="var(--border-subtle)" strokeWidth="1" />
         ))}
         {data.map((d, i) => {
           const isHov = tooltip?.i === i
@@ -3236,7 +3323,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   }
   const vals = data.map(d => Number(d.valor) || 0)
   const max = Math.max(...vals, 1)
-  const { W, H, padL, padR, padTop, padBot, barWMax, barWFrac, gridOpacity, valFontSize, valDy, xFontSize, xDy, rectRx } = EVOLUCAO_BAR_CHART
+  const { W, H, padL, padR, padTop, padBot, barWMax, barWFrac, valFontSize, valDy, xFontSize, xDy, rectRx } = EVOLUCAO_BAR_CHART
   const chartW = W - padL - padR, chartH = H - padTop - padBot
   const n = data.length
   const slotW = chartW / n
@@ -3248,7 +3335,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
         {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
-          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke={`rgba(148,163,184,${gridOpacity})`} strokeWidth="1" />
+          <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke="var(--border-subtle)" strokeWidth="1" />
         ))}
         {data.map((d, i) => {
           const isHov = tooltip?.i === i
