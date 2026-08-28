@@ -449,8 +449,14 @@ body {
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-20);
+  gap: var(--space-16);
   margin-bottom: var(--space-8);
+}
+/* PR I: footprint um pouco mais contraído que o .card padrão — só na Visão
+   do Mês (único consumidor de .cards-grid), sem afetar outras views que
+   compartilham .card. Legibilidade preservada (fonte/hierarquia intactas). */
+.cards-grid .card {
+  padding: var(--space-12) var(--space-12);
 }
 @media (max-width: 900px) {
   .cards-grid { grid-template-columns: repeat(2, 1fr); }
@@ -982,6 +988,11 @@ select.field-input {
   flex-shrink: 0;
   min-width: 0;
 }
+/* PR I: duplicava o losango da sidebar (top-left) em telas onde a sidebar
+   já está visível — oculto por padrão; a sidebar (.sidebar-logo) segue
+   sendo a única marca. No mobile a sidebar vira barra inferior e
+   .sidebar-logo fica display:none, então aqui volta a aparecer (ver
+   media query mobile) como a única marca visível. */
 .topbar-brand-mark {
   width: 22px;
   height: 22px;
@@ -989,7 +1000,7 @@ select.field-input {
   background: var(--accent-light);
   border: 1px solid var(--accent-border);
   color: var(--accent);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   font-size: 12px;
@@ -1148,6 +1159,7 @@ select.field-input {
   .theme-toggle span:not(.theme-toggle-icon) { display: none; }
   .topbar-divider { display: none; }
   .topbar-brand-name { max-width: 96px; }
+  .topbar-brand-mark { display: flex; }
   .view-header-title { font-size: 20px; }
 
   .sub-nav { padding: 0 14px; height: auto; min-height: 44px; flex-wrap: nowrap; gap: 4px; padding-top: 6px; padding-bottom: 6px; }
