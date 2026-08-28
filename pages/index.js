@@ -19,7 +19,7 @@ const fmtPct = (n) => `${Number(n || 0).toFixed(1)}%`
 // os quadros de transição mudam, nenhuma regra de cálculo/formatação é
 // duplicada ou alterada. Respeita prefers-reduced-motion (pula a animação,
 // mostra o valor final direto, sem nenhum rAF rodando).
-function useAnimatedNumber(target, duration = 700) {
+function useAnimatedNumber(target, duration = 350) {
   const safeTarget = Number.isFinite(target) ? target : 0
   const [display, setDisplay] = useState(0)
   const displayRef = useRef(0)
@@ -75,6 +75,40 @@ function AnimatedBar({ pct, statusClass, small, style, fillStyle }) {
     <div className={`metric-progress${small ? ' metric-progress-sm' : ''}`} style={style}>
       <div className={`metric-progress-fill${statusClass ? ` ${statusClass}` : ''}`} style={{ width: `${animated}%`, ...fillStyle }} />
     </div>
+  )
+}
+
+// Preenchimento horizontal animado (0→valor) para os mini-gráficos de barra
+// simples (BarChart, ProgressByOriginChart, AdditionalOriginChart) — mesmo
+// hook de count-up dos KPIs/AnimatedBar; cresce tanto no mount quanto em
+// qualquer troca de filtro/dado que mude o percentual.
+function AnimatedFillDiv({ pct, color, style }) {
+  const clamped = Math.min(Math.max(Number(pct) || 0, 0), 100)
+  const animated = useAnimatedNumber(clamped)
+  return <div style={{ width: `${animated}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, ...style }} />
+}
+
+// Equivalente vertical do AnimatedFillDiv, para colunas (VerticalBarChart).
+function AnimatedColumnFill({ pct, color, style }) {
+  const clamped = Math.min(Math.max(Number(pct) || 0, 0), 100)
+  const animated = useAnimatedNumber(clamped)
+  return <div style={{ width: 34, height: `${animated}%`, borderRadius: '5px 5px 0 0', background: color, opacity: 0.85, ...style }} />
+}
+
+// Coluna de barra SVG animada, usada por VerticalBarChartMonths e
+// VerticalBarChartMonthsGeral — anima a altura via o mesmo hook de count-up;
+// a posição Y é derivada da altura animada, então a barra cresce a partir da
+// base do eixo (não do topo).
+function SvgBarColumn({ x, barW, chartBottom, targetH, rx, fill, opacity, value, formatVal, valFontSize, valDy, xFontSize, xLabel, xY, onMouseEnter, onMouseLeave }) {
+  const h = useAnimatedNumber(targetH)
+  const y = chartBottom - h
+  const cx = x + barW / 2
+  return (
+    <g style={{ cursor: 'pointer' }} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+      <rect x={x} y={y} width={barW} height={h} rx={rx} fill={fill} opacity={opacity} />
+      {h > 16 && <text x={cx} y={y - valDy} textAnchor="middle" fontSize={valFontSize} fill={fill} opacity="0.95" fontWeight="600">{formatVal(value)}</text>}
+      <text x={cx} y={xY} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{xLabel}</text>
+    </g>
   )
 }
 
@@ -177,7 +211,7 @@ function BarChart({ data, valueKey = 'qtd', labelKey = 'nome', colorArr = null, 
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 80, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d[labelKey]}>{d[labelKey]}</div>
             <div style={{ flex: 1, background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
-              <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
+              <AnimatedFillDiv pct={pct} color={color} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: extraValueKey ? 150 : (showPct ? 90 : 36), textAlign: 'right', flexShrink: 0 }}>
               {finalLabel}
@@ -204,7 +238,7 @@ function ProgressByOriginChart({ data, emptyLabel = 'Sem dados' }) {
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
             <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
-              <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
+              <AnimatedFillDiv pct={barPct} color={color} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
               <div>{fmtNum1(d.realPagos)} - {fmtR1(d.realNmrr)}</div>
@@ -241,7 +275,7 @@ function AdditionalOriginChart({ data }) {
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', width: 86, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.nome}>{d.nome}</div>
             <div style={{ flex: '0 1 68%', background: 'var(--bar-track)', borderRadius: 3, height: 18, overflow: 'hidden' }}>
-              <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.85, transition: 'width 0.5s' }} />
+              <AnimatedFillDiv pct={barPct} color={color} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', width: 120, textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
               <div>{fmtNum1(d.realPagos)} - {fmtR1(d.realNmrr)}</div>
@@ -790,7 +824,7 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
                       <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
                           <div style={{ width: 60, height: 5, background: 'var(--bar-track)', borderRadius: 9 }}>
-                            <div style={{ width: `${Math.min(Number(pctNmrr), 100)}%`, height: '100%', borderRadius: 9, background: '#8b5cf6' }} />
+                            <AnimatedFillDiv pct={Number(pctNmrr)} color="#8b5cf6" style={{ borderRadius: 9 }} />
                           </div>
                           <span style={{ color: 'var(--text-secondary)', minWidth: 38, textAlign: 'right' }}>{pctNmrr}%</span>
                         </div>
@@ -1081,7 +1115,7 @@ function VerticalBarChart({ data, valueKey = 'qtd', labelKey = 'nome', extraValu
             <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', flex: '0 0 60px' }}>
               {extraValueKey && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2, whiteSpace: 'nowrap' }}>{formatExtraVal ? formatExtraVal(extraVal) : extraVal}</div>}
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, marginBottom: 6, whiteSpace: 'nowrap' }}>{fmt(val)}</div>
-              <div style={{ width: 34, height: `${pct}%`, borderRadius: '5px 5px 0 0', background: color, opacity: 0.85, transition: 'height 0.5s' }} />
+              <AnimatedColumnFill pct={pct} color={color} />
             </div>
           )
         })}
@@ -3106,7 +3140,7 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
   const barW = Math.max(6, Math.min(barWMax, slotW * barWFrac))
   const bX = (i) => padL + i * slotW + slotW / 2 - barW / 2
   const bH = (v) => Math.max(2, (Number(v) || 0) / max * chartH)
-  const bY = (v) => padTop + chartH - bH(v)
+  const chartBottom = padTop + chartH
   return (
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
@@ -3114,16 +3148,16 @@ function VerticalBarChartMonths({ data, color = '#3b82f6', formatVal = String })
           <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke={`rgba(148,163,184,${gridOpacity})`} strokeWidth="1" />
         ))}
         {data.map((d, i) => {
-          const x = bX(i), bh = bH(d.valor), by = bY(d.valor), cx = x + barW / 2
           const isHov = tooltip?.i === i
           return (
-            <g key={i} style={{ cursor: 'pointer' }}
+            <SvgBarColumn key={i}
+              x={bX(i)} barW={barW} chartBottom={chartBottom} targetH={bH(d.valor)}
+              rx={rectRx} fill={color} opacity={isHov ? 1 : 0.78}
+              value={d.valor} formatVal={formatVal} valFontSize={valFontSize} valDy={valDy}
+              xFontSize={xFontSize} xLabel={d.mes} xY={H - xDy}
               onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor })}
-              onMouseLeave={() => setTooltip(null)}>
-              <rect x={x} y={by} width={barW} height={bh} rx={rectRx} fill={color} opacity={isHov ? 1 : 0.78} />
-              {bh > 16 && <text x={cx} y={by - valDy} textAnchor="middle" fontSize={valFontSize} fill={color} opacity="0.95" fontWeight="600">{formatVal(d.valor)}</text>}
-              <text x={cx} y={H - xDy} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{d.mes}</text>
-            </g>
+              onMouseLeave={() => setTooltip(null)}
+            />
           )
         })}
       </svg>
@@ -3151,7 +3185,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   const barW = Math.max(6, Math.min(barWMax, slotW * barWFrac))
   const bX = (i) => padL + i * slotW + slotW / 2 - barW / 2
   const bH = (v) => Math.max(2, (Number(v) || 0) / max * chartH)
-  const bY = (v) => padTop + chartH - bH(v)
+  const chartBottom = padTop + chartH
   return (
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
@@ -3159,16 +3193,16 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
           <line key={i} x1={padL} x2={W - padR} y1={padTop + g * chartH} y2={padTop + g * chartH} stroke={`rgba(148,163,184,${gridOpacity})`} strokeWidth="1" />
         ))}
         {data.map((d, i) => {
-          const x = bX(i), bh = bH(d.valor), by = bY(d.valor), cx = x + barW / 2
           const isHov = tooltip?.i === i
           return (
-            <g key={i} style={{ cursor: 'pointer' }}
+            <SvgBarColumn key={i}
+              x={bX(i)} barW={barW} chartBottom={chartBottom} targetH={bH(d.valor)}
+              rx={rectRx} fill={color} opacity={isHov ? 1 : 0.78}
+              value={d.valor} formatVal={formatVal} valFontSize={valFontSize} valDy={valDy}
+              xFontSize={xFontSize} xLabel={d.mes} xY={H - xDy}
               onMouseEnter={() => setTooltip({ i, label: d.label || d.mes, valor: d.valor, pagos: d.pagos, valorPago: d.valorPago })}
-              onMouseLeave={() => setTooltip(null)}>
-              <rect x={x} y={by} width={barW} height={bh} rx={rectRx} fill={color} opacity={isHov ? 1 : 0.78} />
-              {bh > 16 && <text x={cx} y={by - valDy} textAnchor="middle" fontSize={valFontSize} fill={color} opacity="0.95" fontWeight="600">{formatVal(d.valor)}</text>}
-              <text x={cx} y={H - xDy} textAnchor="middle" fontSize={xFontSize} fill="#64748b">{d.mes}</text>
-            </g>
+              onMouseLeave={() => setTooltip(null)}
+            />
           )
         })}
       </svg>
@@ -3850,13 +3884,6 @@ export default function Dashboard() {
               title={syncing ? 'Sincronizando…' : 'Sincronizar'}
             >
               <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
-            </button>
-            <button
-              className="sidebar-action"
-              onClick={() => setDarkMode(d => !d)}
-              title={darkMode ? 'Tema claro' : 'Tema escuro'}
-            >
-              {darkMode ? '☀️' : '🌙'}
             </button>
           </div>
         </aside>
