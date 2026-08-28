@@ -888,15 +888,6 @@ select.field-input {
   color: #fff;
 }
 
-.sidebar-label {
-  font-size: 8.5px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  line-height: 1;
-  opacity: 0.85;
-}
-
 .sidebar-divider {
   width: 28px;
   height: 1px;
@@ -1146,7 +1137,6 @@ select.field-input {
     gap: 8px;
   }
   .sidebar-logo { display: none; }
-  .sidebar-label { display: none; }
   .sidebar-divider { width: 1px; height: 28px; margin: 0 4px; }
   .sidebar-footer { flex-direction: row; margin-top: 0; gap: 4px; }
   .sidebar-item { width: 44px; height: 44px; }
