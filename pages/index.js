@@ -538,8 +538,19 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
     </div>
   )
 
+  // Depth 2.0 (§6, accent glow): mapeia a cor sólida já usada no título/strip de cada
+  // Block para o token "-glow" (rgba) correspondente, definido em globals.css — mesma
+  // paleta semântica de sempre (Marketing=azul, Comercial=verde, Resultado=âmbar,
+  // Pace/Performance por Origem=teal/roxo), só acrescenta o halo do .concept-block.
+  const CONCEPT_GLOW = {
+    '#3b82f6': 'var(--blue-glow)',
+    '#10b981': 'var(--green-glow)',
+    '#f59e0b': 'var(--amber-glow)',
+    '#14b8a6': 'var(--teal-glow)',
+    '#8b5cf6': 'var(--purple-glow)',
+  }
   const Block = ({ title, color, children }) => (
-    <div className="concept-block" style={{ '--concept-color': color || 'var(--accent)', padding: '20px 22px' }}>
+    <div className="concept-block" style={{ '--concept-color': color || 'var(--accent)', '--concept-glow': CONCEPT_GLOW[color] || 'var(--accent-glow)', padding: '20px 22px' }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
                     color: color || 'var(--accent)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ display: 'inline-block', width: 3, height: 14, borderRadius: 2, background: color || 'var(--accent)' }} />
@@ -1852,14 +1863,17 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
            múltipla da coluna, como qualquer grid comum. */
         .mo-perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         .mo-perf-card {
-          background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+          /* Depth 2.0 §11: hierarquia Resumo > Origem > Tabela — este card fica um
+             degrau abaixo dos cards de Resumo (.card, shadow-md), por isso usa
+             shadow-sm como base; hover sobe até shadow-md, nunca ultrapassa o Resumo. */
+          background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
           border: 1px solid var(--border-default);
           border-radius: var(--radius-card);
-          box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
+          box-shadow: var(--shadow-sm), var(--card-highlight-sm);
           padding: 16px 18px;
           transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
         }
-        .mo-perf-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07); }
+        .mo-perf-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md), var(--card-highlight); }
         .mo-perf-card-outras { border-style: dashed; }
         .mo-perf-outras-tag { font-size: 9.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 6px; }
         .mo-perf-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
@@ -2685,18 +2699,18 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
           padding: 20px 20px 16px;
           border-radius: 12px;
           border: 1px solid var(--border-default);
-          background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 65%);
+          background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
           min-height: 172px;
-          box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
+          box-shadow: var(--shadow-md), var(--card-highlight);
           transition: box-shadow var(--duration-fast) var(--ease-standard),
                       border-color var(--duration-fast) var(--ease-standard),
-                      transform var(--duration-fast) var(--ease-standard);
+                      transform 220ms var(--ease-standard);
           animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
         }
         .ind-card:hover {
           border-color: var(--border-strong);
-          box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07);
-          transform: translateY(-2px);
+          box-shadow: var(--shadow-lg), var(--card-highlight-hover);
+          transform: translateY(-3px);
         }
       `}</style>
       <div className="ind-grid">
