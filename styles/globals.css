@@ -1540,3 +1540,115 @@ select.field-input {
     --shadow-card-xl:    1px 3px 9px rgba(45,38,28,0.12), 6px 17px 30px rgba(45,38,28,0.15), 13px 33px 56px rgba(45,38,28,0.12);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   PR M — TABLE SYSTEM 2.0 (VP Dash · Precision Dark)
+   ══════════════════════════════════════════════════════════════════════
+   Casco visual compartilhado pelas 7 tabelas reais do dashboard (Painel
+   Geral, Dados Específicos, Metas por Origem, Forecast por Indicador,
+   Evolução Mensal ×3) — substitui os inline styles repetidos linha a
+   linha em cada view. Usa os mesmos tokens de superfície/borda/sombra do
+   resto do Design System, mas com relevo BEM mais discreto que os KPI
+   cards (shadow-sm, sem card-highlight) — tabela não deve competir
+   visualmente com os cards acima dela.
+   Zero mudança de dado, coluna, fórmula, ordenação ou lógica de negócio.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.table-shell {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+.data-table thead th.is-numeric { text-align: right; }
+.data-table thead th.is-sortable { cursor: pointer; user-select: none; }
+.data-table thead th.is-sortable:hover { color: var(--text-secondary); }
+
+.data-table tbody td {
+  padding: 9px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.data-table tbody tr:last-child td { border-bottom: none; }
+
+/* Zebra — só nas tabelas realmente longas (Registros filtrados com até 50
+   linhas/página, Evolução Mensal com vários meses/anos); nas demais
+   (curtas, já filtradas por Empresa/Ano/Mês) as bordas de linha bastam. */
+.data-table.zebra tbody tr:nth-child(even) td { background: var(--bar-track); }
+
+/* Hover sempre por último no cascade — vence tanto linha zebrada quanto
+   normal, com um tom sólido (surface-2) nitidamente mais forte que o
+   overlay translúcido do zebra. */
+.data-table tbody tr:hover td { background: var(--surface-2); }
+.data-table tbody tr { transition: background var(--duration-fast) var(--ease-standard); }
+
+.data-table .is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chip de status — reaproveita os tokens semânticos existentes (mesmos de
+   .card.green/.amber/etc.). Não usado hoje pela coluna "Status" das
+   reuniões (STATUS_COLORS tem 10 valores categóricos, e 4 deles não têm
+   token semântico equivalente sem inventar cor nova) — mantida disponível
+   para colunas de status binário/ternário que já mapeiam 1:1 com
+   positive/negative/warning/info. */
+.data-table-status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.data-table-status.positive { background: var(--positive-bg); color: var(--positive); }
+.data-table-status.negative { background: var(--negative-bg); color: var(--negative); }
+.data-table-status.warning  { background: var(--warning-bg);  color: var(--warning); }
+.data-table-status.info     { background: var(--info-bg);     color: var(--info); }
+.data-table-status.neutral  { background: var(--bar-track);   color: var(--text-muted); }
+
+@media (max-width: 640px) {
+  .data-table { font-size: 11.5px; }
+  .data-table thead th, .data-table tbody td { padding: 8px 10px; }
+}
+
+/* Toggle pill — estado ativo migrado do indigo hardcoded (rgba(99,102,241,…))
+   para os tokens de accent (teal) da marca, usado por ComparativoMensal e
+   Forecast. Background/borda seguem inline (dependem do estado `active`),
+   aqui só a "casca" comum: tamanho, hover, foco e transição. */
+.toggle-pill {
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard),
+              border-color var(--duration-fast) var(--ease-standard),
+              color var(--duration-fast) var(--ease-standard);
+}
+.toggle-pill:hover { border-color: var(--accent-border); color: var(--text-primary); }
+.toggle-pill:focus-visible { outline: 2px solid var(--accent-border); outline-offset: 2px; }
+.toggle-pill-sm { padding: 8px 14px; font-size: 12px; }

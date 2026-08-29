@@ -925,15 +925,12 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
       {/* ── Performance por Origem ── */}
       {origemRows.length > 0 && (
         <Block title="Performance por Origem" color="#8b5cf6">
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div className="table-shell">
+            <table className="data-table">
               <thead>
                 <tr>
                   {['Origem','Reuniões','Pagos','NMRR','% do Total'].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Origem' ? 'left' : 'right',
-                                         fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
-                                         textTransform: 'uppercase', color: 'var(--text-muted)',
-                                         borderBottom: '1px solid var(--border)' }}>{h}</th>
+                    <th key={h} className={h === 'Origem' ? '' : 'is-numeric'}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -941,12 +938,12 @@ function PainelGeralView({ periodoData, periodoAtivo, nomeEmpresa, forecast }) {
                 {origemRows.map((row, i) => {
                   const pctNmrr = totalNmrrOrigem > 0 ? (row.nmrr / totalNmrrOrigem * 100).toFixed(1) : '0.0'
                   return (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>{row.origem}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(row.reunioes)}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{fmt(row.pagos)}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#f59e0b', fontWeight: 700 }}>{fmtR1(row.nmrr)}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{row.origem}</td>
+                      <td className="is-numeric">{fmt(row.reunioes)}</td>
+                      <td className="is-numeric" style={{ color: 'var(--green)', fontWeight: 600 }}>{fmt(row.pagos)}</td>
+                      <td className="is-numeric" style={{ color: 'var(--amber)', fontWeight: 700 }}>{fmtR1(row.nmrr)}</td>
+                      <td className="is-numeric">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
                           <div style={{ width: 60, height: 5, background: 'var(--bar-track)', borderRadius: 9 }}>
                             <AnimatedFillDiv pct={Number(pctNmrr)} color="#8b5cf6" style={{ borderRadius: 9 }} />
@@ -1141,7 +1138,8 @@ function FunilPrincipal({ metricas }) {
         .funil-shape-cell { position: relative; }
         .funil-band {
           position: absolute; inset: 0;
-          background-image: linear-gradient(180deg, #5eead4 0%, #0f766e 100%);
+          /* PR M: tokens em vez de hex fixo — mesmo teal visual, reage ao tema. */
+          background-image: linear-gradient(180deg, var(--teal) 0%, var(--accent) 100%);
           background-size: 100% calc(var(--funil-row-h) * 4);
           background-position: 0 calc(var(--funil-row-h) * var(--i) * -1);
         }
@@ -1157,7 +1155,7 @@ function FunilPrincipal({ metricas }) {
           display: flex; align-items: center; justify-content: space-between;
         }
         .funil-nmrr-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
-        .funil-nmrr-value { font-size: 24px; font-weight: 800; color: #f59e0b; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+        .funil-nmrr-value { font-size: 24px; font-weight: 800; color: var(--amber); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
         .funil-footer {
           margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
@@ -1312,9 +1310,10 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
 
   const ToggleButton = ({ active, onClick, label }) => (
     <button onClick={onClick}
-      style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid', fontSize: 13, cursor: 'pointer',
-        background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
-        borderColor: active ? 'rgba(99,102,241,0.4)' : 'var(--border)',
+      className="toggle-pill"
+      style={{
+        background: active ? 'var(--accent-light)' : 'transparent',
+        borderColor: active ? 'var(--accent-border)' : 'var(--border)',
         color: active ? 'var(--text-primary)' : 'var(--text-muted)' }}>
       {label}
     </button>
@@ -1691,19 +1690,19 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Registros filtrados</div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <div className="table-shell">
+        <table className="data-table zebra">
           <thead>
             <tr>
               {[
                 { label: 'Empresa', key: 'empresa' }, { label: 'Mês', key: 'mes' }, { label: 'Ano', key: null },
                 { label: 'Origem', key: 'origem' }, { label: 'SDR', key: 'sdr' }, { label: 'Closer', key: 'closer' },
                 { label: 'Data', key: 'data' }, { label: 'Serviço', key: null }, { label: 'Cliente', key: 'cliente' },
-                { label: 'Nota', key: null }, { label: 'Valor', key: 'valor' }, { label: 'Status', key: 'status' },
+                { label: 'Nota', key: null }, { label: 'Valor', key: 'valor', numeric: true }, { label: 'Status', key: 'status' },
                 { label: 'Data FUP', key: null },
-              ].map(({ label, key }) => (
+              ].map(({ label, key, numeric }) => (
                 <th key={label} onClick={key ? () => handleSort(key) : undefined}
-                  style={{ textAlign: label === 'Cliente' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', cursor: key ? 'pointer' : 'default', userSelect: 'none' }}>
+                  className={`${numeric ? 'is-numeric ' : ''}${key ? 'is-sortable' : ''}`}>
                   {label}{key && sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
                 </th>
               ))}
@@ -1711,20 +1710,20 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
           </thead>
           <tbody>
             {paginaRows.map((r, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: 'var(--text-secondary)' }}>{r.empresa}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.mes}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.ano}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.origem}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.sdr}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.closer}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{r.data}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.servico}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'left', minWidth: 140 }}>{r.cliente}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{r.nota}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b' }}>{fmtR(r.valor)}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', color: STATUS_COLORS[norm(r.status)] || 'var(--text-secondary)', fontWeight: 600 }}>{r.status}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{r.dataFup}</td>
+              <tr key={i}>
+                <td>{r.empresa}</td>
+                <td>{r.mes}</td>
+                <td>{r.ano}</td>
+                <td>{r.origem}</td>
+                <td>{r.sdr}</td>
+                <td>{r.closer}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{r.data}</td>
+                <td>{r.servico}</td>
+                <td style={{ minWidth: 140 }}>{r.cliente}</td>
+                <td>{r.nota}</td>
+                <td className="is-numeric" style={{ color: 'var(--amber)' }}>{fmtR(r.valor)}</td>
+                <td style={{ color: STATUS_COLORS[norm(r.status)] || 'var(--text-secondary)', fontWeight: 600 }}>{r.status}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{r.dataFup}</td>
               </tr>
             ))}
           </tbody>
@@ -2052,8 +2051,8 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
 
       {/* ── Detalhamento por Origem ── */}
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Detalhamento por Origem</div>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <div className="table-shell">
+        <table className="data-table">
           <thead>
             <tr>
               {[
@@ -2063,7 +2062,7 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
                 ['Meta NMRR','metaNmrr'], ['Real NMRR','realNmrr'], ['Gap','gapNmrr'], ['%','pctNmrr'],
               ].map(([h, key], i) => (
                 <th key={h} onClick={() => handleSort(key)}
-                  style={{ textAlign: i < 4 ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
+                  className={`is-sortable${i < 4 ? '' : ' is-numeric'}`}>
                   {h}{sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
                 </th>
               ))}
@@ -2071,11 +2070,11 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
           </thead>
           <tbody>
             {filtradosOrdenados.map((r, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 8px' }}>{r.empresa}</td><td style={{ padding: '9px 8px' }}>{r.ano}</td><td style={{ padding: '9px 8px' }}>{r.mes}</td><td style={{ padding: '9px 8px', fontWeight: 600 }}>{r.origem}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realReunioes)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: gapColor(r.gapReunioes) }}>{fmtGap(r.gapReunioes, fmtNum1)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: r.metaReunioes > 0 ? (r.pctReunioes >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaReunioes > 0 ? fmtPct(r.pctReunioes) : '—'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.metaPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtNum1(r.realPagos)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: gapColor(r.gapPagos) }}>{fmtGap(r.gapPagos, fmtNum1)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: r.metaPagos > 0 ? (r.pctPagos >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaPagos > 0 ? fmtPct(r.pctPagos) : '—'}</td>
-                <td style={{ padding: '9px 8px', textAlign: 'right' }}>{fmtR1(r.metaNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b' }}>{fmtR1(r.realNmrr)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: gapColor(r.gapNmrr) }}>{fmtGap(r.gapNmrr, fmtR1)}</td><td style={{ padding: '9px 8px', textAlign: 'right', color: r.metaNmrr > 0 ? (r.pctNmrr >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaNmrr > 0 ? fmtPct(r.pctNmrr) : '—'}</td>
+              <tr key={i}>
+                <td>{r.empresa}</td><td>{r.ano}</td><td>{r.mes}</td><td style={{ fontWeight: 600 }}>{r.origem}</td>
+                <td className="is-numeric">{fmtNum1(r.metaReunioes)}</td><td className="is-numeric">{fmtNum1(r.realReunioes)}</td><td className="is-numeric" style={{ color: gapColor(r.gapReunioes) }}>{fmtGap(r.gapReunioes, fmtNum1)}</td><td className="is-numeric" style={{ color: r.metaReunioes > 0 ? (r.pctReunioes >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaReunioes > 0 ? fmtPct(r.pctReunioes) : '—'}</td>
+                <td className="is-numeric">{fmtNum1(r.metaPagos)}</td><td className="is-numeric">{fmtNum1(r.realPagos)}</td><td className="is-numeric" style={{ color: gapColor(r.gapPagos) }}>{fmtGap(r.gapPagos, fmtNum1)}</td><td className="is-numeric" style={{ color: r.metaPagos > 0 ? (r.pctPagos >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaPagos > 0 ? fmtPct(r.pctPagos) : '—'}</td>
+                <td className="is-numeric">{fmtR1(r.metaNmrr)}</td><td className="is-numeric" style={{ color: 'var(--amber)' }}>{fmtR1(r.realNmrr)}</td><td className="is-numeric" style={{ color: gapColor(r.gapNmrr) }}>{fmtGap(r.gapNmrr, fmtR1)}</td><td className="is-numeric" style={{ color: r.metaNmrr > 0 ? (r.pctNmrr >= 100 ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)' }}>{r.metaNmrr > 0 ? fmtPct(r.pctNmrr) : '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -3046,7 +3045,7 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Meta {fmtVal(metaVal)}</span>
               {pctMeta !== null && (
-                <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? '#22c55e' : pctMeta >= 80 ? '#f59e0b' : '#ef4444' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? 'var(--green)' : pctMeta >= 80 ? 'var(--amber)' : 'var(--red)' }}>
                   {pctMeta}%
                 </span>
               )}
@@ -3110,9 +3109,10 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
 
   const FilterButton = ({ value, label }) => (
     <button onClick={() => { setTipoVisao(value); setNomeSel('') }}
-      style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid', fontSize: 12, cursor: 'pointer',
-        background: tipoVisao === value ? 'rgba(99,102,241,0.15)' : 'transparent',
-        borderColor: tipoVisao === value ? 'rgba(99,102,241,0.4)' : 'var(--border)',
+      className="toggle-pill toggle-pill-sm"
+      style={{
+        background: tipoVisao === value ? 'var(--accent-light)' : 'transparent',
+        borderColor: tipoVisao === value ? 'var(--accent-border)' : 'var(--border)',
         color: tipoVisao === value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
       {label}
     </button>
@@ -3223,12 +3223,12 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>
               Por Origem — {mesAtivo} {anoAtivo}
             </div>
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div className="table-shell">
+              <table className="data-table">
                 <thead>
                   <tr>
                     {['Origem','Reuniões','Pagos','NMRR Pago','Tx Conv.','TKM'].map(h => (
-                      <th key={h} style={{ textAlign: h === 'Origem' ? 'left' : 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} className={h === 'Origem' ? '' : 'is-numeric'}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -3237,13 +3237,13 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
                     const tx = o.realizadas > 0 ? (o.pagos / o.realizadas) * 100 : 0
                     const tkm = o.pagos > 0 ? o.valor / o.pagos : 0
                     return (
-                      <tr key={o.origem} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{o.origem}</td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#6366f1', fontWeight: 500 }}>{fmt(o.realizadas)}</td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#10b981', fontWeight: 500 }}>{fmt(o.pagos)}</td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#f59e0b', fontWeight: 500 }}>{fmtR1(o.valor)}</td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#3b82f6', fontWeight: 500 }}>{fmtPct(tx)}</td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', color: '#ec4899', fontWeight: 500 }}>{o.pagos > 0 ? fmtR1(tkm) : '—'}</td>
+                      <tr key={o.origem}>
+                        <td style={{ color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{o.origem}</td>
+                        <td className="is-numeric" style={{ color: '#6366f1', fontWeight: 500 }}>{fmt(o.realizadas)}</td>
+                        <td className="is-numeric" style={{ color: 'var(--green)', fontWeight: 500 }}>{fmt(o.pagos)}</td>
+                        <td className="is-numeric" style={{ color: 'var(--amber)', fontWeight: 500 }}>{fmtR1(o.valor)}</td>
+                        <td className="is-numeric" style={{ color: 'var(--blue)', fontWeight: 500 }}>{fmtPct(tx)}</td>
+                        <td className="is-numeric" style={{ color: '#ec4899', fontWeight: 500 }}>{o.pagos > 0 ? fmtR1(tkm) : '—'}</td>
                       </tr>
                     )
                   })}
@@ -3638,30 +3638,30 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
     if (metrAtiva) {
       return (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 32 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <div className="table-shell" style={{ marginTop: 32 }}>
+          <table className="data-table zebra">
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
+                <th>Mês</th>
                 {displayVals.map((v, vi) => (
-                  <th key={v} style={{ textAlign: 'right', color: colorArr[vi % colorArr.length], fontWeight: 600, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
+                  <th key={v} className="is-numeric" style={{ color: colorArr[vi % colorArr.length], fontWeight: 600 }}>{v}</th>
                 ))}
               </tr>
               <tr>
-                <th style={{ borderBottom: '1px solid var(--border)', padding: '6px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 10 }}>{metrAtiva.label}</th>
+                <th style={{ padding: '6px 12px', fontSize: 10 }}>{metrAtiva.label}</th>
                 {displayVals.map(v => (
-                  <th key={v} style={{ textAlign: 'right', color: metrAtiva.color, fontWeight: 500, fontSize: 10, padding: '6px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>—</th>
+                  <th key={v} className="is-numeric" style={{ color: metrAtiva.color, fontWeight: 500, fontSize: 10, padding: '6px 8px' }}>—</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {[...mesesG].reverse().map(mg => (
-                <tr key={mg.key} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
+                <tr key={mg.key}>
+                  <td style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
                   {displayVals.map(v => {
                     const s = geralStats(mg, field, v)
                     const val = geralMetricVal(s, metrAtiva.key)
-                    return <td key={v} style={{ padding: '9px 8px', textAlign: 'right', color: metrAtiva.color, fontWeight: 500 }}>{metrAtiva.fmt(val)}</td>
+                    return <td key={v} className="is-numeric" style={{ color: metrAtiva.color, fontWeight: 500 }}>{metrAtiva.fmt(val)}</td>
                   })}
                 </tr>
               ))}
@@ -3672,35 +3672,35 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     }
 
     return (
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', marginTop: 32 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <div className="table-shell" style={{ marginTop: 32 }}>
+        <table className="data-table zebra">
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
+              <th>Mês</th>
               {displayVals.map((v, vi) => (
-                <th key={v} colSpan={3} style={{ textAlign: 'center', color: colorArr[vi % colorArr.length], fontWeight: 600, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{v}</th>
+                <th key={v} colSpan={3} style={{ textAlign: 'center', color: colorArr[vi % colorArr.length], fontWeight: 600 }}>{v}</th>
               ))}
             </tr>
             <tr>
-              <th style={{ borderBottom: '1px solid var(--border)' }}></th>
+              <th></th>
               {displayVals.map((v) => (
                 ['Realizadas','Pagos','Valor Pago'].map(h => (
-                  <th key={`${v}-${h}`} style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 10, padding: '6px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={`${v}-${h}`} className="is-numeric" style={{ fontSize: 10, padding: '6px 8px' }}>{h}</th>
                 ))
               ))}
             </tr>
           </thead>
           <tbody>
             {[...mesesG].reverse().map(mg => (
-              <tr key={mg.key} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
+              <tr key={mg.key}>
+                <td style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
                 {displayVals.map((v, vi) => {
                   const s = geralStats(mg, field, v)
                   const c = colorArr[vi % colorArr.length]
                   return [
-                    <td key={`${v}-r`} style={{ padding: '9px 8px', textAlign: 'right', color: c, fontWeight: 500 }}>{fmt(s.realizadas)}</td>,
-                    <td key={`${v}-p`} style={{ padding: '9px 8px', textAlign: 'right', color: '#10b981', fontWeight: 500 }}>{fmt(s.pagos)}</td>,
-                    <td key={`${v}-v`} style={{ padding: '9px 8px', textAlign: 'right', color: '#f59e0b', fontWeight: 500 }}>{fmtR1(s.valor)}</td>,
+                    <td key={`${v}-r`} className="is-numeric" style={{ color: c, fontWeight: 500 }}>{fmt(s.realizadas)}</td>,
+                    <td key={`${v}-p`} className="is-numeric" style={{ color: 'var(--green)', fontWeight: 500 }}>{fmt(s.pagos)}</td>,
+                    <td key={`${v}-v`} className="is-numeric" style={{ color: 'var(--amber)', fontWeight: 500 }}>{fmtR1(s.valor)}</td>,
                   ]
                 })}
               </tr>
@@ -3802,19 +3802,19 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>
             Tabela resumo — {metricaAtiva.label} · {empresaSelecionada}
           </div>
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <div className="table-shell">
+            <table className="data-table zebra">
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Mês</th>
-                  <th style={{ textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500, fontSize: 11, padding: '10px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{metricaAtiva.label}</th>
+                  <th>Mês</th>
+                  <th className="is-numeric">{metricaAtiva.label}</th>
                 </tr>
               </thead>
               <tbody>
                 {[...currentMeses].reverse().map(mes => (
-                  <tr key={mes.key} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mes.label}</td>
-                    <td style={{ padding: '9px 8px', textAlign: 'right', color: metricaAtiva.color, fontWeight: 500 }}>
+                  <tr key={mes.key}>
+                    <td style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mes.label}</td>
+                    <td className="is-numeric" style={{ color: metricaAtiva.color, fontWeight: 500 }}>
                       {mes[metricaAtiva.key] == null ? '-' : metricaAtiva.fmt(mes[metricaAtiva.key])}
                     </td>
                   </tr>
