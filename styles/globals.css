@@ -96,14 +96,20 @@
      no teto da escala e nunca sozinho — sempre com --shadow-xl por cima.
      4 níveis: primary (fundo) < nav/sidebar/sub-nav (superfície/painéis,
      §2) < card (quase-branco, §3) < tooltip (elevado, §4). */
-  --bg-primary:      #f3f1ea;
-  --bg-card:         #fbf9f3;
-  --bg-card-hover:   #ffffff;
-  --bg-nav:          #f7f5ef;
-  --bg-sub-nav:      #f5f3ec;
-  --bg-input:        #f8f6f0;
-  --bg-tooltip:      #ffffff;
-  --bg-sidebar:      #f7f5ef;
+  /* Opacidade +15% (PR #103, ajuste pós-comparação): fundo um pouco mais
+     opaco/suave que o marfim original, menos próximo de branco, mantendo a
+     mesma hierarquia (fundo < sub-nav < nav/sidebar < input < card <
+     card-hover/tooltip) — escolhido entre 3 alternativas (10/15/20%)
+     comparadas visualmente; 15% teve a queda de contraste mais discreta das
+     três sem soar "lavado". Texto/sombras/cores semânticas inalterados. */
+  --bg-primary:      #ece8de;
+  --bg-card:         #f8f5ee;
+  --bg-card-hover:   #fdfdfc;
+  --bg-nav:          #f2efe7;
+  --bg-sub-nav:      #efebe2;
+  --bg-input:        #f3f0e8;
+  --bg-tooltip:      #fdfdfc;
+  --bg-sidebar:      #f2efe7;
 
   /* §Bordas: cinza-bege frio, claramente visível (era slate puro — não
      conversava com o novo fundo quente). */
@@ -119,7 +125,7 @@
   --text-muted:      #7b8390;
 
   --bar-track:       rgba(58,50,38,0.08);
-  --pie-stroke:      #f3f1ea;
+  --pie-stroke:      #ece8de; /* acompanha --bg-primary */
   --grid-line:       rgba(58,50,38,0.09);
   --axis-text:       #6b7280;
 
@@ -152,7 +158,7 @@
   --red:             #dc2626;
   --red-bg:          rgba(220,38,38,0.08);
   --red-glow:        rgba(220,38,38,0.22);
-  --card-gradient-base: #fbf9f3; /* acompanha --bg-card */
+  --card-gradient-base: #f8f5ee; /* acompanha --bg-card */
 
   /* §Shadow — light: precisa "aparecer mais" (feedback explícito) — base
      neutra quente (45,38,28) em vez de slate azulado, opacidade e alcance
