@@ -96,14 +96,20 @@
      no teto da escala e nunca sozinho — sempre com --shadow-xl por cima.
      4 níveis: primary (fundo) < nav/sidebar/sub-nav (superfície/painéis,
      §2) < card (quase-branco, §3) < tooltip (elevado, §4). */
-  --bg-primary:      #f3f1ea;
-  --bg-card:         #fbf9f3;
-  --bg-card-hover:   #ffffff;
-  --bg-nav:          #f7f5ef;
-  --bg-sub-nav:      #f5f3ec;
-  --bg-input:        #f8f6f0;
-  --bg-tooltip:      #ffffff;
-  --bg-sidebar:      #f7f5ef;
+  /* Opacidade +15% (PR #103, ajuste pós-comparação): fundo um pouco mais
+     opaco/suave que o marfim original, menos próximo de branco, mantendo a
+     mesma hierarquia (fundo < sub-nav < nav/sidebar < input < card <
+     card-hover/tooltip) — escolhido entre 3 alternativas (10/15/20%)
+     comparadas visualmente; 15% teve a queda de contraste mais discreta das
+     três sem soar "lavado". Texto/sombras/cores semânticas inalterados. */
+  --bg-primary:      #ece8de;
+  --bg-card:         #f8f5ee;
+  --bg-card-hover:   #fdfdfc;
+  --bg-nav:          #f2efe7;
+  --bg-sub-nav:      #efebe2;
+  --bg-input:        #f3f0e8;
+  --bg-tooltip:      #fdfdfc;
+  --bg-sidebar:      #f2efe7;
 
   /* §Bordas: cinza-bege frio, claramente visível (era slate puro — não
      conversava com o novo fundo quente). */
@@ -119,7 +125,7 @@
   --text-muted:      #7b8390;
 
   --bar-track:       rgba(58,50,38,0.08);
-  --pie-stroke:      #f3f1ea;
+  --pie-stroke:      #ece8de; /* acompanha --bg-primary */
   --grid-line:       rgba(58,50,38,0.09);
   --axis-text:       #6b7280;
 
@@ -152,7 +158,7 @@
   --red:             #dc2626;
   --red-bg:          rgba(220,38,38,0.08);
   --red-glow:        rgba(220,38,38,0.22);
-  --card-gradient-base: #fbf9f3; /* acompanha --bg-card */
+  --card-gradient-base: #f8f5ee; /* acompanha --bg-card */
 
   /* §Shadow — light: precisa "aparecer mais" (feedback explícito) — base
      neutra quente (45,38,28) em vez de slate azulado, opacidade e alcance
@@ -634,6 +640,21 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   margin-bottom: 14px;
+}
+
+/* Gráfico + indicadores lado a lado (ForecastView — "Forecast" mensal).
+   Mobile UX 2.0: extraído do inline style pra ter um ponto único e confiável
+   de override no mobile (não depende mais do seletor de atributo
+   `[style*="gridTemplateColumns: 'minmax(0, 2fr)"]` mais abaixo). */
+.forecast-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 0.75fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.forecast-chart-side {
+  border-left: 1px solid var(--border);
+  padding-left: 18px;
 }
 
 /* SVG pie stroke */
@@ -1119,11 +1140,14 @@ select.field-input {
    MOBILE
 ══════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* Sidebar collapses to bottom bar on mobile */
+  /* Sidebar collapses to bottom bar on mobile — env(safe-area-inset-bottom)
+     (Mobile UX 2.0) soma a área do home-indicator do iOS (viewport-fit=cover
+     precisa estar setado no meta viewport pra isso ter efeito; ver
+     pages/_document.js) sem mudar nada em telas sem essa área (soma 0). */
   .app-layout { flex-direction: column; }
   .sidebar {
     width: 100%;
-    height: 56px;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
     flex-direction: row;
     position: fixed;
     top: auto;
@@ -1132,7 +1156,7 @@ select.field-input {
     right: 0;
     border-right: none;
     border-top: 1px solid var(--border);
-    padding: 0 16px;
+    padding: 0 16px calc(env(safe-area-inset-bottom, 0px));
     justify-content: center;
     gap: 8px;
   }
@@ -1141,32 +1165,85 @@ select.field-input {
   .sidebar-footer { flex-direction: row; margin-top: 0; gap: 4px; }
   .sidebar-item { width: 44px; height: 44px; }
   .sidebar-item.active::before { left: 50%; top: -1px; transform: translateX(-50%); width: 24px; height: 3px; border-radius: 0 0 3px 3px; }
-  .main-area { margin-left: 0; margin-bottom: 56px; }
+  .main-area { margin-left: 0; margin-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 
-  .top-bar { padding: 0 14px; height: 52px; }
-  .top-bar-title { font-size: 14px; }
-  .sync-btn span:last-child { display: none; }
-  .theme-toggle span:not(.theme-toggle-icon) { display: none; }
+  /* Topbar: a causa raiz do overflow horizontal em quase toda view era o
+     <select> de "Análises…" com minWidth:180 inline nunca sobrescrito no
+     mobile (inline sempre vence a classe), somado às 3 seções + brand +
+     seletor de mês tentando caber numa única linha de 58px sem quebrar.
+     Agora quebra em 2 linhas controladas: linha 1 = marca + mês (esquerda) +
+     sync/tema (direita); linha 2 = análises, ocupando a largura toda. */
+  .top-bar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 52px;
+    padding: 8px 14px;
+    row-gap: 8px;
+  }
+  .topbar-left { order: 1; min-width: 0; flex: 1 1 auto; }
+  .topbar-right { order: 2; }
   .topbar-divider { display: none; }
-  .topbar-brand-name { max-width: 96px; }
+  .topbar-center {
+    order: 3;
+    flex: 1 1 100% !important; /* sobrescreve flex:1 inline — sem isso a seção
+      não ganha sua própria linha cheia */
+    width: 100%;
+    padding: 0 !important;
+    justify-content: flex-start !important;
+  }
+  .topbar-center select { width: 100%; }
+  .topbar-brand-name { max-width: 84px; }
   .topbar-brand-mark { display: flex; }
+  .last-sync { display: none; } /* não cabe com folga em 360-390px; hora de sync não é essencial ali */
   .view-header-title { font-size: 20px; }
 
   .sub-nav { padding: 0 14px; height: auto; min-height: 44px; flex-wrap: nowrap; gap: 4px; padding-top: 6px; padding-bottom: 6px; }
-  .period-select { min-width: 130px; font-size: 12.5px; }
+  .period-select { min-width: 108px; font-size: 12.5px; padding-top: 9px; padding-bottom: 9px; }
   .sub-tab { font-size: 12px; padding: 5px 9px; }
+  /* Touch targets (§20): um pouco mais de altura em toque, sem redesenhar o
+     campo — ainda não bate 44px cravado em todo lugar, mas fica bem mais
+     perto sem comprometer a densidade dos filtros. */
+  .field-input { padding: 11px 12px; }
+  select.field-input { padding-right: 32px; }
 
-  .hero { padding: 16px; gap: 16px; }
-  .hero-headline { font-size: 22px; }
-  .hero-right { gap: 20px; }
+  /* Hero: separa visualmente resultado principal (título) das métricas
+     secundárias (Investido/MRR Pago) com uma divisória, em vez de deixá-las
+     flutuando à direita — o que, ao quebrar de linha num container estreito,
+     lia como "espremido contra o título" em vez de uma seção própria. */
+  .hero { flex-direction: column; align-items: stretch; padding: 16px; gap: 14px; }
+  .hero-headline { font-size: clamp(20px, 6vw, 24px); }
+  .hero-right {
+    gap: 16px;
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .hero-stat { text-align: left; }
   .hero-stat-value { font-size: 18px; }
 
   .page { padding: 14px; }
   .card { padding: 14px 12px; }
-  .card-value { font-size: 24px; }
+  .card-value { font-size: clamp(20px, 5.5vw, 24px); }
   .card-label { font-size: 10px; }
   .card-sub { font-size: 11px; }
   .charts-grid { grid-template-columns: 1fr !important; }
+
+  .forecast-chart-grid { grid-template-columns: 1fr; }
+  .forecast-chart-side {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+}
+
+/* Telas de celular mais estreitas (360-412px) — um degrau a mais de
+   compactação além do tier de 768px acima, sem duplicar tudo. */
+@media (max-width: 420px) {
+  .topbar-brand-name { max-width: 64px; }
+  .period-select { min-width: 92px; font-size: 12px; }
+  .cards-grid { grid-template-columns: 1fr 1fr; gap: var(--space-8); }
 }
 
 /* ── Painel Geral ──────────────────────────────────────── */
@@ -1189,10 +1266,17 @@ select.field-input {
 }
 
 @media (max-width: 768px) {
+  /* Mobile UX 2.0: cobre também repeat(2,1fr)/repeat(4,1fr) — Row2 (Painel
+     Geral) gera esse grid dinamicamente (repeat(${items.length}, 1fr)); o
+     valor computado que vai pro DOM é sempre um desses três, então o
+     seletor por atributo continua pegando. gridTemplateColumns: 'minmax(0,
+     2fr)... (ForecastView) foi removido daqui — essa view agora usa
+     .forecast-chart-grid (classe própria, ver acima), não inline style. */
+  [style*="grid-template-columns: repeat(2, 1fr)"],
   [style*="grid-template-columns: repeat(3, 1fr)"],
+  [style*="grid-template-columns: repeat(4, 1fr)"],
   [style*="gridTemplateColumns: 'repeat(3, 1fr)'"] { grid-template-columns: 1fr !important; }
   [style*="grid-template-columns: repeat(2, minmax"] { grid-template-columns: 1fr !important; }
-  [style*="gridTemplateColumns: 'minmax(0, 2fr)"] { grid-template-columns: 1fr !important; }
 }
 
 @media (max-width: 640px) {
