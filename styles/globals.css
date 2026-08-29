@@ -434,6 +434,27 @@ body {
   .semanas-grid-comparar > * { flex: 1 1 100%; width: 100%; }
 }
 
+/* PR N: SemanaCard alinhado à profundidade/motion do resto do Design System —
+   mesma receita de .mo-perf-card (superfície em gradiente, shadow-md +
+   card-highlight, fadeIn de entrada), com a faixa colorida do topo (uma cor
+   por mês/grupo, já existente) preservada via custom property em vez de
+   hardcoded. Antes: só var(--shadow-card) puro, sem realce top-left, sem
+   entrada — o único card do app nesse estado. */
+.semana-card {
+  --semana-color: var(--accent);
+  background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
+  border: 1px solid var(--border-default);
+  border-top: 3px solid var(--semana-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md), var(--card-highlight);
+  padding: 16px 14px;
+  transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
+  display: flex;
+  flex-direction: column;
+}
+.semana-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg), var(--card-highlight-hover); }
+
 .section-title {
   font-size: 10.5px;
   font-weight: 700;
