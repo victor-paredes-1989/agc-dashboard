@@ -527,7 +527,7 @@ function SemanaCard({ s, cor }) {
   )
 
   return (
-    <div style={{ background: 'var(--bg-card)', border: `1px solid var(--border)`, borderTop: `3px solid ${cor}`, borderRadius: 14, padding: '16px 14px', boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <div className="semana-card" style={{ '--semana-color': cor }}>
       {/* Header */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: cor, marginBottom: 2 }}>Semana</div>
@@ -536,7 +536,7 @@ function SemanaCard({ s, cor }) {
 
       {/* Bloco Marketing */}
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '6px 0 4px' }}>Marketing</div>
-      <Row label="Leads"           value={fmt(s.leads)}                             color="#3b82f6" bold />
+      <Row label="Leads"           value={<AnimatedNumber value={Number(s.leads) || 0} format={fmt} />}       color="#3b82f6" bold />
       <Row label="MQL %"           value={s.mql || '-'}                             color="#8b5cf6" />
       <Row label="Leads MQL"       value={s.leadsMql ? fmt(s.leadsMql) : '-'}       color="#8b5cf6" />
       <Row label="CPL"             value={s.cpl ? fmtR1(s.cpl) : '-'}              color="var(--text-secondary)" />
@@ -545,22 +545,23 @@ function SemanaCard({ s, cor }) {
 
       {/* Bloco Comercial */}
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '10px 0 4px' }}>Comercial</div>
-      <Row label="Agendamentos"    value={fmt(s.agendamentos)}                      color="var(--text-primary)" bold />
+      <Row label="Agendamentos"    value={<AnimatedNumber value={Number(s.agendamentos) || 0} format={fmt} />} color="var(--text-primary)" bold />
       <Row label="% Agend."        value={s.pctAgd || '-'}                          color="var(--text-secondary)" />
-      <Row label="Realizadas"      value={fmt(s.realizadas)}                        color="var(--text-primary)" bold />
+      <Row label="Realizadas"      value={<AnimatedNumber value={Number(s.realizadas) || 0} format={fmt} />}  color="var(--text-primary)" bold />
       <Row label="% Realizadas"    value={s.pctRlzd || '-'}                         color="var(--text-secondary)" />
-      <Row label="Vendas"          value={fmt(s.contratosPagos)}                    color="#10b981" bold />
+      <Row label="Vendas"          value={<AnimatedNumber value={Number(s.contratosPagos) || 0} format={fmt} />} color="var(--green)" bold />
       <Row label="% Conv. Venda"   value={s.pctConv || '-'}                         color="var(--text-secondary)" />
 
       {/* Bloco Resultado */}
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '10px 0 4px' }}>Resultado</div>
-      <Row label="Valor Vendas"    value={fmtR1(s.nmrr)}                            color="#f59e0b" bold />
+      <Row label="Valor Vendas"    value={<AnimatedNumber value={Number(s.nmrr) || 0} format={fmtR1} />}       color="var(--amber)" bold />
       <Row label="TKM"             value={s.tkm ? fmtR1(s.tkm) : '-'}              color="var(--text-secondary)" />
       {temMeta && <>
         <Row label="Meta"          value={fmtR1(s.metaNmrr)}                        color="var(--text-secondary)" />
-        <Row label="Gap"           value={gap != null ? fmtR1(Math.abs(gap)) : '-'} color={acima ? '#10b981' : '#ef4444'} />
-        <Row label="% Ating. Meta" value={pctAtng != null ? `${pctAtng.toFixed(1)}%` : '-'} color={acima ? '#10b981' : '#f59e0b'} bold />
-        <Row label="% Gap Restante"value={pctGap != null ? `${Math.abs(pctGap).toFixed(1)}%` : '-'} color={acima ? '#10b981' : '#ef4444'} />
+        <Row label="Gap"           value={gap != null ? fmtR1(Math.abs(gap)) : '-'} color={acima ? 'var(--green)' : 'var(--red)'} />
+        <Row label="% Ating. Meta" value={pctAtng != null ? `${pctAtng.toFixed(1)}%` : '-'} color={acima ? 'var(--green)' : 'var(--amber)'} bold />
+        {pctAtng != null && <AnimatedBar pct={pctAtng} statusClass={acima ? 'positive' : 'negative'} small style={{ margin: '2px 0 6px' }} />}
+        <Row label="% Gap Restante"value={pctGap != null ? `${Math.abs(pctGap).toFixed(1)}%` : '-'} color={acima ? 'var(--green)' : 'var(--red)'} />
       </>}
     </div>
   )
@@ -621,12 +622,15 @@ function SemanasComparativo({ semanas }) {
     })
   }
 
-  const btnStyle = (ativo) => ({
-    padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border)',
-    background: ativo ? 'var(--accent)' : 'var(--bg-card)',
-    color: ativo ? '#fff' : 'var(--text-secondary)',
-    fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
-  })
+  // PR N: mesmo ToggleButton (teal/accent) já usado em Comparativo Mensal e Forecast —
+  // antes esse toggle usava preenchimento sólido (var(--accent) + texto branco), um
+  // terceiro visual de toggle só nesta view. Unificado ao .toggle-pill do resto do app.
+  const ToggleButton = ({ ativo, onClick, children }) => (
+    <button onClick={onClick} className="toggle-pill toggle-pill-sm"
+      style={{ background: ativo ? 'var(--accent-light)' : 'transparent', borderColor: ativo ? 'var(--accent-border)' : 'var(--border)', color: ativo ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+      {children}
+    </button>
+  )
 
   return (
     <div style={{ width: '100%' }}>
@@ -637,8 +641,8 @@ function SemanasComparativo({ semanas }) {
       {/* Barra de filtros */}
       <div className="filter-bar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 24, padding: '12px 16px' }}>
         <span className="field-label" style={{ display: 'inline', marginBottom: 0, marginRight: 4 }}>Visualizar</span>
-        <button style={btnStyle(modo === 'mes')} onClick={() => setModo('mes')}>Mês selecionado</button>
-        <button style={btnStyle(modo === 'comparar')} onClick={() => setModo('comparar')}>Comparar semana</button>
+        <ToggleButton ativo={modo === 'mes'} onClick={() => setModo('mes')}>Mês selecionado</ToggleButton>
+        <ToggleButton ativo={modo === 'comparar'} onClick={() => setModo('comparar')}>Comparar semana</ToggleButton>
         <div className="topbar-divider" />
         {modo === 'mes' ? (
           <select className="field-input" value={mesFinal} onChange={e => setMesSel(e.target.value)}>
@@ -663,7 +667,7 @@ function SemanasComparativo({ semanas }) {
       ) : modo === 'mes' ? (
         /* Modo mês: grid amplo responsivo */
         grupos.map((grupo) => (
-          <div key={grupo.key} className="semanas-grid">
+          <div key={grupo.key} className="semanas-grid stagger-children">
             {grupo.dados.map((s, si) => (
               <SemanaCard key={si} s={s} cor={grupo.cor} />
             ))}
@@ -671,7 +675,7 @@ function SemanasComparativo({ semanas }) {
         ))
       ) : (
         /* Modo comparar: cards compactos lado a lado */
-        <div className="semanas-grid-comparar">
+        <div className="semanas-grid-comparar stagger-children">
           {grupos.map((grupo) =>
             grupo.dados.map((s, si) => (
               <SemanaCard key={`${grupo.key}-${si}`} s={s} cor={grupo.cor} />
@@ -1382,12 +1386,12 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
         <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Sem registros para essa combinação</div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 20 }}>
-            <div className="card"><div className="card-label">Total no Período</div><div className="card-value">{fmt(totalQtd)}</div><div className="card-sub">{eventoLabel.toLowerCase()}</div></div>
-            <div className="card blue"><div className="card-label">Média Mensal</div><div className="card-value">{fmtDec(mediaMensal)}</div></div>
-            <div className="card green"><div className="card-label">Melhor Mês</div><div className="card-value">{melhorMes ? fmt(melhorMes.qtd) : '-'}</div><div className="card-sub">{melhorMes?.nome || ''}</div></div>
+          <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 20 }}>
+            <div className="card"><div className="card-label">Total no Período</div><div className="card-value"><AnimatedNumber value={totalQtd} format={fmt} /></div><div className="card-sub">{eventoLabel.toLowerCase()}</div></div>
+            <div className="card blue"><div className="card-label">Média Mensal</div><div className="card-value"><AnimatedNumber value={mediaMensal} format={fmtDec} /></div></div>
+            <div className="card green"><div className="card-label">Melhor Mês</div><div className="card-value">{melhorMes ? <AnimatedNumber value={melhorMes.qtd} format={fmt} /> : '-'}</div><div className="card-sub">{melhorMes?.nome || ''}</div></div>
             {evento === 'VENDAS' && (
-              <div className="card amber"><div className="card-label">Valor Total Pago</div><div className="card-value">{fmtR(totalValor)}</div></div>
+              <div className="card amber"><div className="card-label">Valor Total Pago</div><div className="card-value"><AnimatedNumber value={totalValor} format={fmtR} /></div></div>
             )}
           </div>
           <div className="chart-card">
@@ -1398,7 +1402,7 @@ function ComparativoMensalDashboard({ registros, empresaSelecionada }) {
               labelKey="nome"
               extraValueKey={evento === 'VENDAS' ? 'valor' : null}
               formatExtraVal={v => fmtR1(v)}
-              color={evento === 'VENDAS' ? '#10b981' : '#3b82f6'}
+              color={evento === 'VENDAS' ? 'var(--green)' : 'var(--blue)'}
             />
           </div>
         </>
@@ -1909,18 +1913,36 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
     { key: 'realNmrr', label: 'NMRR Real' },
     { key: 'origem', label: 'Origem' },
   ]
-  const performancePorOrigem = [...performancePorOrigemBase].sort((a, b) => {
-    if (ordenarPor === 'origem') return a.origem.localeCompare(b.origem, 'pt-BR')
-    return (Number(b[ordenarPor]) || 0) - (Number(a[ordenarPor]) || 0)
-  })
 
   const adicionaisSemMeta = [...filtradosSemMeta]
     .filter(r => (Number(r.realReunioes) || 0) > 0 || (Number(r.realPagos) || 0) > 0 || (Number(r.realNmrr) || 0) > 0)
     .sort((a, b) => (Number(b.realNmrr) || 0) - (Number(a.realNmrr) || 0))
     .map(r => ({ nome: r.origem, valor: Number(r.realNmrr) || 0, realReunioes: Number(r.realReunioes) || 0, realPagos: Number(r.realPagos) || 0, realNmrr: Number(r.realNmrr) || 0 }))
   // Mesma condição usada para decidir se o gráfico "Adicionais sem Meta" tem algo a mostrar
-  // — reaproveitada aqui para decidir se o card "Outras" aparece no grid.
+  // — reaproveitada aqui para decidir se o realizado "sem meta" precisa ser absorvido.
   const temOutras = adicionaisSemMeta.length > 0
+
+  // "Outras" (AI) / "Outros" (MO) é o card de origem com meta que funciona como cesta
+  // catch-all — o realizado das origens sem meta própria (mesmo agregado do card
+  // "Adicional sem Meta" do topo) pertence a essa cesta, não a um card à parte. Fundimos
+  // aqui, no lado realizado, mantendo a meta do card OUTRAS/OUTROS como está; se essa
+  // origem não tiver meta configurada no recorte atual, não há em que fundir e o card
+  // avulso "sem meta" volta a aparecer no grid (fallback abaixo, comportamento anterior).
+  const outrasComMetaIdx = performancePorOrigemBase.findIndex(r => r.origem === 'OUTRAS' || r.origem === 'OUTROS')
+  const outrasAbsorveuSemMeta = temOutras && outrasComMetaIdx !== -1
+  const performancePorOrigemMerged = !outrasAbsorveuSemMeta ? performancePorOrigemBase : performancePorOrigemBase.map((r, i) =>
+    i !== outrasComMetaIdx ? r : withGapPct({
+      ...r,
+      realReunioes: r.realReunioes + realReunioesAdicional,
+      realPagos: r.realPagos + realPagosAdicional,
+      realNmrr: r.realNmrr + realNmrrAdicional,
+    })
+  )
+
+  const performancePorOrigem = [...performancePorOrigemMerged].sort((a, b) => {
+    if (ordenarPor === 'origem') return a.origem.localeCompare(b.origem, 'pt-BR')
+    return (Number(b[ordenarPor]) || 0) - (Number(a[ordenarPor]) || 0)
+  })
 
   // Ordenação da tabela de detalhamento — mesmo padrão já usado em DadosEspecificosView
   // (clique no cabeçalho ordena; clique de novo inverte a direção).
@@ -2024,12 +2046,12 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
               <OrigemMetricRow label="NMRR" real={r.realNmrr} meta={r.metaNmrr} pctVal={r.pctNmrr} fmtFn={fmtR1} />
             </div>
           ))}
-          {/* "Outras" não é uma origem com meta própria — é o resumo agregado de todas as
-              origens sem meta configurada (mesmo critério temMeta de sempre), sempre por
-              último no grid, nunca com Meta/Gap/%/status verde-vermelho (não haveria meta
-              para comparar). Mesmos números já mostrados no card "Adicional sem Meta" do
-              topo — só reaproveitados aqui, nenhum cálculo novo. */}
-          {temOutras && (
+          {/* Fallback: só aparece um card avulso "sem meta" quando NÃO existe origem
+              OUTRAS/OUTROS com meta configurada no recorte atual para absorver esse
+              realizado (outrasAbsorveuSemMeta === false) — caso normal, esses números já
+              estão somados dentro do card OUTRAS/OUTROS acima, no mesmo formato dos
+              demais cards da grade (Reuniões/Pagos/NMRR real ÷ meta). */}
+          {temOutras && !outrasAbsorveuSemMeta && (
             <div className="mo-perf-card mo-perf-card-outras" key="outras">
               <div className="mo-perf-title">Outras <span className="mo-perf-outras-tag">sem meta</span></div>
               <div className="mo-metric-row"><span className="mo-metric-label">Reuniões</span><span className="mo-metric-values">{fmtNum1(realReunioesAdicional)}</span></div>
@@ -3157,24 +3179,24 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
           <div className="forecast-chart-side" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 22 }}>
             <div>
               <div className="card-label">Realizado no mês</div>
-              <div className="card-value">{valorFmt(dadosGrafico.realizado)}</div>
+              <div className="card-value"><AnimatedNumber value={dadosGrafico.realizado} format={valorFmt} /></div>
               <div className="card-sub">Previsão final: {valorFmt(dadosGrafico.previsaoFinal)} · média/dia: {valorFmt(dadosGrafico.mediaDia)}</div>
             </div>
             <div>
               <div className="card-label">Objetivo do mês</div>
-              <div className="card-value">{valorFmt(metaGrafico)}</div>
+              <div className="card-value"><AnimatedNumber value={metaGrafico} format={valorFmt} /></div>
               <AnimatedBar pct={dadosGrafico.pctMeta} style={{ margin: '8px 0' }} fillStyle={{ background: 'var(--purple)' }} />
               <div className="card-sub">{fmtPct(dadosGrafico.pctMeta)} realizado</div>
             </div>
             {supermetaGrafico > 0 && (
               <div>
                 <div className="card-label">Supermeta</div>
-                <div className="card-value">{valorFmt(supermetaGrafico)}</div>
+                <div className="card-value"><AnimatedNumber value={supermetaGrafico} format={valorFmt} /></div>
               </div>
             )}
             <div>
               <div className="card-label">Necessário por dia útil/sábado restante</div>
-              <div className="card-value">{valorFmt(necessario)}</div>
+              <div className="card-value"><AnimatedNumber value={necessario} format={valorFmt} /></div>
               <div className="card-sub">{dadosGrafico.diasOperacionaisRestantes} dias restantes · Unidade: {unidade}</div>
             </div>
           </div>
@@ -3184,14 +3206,14 @@ function ForecastView({ forecast, forecastEquipe = [], registros = [], empresaSe
       {forecastMes && forecastMes.mes && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Resumo do Forecast Mensal</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 20 }}>
-            <div className="card blue"><div className="card-label">Meta</div><div className="card-value">{fmtR1(forecastMes.meta)}</div><div className="card-sub">meta do mês</div></div>
-            <div className={`card ${Number(forecastMes.meta || 0) > 0 && Number(forecastMes.mrrPago || 0) < Number(forecastMes.meta || 0) ? 'red' : 'green'}`}><div className="card-label">MRR Pago Projetado</div><div className="card-value">{fmtR1(forecastMes.mrrPago)}</div><div className="card-sub">{fmtPct(forecastMes.pctPago)} da meta</div></div>
-            <div className={`card ${gapCardClass(forecastMes.gapPago)}`}><div className="card-label">Gap Pago</div><div className="card-value">{fmtR1(forecastMes.gapPago)}</div><div className="card-sub">{gapSub(forecastMes.gapPago)}</div></div>
-            <div className="card amber"><div className="card-label">Projeção Vendido</div><div className="card-value">{fmtR1(forecastMes.projecaoVendido)}</div><div className="card-sub">{fmtPct(forecastMes.pctVendido)} do projetado</div></div>
-            <div className={`card ${gapCardClass(forecastMes.gapContratos)}`}><div className="card-label">Gap Contratos</div><div className="card-value">{signedNumber(forecastMes.gapContratos)}</div><div className="card-sub">{gapSub(forecastMes.gapContratos, 'vs meta')}</div></div>
-            <div className={`card ${gapCardClass(forecastMes.gapRlzd)}`}><div className="card-label">Gap Realizadas</div><div className="card-value">{signedNumber(forecastMes.gapRlzd)}</div><div className="card-sub">{gapSub(forecastMes.gapRlzd, 'vs meta')}</div></div>
-            <div className={`card ${gapCardClass(forecastMes.gapAgd)}`}><div className="card-label">Gap Agendadas</div><div className="card-value">{signedNumber(forecastMes.gapAgd)}</div><div className="card-sub">{gapSub(forecastMes.gapAgd, 'vs meta')}</div></div>
+          <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 20 }}>
+            <div className="card blue"><div className="card-label">Meta</div><div className="card-value"><AnimatedNumber value={Number(forecastMes.meta) || 0} format={fmtR1} /></div><div className="card-sub">meta do mês</div></div>
+            <div className={`card ${Number(forecastMes.meta || 0) > 0 && Number(forecastMes.mrrPago || 0) < Number(forecastMes.meta || 0) ? 'red' : 'green'}`}><div className="card-label">MRR Pago Projetado</div><div className="card-value"><AnimatedNumber value={Number(forecastMes.mrrPago) || 0} format={fmtR1} /></div><div className="card-sub">{fmtPct(forecastMes.pctPago)} da meta</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapPago)}`}><div className="card-label">Gap Pago</div><div className="card-value"><AnimatedNumber value={Number(forecastMes.gapPago) || 0} format={fmtR1} /></div><div className="card-sub">{gapSub(forecastMes.gapPago)}</div></div>
+            <div className="card amber"><div className="card-label">Projeção Vendido</div><div className="card-value"><AnimatedNumber value={Number(forecastMes.projecaoVendido) || 0} format={fmtR1} /></div><div className="card-sub">{fmtPct(forecastMes.pctVendido)} do projetado</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapContratos)}`}><div className="card-label">Gap Contratos</div><div className="card-value"><AnimatedNumber value={Number(forecastMes.gapContratos) || 0} format={signedNumber} /></div><div className="card-sub">{gapSub(forecastMes.gapContratos, 'vs meta')}</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapRlzd)}`}><div className="card-label">Gap Realizadas</div><div className="card-value"><AnimatedNumber value={Number(forecastMes.gapRlzd) || 0} format={signedNumber} /></div><div className="card-sub">{gapSub(forecastMes.gapRlzd, 'vs meta')}</div></div>
+            <div className={`card ${gapCardClass(forecastMes.gapAgd)}`}><div className="card-label">Gap Agendadas</div><div className="card-value"><AnimatedNumber value={Number(forecastMes.gapAgd) || 0} format={signedNumber} /></div><div className="card-sub">{gapSub(forecastMes.gapAgd, 'vs meta')}</div></div>
           </div>
         </div>
       )}
