@@ -203,6 +203,7 @@ export default function AdminUsuarios() {
       <div className="u-shell">
         <header className="top-bar">
           <div className="top-bar-title"><span>◆</span>Admin · Usuários</div>
+          <Link href="/admin/analytics" className="u-btn u-btn-ghost">Analytics</Link>
           <Link href="/" className="u-btn u-btn-ghost">← Dashboard</Link>
           <button className="u-btn u-btn-secondary" onClick={loadUsers} disabled={loading}>
             <span style={{ display: 'inline-block', animation: loading ? 'spin 1s linear infinite' : 'none' }}>↻</span> Atualizar
