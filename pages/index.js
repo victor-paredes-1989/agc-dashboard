@@ -3991,7 +3991,7 @@ export default function Dashboard() {
   }, [data, empresa])
 
   const empresasConfig = data?.CONFIG?.empresas || [['AI','Acelera Imob'],['MO','Mundo Ótico']].map(([codigo,nome]) => ({ codigo, nome }))
-  const dashboardNome = data?.CONFIG?.dashboardNome || 'AGC Dashboard'
+  const dashboardNome = data?.CONFIG?.dashboardNome || 'VP Dash'
   const currentData = data ? data[empresa] : null
   const periodosDinamicos = data?.PERIODOS || []
   const specialViews = [

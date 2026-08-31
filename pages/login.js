@@ -1,6 +1,7 @@
 import { signIn, useSession } from 'next-auth/react'
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
+import Head from 'next/head'
 
 export default function Login() {
   const { data: session, status } = useSession()
@@ -14,10 +15,12 @@ export default function Login() {
   if (status === 'loading') return null
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg-primary, #0f172a)', fontFamily: 'sans-serif',
-    }}>
+    <>
+      <Head><title>VP Dash</title></Head>
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg-primary, #0f172a)', fontFamily: 'sans-serif',
+      }}>
       <div style={{
         background: 'var(--bg-card, #1e293b)', borderRadius: 12, padding: '48px 40px',
         textAlign: 'center', maxWidth: 360, width: '100%',
@@ -25,7 +28,7 @@ export default function Login() {
       }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
         <h1 style={{ color: 'var(--text-primary, #f1f5f9)', fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>
-          AGC Dashboard
+          VP Dash
         </h1>
         <p style={{ color: 'var(--text-muted, #64748b)', fontSize: 13, margin: '0 0 32px' }}>
           Acesso restrito a usuários autorizados
@@ -58,6 +61,7 @@ export default function Login() {
           Entrar com Google
         </button>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
