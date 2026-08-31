@@ -1642,7 +1642,12 @@ function DadosEspecificosView({ registros, empresaAtiva, periodoAtivo }) {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros — Dados Específicos</div>
+      {/* Mesmo .view-header das demais análises — antes só existia um eyebrow de
+          filtro ("Filtros — Dados Específicos"), sem nenhum título de página. */}
+      <div className="view-header">
+        <div className="view-header-title">Dados Específicos</div>
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros</div>
       <div className="filter-bar" style={{ padding: 16, marginBottom: 32 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
           <SelectFiltro label="Empresa" value={filtros.empresa} onChange={v=>setFiltro('empresa', v)} options={unique('empresa')} allLabel="Todas" />
@@ -2008,7 +2013,11 @@ function MetasOrigemView({ performance, empresaSelecionada, periodoAtivo }) {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros — Metas por Origem</div>
+      {/* Mesmo .view-header das demais análises — mesma correção de Dados Específicos. */}
+      <div className="view-header">
+        <div className="view-header-title">Metas por Origem</div>
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 16 }}>Filtros</div>
       <div className="filter-bar" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px 20px', marginBottom: 32 }}>
         <Select label="Empresa" value={filters.empresa} options={opts.empresa} onChange={v=>setFilter('empresa', v)} />
         <Select label="Ano" value={filters.ano} options={opts.ano} onChange={v=>setFilter('ano', v)} />
@@ -2919,11 +2928,13 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
 
   return (
     <div style={{ maxWidth: 940, margin: '0 auto' }}>
-      {/* Cabeçalho */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
+      {/* Cabeçalho — mesmo .view-header das demais análises (Por Semana, Comparativo
+          Mensal, Forecast, Evolução Mensal); antes era um eyebrow menor isolado, único
+          na tela sem o título de página que todas as outras views recebem. */}
+      <div className="view-header" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)' }}>Forecast por Indicador</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{periodoAtivo.label} · {String(empresaSelecionada).toUpperCase()}</div>
+          <div className="view-header-title">Forecast por Indicador</div>
+          <div className="view-header-sub">{periodoAtivo.label} · {String(empresaSelecionada).toUpperCase()}</div>
         </div>
         <select
           className="period-select has-selection"
