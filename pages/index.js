@@ -3407,7 +3407,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   )
 }
 
-function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }) {
+function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, periodoAtivo }) {
   const CATEGORIAS = [
     { key: 'comercial',   label: 'Dados Comerciais' },
     { key: 'marketing',   label: 'Dados Marketing' },
@@ -3460,10 +3460,10 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'cpmql',         label: 'CPMQL',            color: '#ec4899', fmt: fmtR1,  desc: 'Custo por lead MQL. Fórmula: investimento / leads MQL.' },
     { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1,  desc: 'Soma dos valores em status de pipeline: PM, FECHOU, RECALL, R2, CONTRATO e ASSINADO.' },
     { key: 'nmrrOutrasOrigens', label: 'NMRR — Outras Origens', color: '#f97316', fmt: fmtR1,
-      desc: 'Soma do NMRR de todas as origens que não são MQL nem FMQL (inclui o rótulo histórico "IB" agregado, para meses anteriores à separação).' },
+      desc: 'Soma do NMRR de todas as origens que não são Inbound — exclui MQL, FMQL e também o rótulo histórico "IB" de meses anteriores à separação (IB é Inbound, nunca "outra origem").' },
     { key: 'roasIb',        label: 'ROAS IB',          color: '#10b981',
       fmt: v => v == null ? '-' : `${fmtNum1(v)}x · ${(v * 100).toFixed(0)}%`,
-      desc: 'NMRR IB (MQL + FMQL) ÷ Investimento em anúncios do mês. Mostrado como múltiplo e como percentual.' },
+      desc: 'NMRR IB (Inbound consolidado) ÷ Investimento em anúncios do mês. Mostrado como múltiplo e como percentual.' },
   ]
 
   // Meta Atingida — categoria nova, só NMRR nesta primeira versão.
@@ -3525,13 +3525,23 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       .filter(p2 => PIPELINE_STATUSES_CALC.includes(String(p2.nome || '').toUpperCase()))
       .reduce((s, p2) => s + (p2.valor || 0), 0)
     // IB/Outras Origens (Blocos C/F) — mesma fonte oficial já usada pelo Painel Geral para
-    // "Performance por Origem" (graficosGranular.valorPagoPorOrigem), pré-agregada por mês
-    // pelo backend. "IB" aqui cobre também o rótulo legado de meses anteriores à separação
-    // MQL/FMQL (ex.: ABR/26), quando a origem já chega assim, sem quebra em MQL+FMQL.
+    // "Performance por Origem" (graficosGranular.valorPagoPorOrigem/reunioesPorOrigem),
+    // pré-agregada por mês pelo backend.
     const origemGranularValores = d?.reunioes?.graficosGranular?.valorPagoPorOrigem || []
-    const nmrrIB = origemGranularValores
-      .filter(o => ['MQL', 'FMQL', 'IB'].includes(String(o.nome || '').trim().toUpperCase()))
+    const origemGranularReunioes = d?.reunioes?.graficosGranular?.reunioesPorOrigem || []
+    const valorPorNomeOrigem = (nomeAlvo) => origemGranularValores
+      .filter(o => String(o.nome || '').trim().toUpperCase() === nomeAlvo)
       .reduce((s, o) => s + (Number(o.valor) || 0), 0)
+    // IB é FALLBACK do rótulo legado, nunca uma terceira parcela somada a MQL/FMQL (mesma
+    // regra de geralStats() acima, aplicada aqui à fonte por período em vez de GERAL) — se o
+    // mês já tem qualquer reunião MQL ou FMQL (checado por reunioesPorOrigem, não só pagos),
+    // NMRR IB = NMRR MQL + NMRR FMQL e o rótulo bruto "IB" daquele mês é ignorado.
+    const temSeparacaoNoMes = origemGranularReunioes.some(o => ['MQL', 'FMQL'].includes(String(o.nome || '').trim().toUpperCase()))
+    const nmrrIB = temSeparacaoNoMes
+      ? valorPorNomeOrigem('MQL') + valorPorNomeOrigem('FMQL')
+      : valorPorNomeOrigem('IB')
+    // Outras Origens NUNCA inclui Inbound em nenhuma forma — exclui MQL, FMQL e o rótulo
+    // legado "IB" sempre, independente de qual dos dois representa o Inbound naquele mês.
     const nmrrOutrasOrigens = origemGranularValores
       .filter(o => !['MQL', 'FMQL', 'IB'].includes(String(o.nome || '').trim().toUpperCase()))
       .reduce((s, o) => s + (Number(o.valor) || 0), 0)
@@ -3655,19 +3665,44 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     return { mesesG, vals }
   }
 
+  // Nota sobre anoFiltro: removido do filtro de linhas abaixo (existia aqui antes) porque era
+  // redundante quando `mg` vem de geralMeses() — geralMeses() já só enumera meses cujo ano
+  // passa no anoFiltro, então nenhuma linha de um ano fora do filtro poderia bater com
+  // `mg.key` de qualquer forma. Remover essa checagem também é o que permite o Funil IB
+  // (Bloco D) consultar um mês específico do seletor global "Mês…" independente do que o
+  // dropdown "Ano" desta view estiver mostrando — sem essa mudança, um "Ano" diferente do mês
+  // ativo global faria geralStats devolver zero silenciosamente para o Funil IB.
   function geralStats(mg, field, val) {
+    if (field === 'origem' && val === 'IB') {
+      // Bloco C (ajuste de revisão) — IB é FALLBACK, nunca uma terceira parcela. Se o mês já
+      // tem QUALQUER dado em MQL ou FMQL (a separação já existe naquele mês), IB = MQL+FMQL e
+      // o rótulo legado "IB" daquele mês (se por algum motivo também existir) é ignorado —
+      // evita contar o mesmo negócio duas vezes num mês de transição. Só cai no rótulo bruto
+      // "IB" quando o mês não tem nenhuma linha MQL/FMQL.
+      const statsMql = geralStats(mg, field, 'MQL')
+      const statsFmql = geralStats(mg, field, 'FMQL')
+      if (statsMql.realizadas + statsFmql.realizadas > 0) {
+        return {
+          realizadas: statsMql.realizadas + statsFmql.realizadas,
+          pagos: statsMql.pagos + statsFmql.pagos,
+          valor: statsMql.valor + statsFmql.valor,
+        }
+      }
+      const rowsLegado = geralEmpresa.filter(r => {
+        const ano = String(r.ano || '').trim()
+        const mes = String(r.mes || '').trim().toUpperCase()
+        if (`${ano}-${mes}` !== mg.key) return false
+        return normalizarOrigemForecast(r.origemRaw || r.origem) === 'IB'
+      })
+      const pagosLegado = rowsLegado.filter(r => String(r.status || '').trim().toUpperCase() === 'PAGO')
+      const valorLegado = pagosLegado.reduce((s, r) => s + (Number(r.valor) || 0), 0)
+      return { realizadas: rowsLegado.length, pagos: pagosLegado.length, valor: valorLegado }
+    }
     const rows = geralEmpresa.filter(r => {
       const ano = String(r.ano || '').trim()
       const mes = String(r.mes || '').trim().toUpperCase()
-      if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
       if (`${ano}-${mes}` !== mg.key) return false
-      if (field === 'origem') {
-        const o = normalizarOrigemForecast(r.origemRaw || r.origem)
-        // IB = MQL + FMQL (Bloco C), somando também o rótulo legado "IB" para meses
-        // anteriores à separação — garante que a soma funcione dos dois lados da transição.
-        if (val === 'IB') return o === 'MQL' || o === 'FMQL' || o === 'IB'
-        return o === val
-      }
+      if (field === 'origem') return normalizarOrigemForecast(r.origemRaw || r.origem) === val
       return String(r[field] || '').trim() === val
     })
     const pagos = rows.filter(r => String(r.status || '').trim().toUpperCase() === 'PAGO')
@@ -3860,16 +3895,26 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   }
 
   // ── Bloco D — Funil IB ─────────────────────────────────────────────────
-  // Mostra o mês mais recente dentro do filtro de Ano atual (varia com o filtro, como pedido
-  // no briefing) — mesma noção de "período ativo" que "AI · N meses" já usa ao lado. Leads IB
-  // vem de metricas.leads (todo lead do dashboard é Inbound — não há outra fonte de lead) e
-  // Realizadas/Pagos/NMRR IB vêm da mesma agregação de GERAL usada pelo seletor de Origem
-  // (garante que o funil bate exatamente com o que "IB" mostra lá).
-  const funilMesRef = mesesFiltrados[mesesFiltrados.length - 1] || null
-  const funilLeadsIB = funilMesRef ? (meses[mesesFiltrados.length - 1]?.leads || 0) : 0
-  const funilKeyGeral = funilMesRef ? `${funilMesRef.ano}-${String(funilMesRef.mesNome || '').toUpperCase()}` : null
-  const funilMgRef = funilKeyGeral ? geralMeses().find(mg => mg.key === funilKeyGeral) : null
-  const funilIbStats = funilMgRef ? geralStats(funilMgRef, 'origem', 'IB') : null
+  // Usa periodoAtivo — o mês globalmente selecionado no dropdown "Mês…" do topo, a MESMA
+  // referência que Painel Geral/Dados Específicos/Metas por Origem/Forecast por Indicador já
+  // recebem (Dashboard já a calcula; só passamos como prop a mais aqui, nenhum estado novo).
+  // Esse dropdown fica visível e ativo mesmo com "Evolução Mensal" selecionada, então
+  // periodoAtivo reflete exatamente o mês que o usuário vê marcado ali — nunca um mês
+  // diferente escolhido silenciosamente por esta view.
+  //
+  // Deliberadamente INDEPENDENTE do filtro "Ano" desta própria view: esse filtro só afeta as
+  // séries de evolução (mês a mês) abaixo, que por natureza mostram vários meses ao mesmo
+  // tempo — não faz sentido "fatiar" um widget de um único mês (o Funil IB) por ele. Se
+  // periodoAtivo apontar para um ano diferente do que está selecionado em "Ano", o Funil IB
+  // mostra esse mês de qualquer forma (é a leitura mais direta de "o mês que o usuário está
+  // olhando" — geralStats() foi ajustado para não depender mais de anoFiltro).
+  const funilDadosMes = periodoAtivo ? getData(empresaSelecionada, periodoAtivo.key) : null
+  const funilLeadsIB = Number(funilDadosMes?.metricas?.leads) || 0
+  const funilKeyGeral = periodoAtivo ? `${periodoAtivo.ano}-${String(periodoAtivo.mesNome || '').toUpperCase()}` : null
+  const funilTemDadosGeral = funilKeyGeral
+    ? geralEmpresa.some(r => `${String(r.ano || '').trim()}-${String(r.mes || '').trim().toUpperCase()}` === funilKeyGeral)
+    : false
+  const funilIbStats = funilTemDadosGeral ? geralStats({ key: funilKeyGeral }, 'origem', 'IB') : null
   const funilRealizadasIB = funilIbStats?.realizadas || 0
   const funilPagosIB = funilIbStats?.pagos || 0
   const funilNmrrIB = funilIbStats?.valor || 0
@@ -3950,11 +3995,11 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.4 }}>{metricaAtiva.desc}</div>
       )}
 
-      {/* ── Bloco D — Funil IB ── resumo do mês mais recente dentro do filtro de Ano atual;
-          não substitui nenhum funil existente em outras views, é exclusivo desta aba. */}
+      {/* ── Bloco D — Funil IB ── resumo do mês globalmente selecionado (dropdown "Mês…" do
+          topo); não substitui nenhum funil existente em outras views, é exclusivo desta aba. */}
       <div className="chart-card" style={{ marginBottom: 32 }}>
-        <div className="chart-title">Funil IB{funilMesRef ? ` — ${funilMesRef.label}` : ''}</div>
-        {!funilMesRef || !funilIbStats ? (
+        <div className="chart-title">Funil IB{periodoAtivo ? ` — ${periodoAtivo.label}` : ''}</div>
+        {!periodoAtivo || !funilIbStats ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>
             Sem dados de Funil IB para o período selecionado.
           </div>
@@ -4327,7 +4372,7 @@ export default function Dashboard() {
               {periodo==='PAINEL' ? <PainelGeralView key={`painel-${empresa}-${periodoAtivo?.key}`} periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
                periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
+               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} periodoAtivo={periodoAtivo} /> :
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
