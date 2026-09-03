@@ -3407,7 +3407,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   )
 }
 
-function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }) {
+function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, periodoAtivo }) {
   const CATEGORIAS = [
     { key: 'comercial',   label: 'Dados Comerciais' },
     { key: 'marketing',   label: 'Dados Marketing' },
@@ -3416,6 +3416,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'origem',      label: 'Origem' },
     { key: 'closer',      label: 'Closer' },
     { key: 'sdr',         label: 'SDR' },
+    { key: 'meta',        label: 'Meta Atingida' },
   ]
 
   // Indicadores prontos em d.metricas (parseDashRow) — sem cálculo no front, sem tocar parser.
@@ -3458,6 +3459,18 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'leadsMql',      label: 'Leads MQL',        color: '#3b82f6', fmt: fmt,    desc: 'Estimativa de leads qualificados. Fórmula: leads × MQL%.' },
     { key: 'cpmql',         label: 'CPMQL',            color: '#ec4899', fmt: fmtR1,  desc: 'Custo por lead MQL. Fórmula: investimento / leads MQL.' },
     { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1,  desc: 'Soma dos valores em status de pipeline: PM, FECHOU, RECALL, R2, CONTRATO e ASSINADO.' },
+    { key: 'nmrrOutrasOrigens', label: 'NMRR — Outras Origens', color: '#f97316', fmt: fmtR1,
+      desc: 'Soma do NMRR de todas as origens que não são Inbound — exclui MQL, FMQL e também o rótulo histórico "IB" de meses anteriores à separação (IB é Inbound, nunca "outra origem").' },
+    { key: 'roasIb',        label: 'ROAS IB',          color: '#10b981',
+      fmt: v => v == null ? '-' : `${fmtNum1(v)}x · ${(v * 100).toFixed(0)}%`,
+      desc: 'NMRR IB (Inbound consolidado) ÷ Investimento em anúncios do mês. Mostrado como múltiplo e como percentual.' },
+  ]
+
+  // Meta Atingida — categoria nova, só NMRR nesta primeira versão.
+  const META_ATINGIDA = [
+    { key: 'metaAtingidaNmrr', label: 'NMRR', color: '#10b981',
+      fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
+      desc: 'NMRR Real ÷ Meta NMRR do mês × 100 — pode ultrapassar 100%.' },
   ]
 
   const METRICAS_GERAL = [
@@ -3465,7 +3478,12 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     { key: 'pagos',         label: 'Contratos pagos',     color: '#10b981', fmt: fmt,    desc: 'Total de reuniões com status PAGO.' },
     { key: 'valorPago',     label: 'Valor pago',          color: '#f59e0b', fmt: fmtR1,  desc: 'Soma dos valores das reuniões com status PAGO.' },
     { key: 'taxaConversao', label: 'Taxa de conversão',   color: '#3b82f6', fmt: fmtPct, desc: 'Contratos pagos / reuniões realizadas.' },
-    { key: 'tkm',           label: 'TKM',                 color: '#ec4899', fmt: fmtR1,  desc: 'Valor pago / contratos pagos.' },
+    // fmt tratado como null-aware (não fmtR1 direto): TKM sem contratos pagos é indefinido,
+    // não zero — mesma regra usada para IB (ver geralMetricVal) e para as demais métricas
+    // calculadas desta view quando o denominador é zero.
+    { key: 'tkm',           label: 'TKM',                 color: '#ec4899', fmt: v => v == null ? '-' : fmtR1(v), desc: 'Valor pago / contratos pagos.' },
+    { key: 'pctFaturamento', label: '% do Faturamento',   color: '#8b5cf6', fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
+      desc: 'NMRR desta origem/SDR/Closer ÷ NMRR total da empresa no mês × 100.' },
   ]
 
   const [categoria, setCategoria] = useState('comercial')
@@ -3506,6 +3524,30 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     const valorPipeline = (d?.reunioes?.graficos?.pipeline || [])
       .filter(p2 => PIPELINE_STATUSES_CALC.includes(String(p2.nome || '').toUpperCase()))
       .reduce((s, p2) => s + (p2.valor || 0), 0)
+    // IB/Outras Origens (Blocos C/F) — mesma fonte oficial já usada pelo Painel Geral para
+    // "Performance por Origem" (graficosGranular.valorPagoPorOrigem/reunioesPorOrigem),
+    // pré-agregada por mês pelo backend.
+    const origemGranularValores = d?.reunioes?.graficosGranular?.valorPagoPorOrigem || []
+    const origemGranularReunioes = d?.reunioes?.graficosGranular?.reunioesPorOrigem || []
+    const valorPorNomeOrigem = (nomeAlvo) => origemGranularValores
+      .filter(o => String(o.nome || '').trim().toUpperCase() === nomeAlvo)
+      .reduce((s, o) => s + (Number(o.valor) || 0), 0)
+    // IB é FALLBACK do rótulo legado, nunca uma terceira parcela somada a MQL/FMQL (mesma
+    // regra de geralStats() acima, aplicada aqui à fonte por período em vez de GERAL) — se o
+    // mês já tem qualquer reunião MQL ou FMQL (checado por reunioesPorOrigem, não só pagos),
+    // NMRR IB = NMRR MQL + NMRR FMQL e o rótulo bruto "IB" daquele mês é ignorado.
+    const temSeparacaoNoMes = origemGranularReunioes.some(o => ['MQL', 'FMQL'].includes(String(o.nome || '').trim().toUpperCase()))
+    const nmrrIB = temSeparacaoNoMes
+      ? valorPorNomeOrigem('MQL') + valorPorNomeOrigem('FMQL')
+      : valorPorNomeOrigem('IB')
+    // Outras Origens NUNCA inclui Inbound em nenhuma forma — exclui MQL, FMQL e o rótulo
+    // legado "IB" sempre, independente de qual dos dois representa o Inbound naquele mês.
+    const nmrrOutrasOrigens = origemGranularValores
+      .filter(o => !['MQL', 'FMQL', 'IB'].includes(String(o.nome || '').trim().toUpperCase()))
+      .reduce((s, o) => s + (Number(o.valor) || 0), 0)
+    // ROAS IB — nunca infinito: sem investimento no mês, o múltiplo fica indefinido (null),
+    // renderizado como "-" pelo fmt do CALCULADAS.roasIb.
+    const roasIb = investimento > 0 ? (nmrrIB / investimento) : null
     return {
       key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
       agendamentos: Number(m.agendamentos) || 0,
@@ -3528,6 +3570,8 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       taxaConversao: realizadas ? (contratosPagos / realizadas) * 100 : 0,
       valorPago:     nmrr,
       valorPipeline,
+      nmrrOutrasOrigens,
+      roasIb,
     }
   })
 
@@ -3558,6 +3602,18 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       fc_metaAgdDia:          fcEntry.metaAgdDia      || null,
       fc_metaRlzdDia:         fcEntry.metaRlzdDia     || null,
       fc_metaContPagoDia:     fcEntry.metaContPagoDia || null,
+    }
+  })
+
+  // Meta Atingida (Bloco G) — reaproveita meses[].nmrr (mesma fonte de NMRR de toda a
+  // categoria "Dados Comerciais") e mesesForecast[].fc_meta (mesma fonte de meta de NMRR
+  // já usada pela própria categoria "Forecast" acima, e pelo Painel Geral). meses e
+  // mesesForecast vêm do mesmo mesesFiltrados, na mesma ordem — não precisa de busca por key.
+  const mesesMeta = meses.map((m2, i) => {
+    const metaMrr = mesesForecast[i]?.fc_meta || 0
+    return {
+      key: m2.key, mes: m2.mes, label: m2.label, ano: m2.ano,
+      metaAtingidaNmrr: metaMrr > 0 ? (m2.nmrr / metaMrr) * 100 : null,
     }
   })
 
@@ -3593,9 +3649,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     if (field === 'origem') {
       // Origem usa origemRaw + normalização específica (MQL/FMQL separados, não agrupados como IB)
       const uniqueVals = [...new Set(geralEmpresa.map(r => normalizarOrigemForecast(r.origemRaw || r.origem)).filter(Boolean))]
+      // Bloco C — "IB" convive com MQL e FMQL na mesma lista (nunca os substitui). Aparece
+      // sempre que MQL, FMQL ou o rótulo legado "IB" (meses antes da separação) existirem
+      // nos dados — geralStats() abaixo é quem soma MQL+FMQL+IB legado quando val === 'IB'.
+      const semIB = uniqueVals.filter(o => o !== 'IB')
+      const mostraIB = uniqueVals.includes('IB') || semIB.includes('MQL') || semIB.includes('FMQL')
       const vals = [
-        ...FORECAST_ORIGEM_ORDER.filter(o => uniqueVals.includes(o)),
-        ...uniqueVals.filter(o => !FORECAST_ORIGEM_ORDER.includes(o)),
+        ...(mostraIB ? ['IB'] : []),
+        ...FORECAST_ORIGEM_ORDER.filter(o => semIB.includes(o)),
+        ...semIB.filter(o => !FORECAST_ORIGEM_ORDER.includes(o)),
       ]
       return { mesesG, vals }
     }
@@ -3603,11 +3665,42 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     return { mesesG, vals }
   }
 
+  // Nota sobre anoFiltro: removido do filtro de linhas abaixo (existia aqui antes) porque era
+  // redundante quando `mg` vem de geralMeses() — geralMeses() já só enumera meses cujo ano
+  // passa no anoFiltro, então nenhuma linha de um ano fora do filtro poderia bater com
+  // `mg.key` de qualquer forma. Remover essa checagem também é o que permite o Funil IB
+  // (Bloco D) consultar um mês específico do seletor global "Mês…" independente do que o
+  // dropdown "Ano" desta view estiver mostrando — sem essa mudança, um "Ano" diferente do mês
+  // ativo global faria geralStats devolver zero silenciosamente para o Funil IB.
   function geralStats(mg, field, val) {
+    if (field === 'origem' && val === 'IB') {
+      // Bloco C (ajuste de revisão) — IB é FALLBACK, nunca uma terceira parcela. Se o mês já
+      // tem QUALQUER dado em MQL ou FMQL (a separação já existe naquele mês), IB = MQL+FMQL e
+      // o rótulo legado "IB" daquele mês (se por algum motivo também existir) é ignorado —
+      // evita contar o mesmo negócio duas vezes num mês de transição. Só cai no rótulo bruto
+      // "IB" quando o mês não tem nenhuma linha MQL/FMQL.
+      const statsMql = geralStats(mg, field, 'MQL')
+      const statsFmql = geralStats(mg, field, 'FMQL')
+      if (statsMql.realizadas + statsFmql.realizadas > 0) {
+        return {
+          realizadas: statsMql.realizadas + statsFmql.realizadas,
+          pagos: statsMql.pagos + statsFmql.pagos,
+          valor: statsMql.valor + statsFmql.valor,
+        }
+      }
+      const rowsLegado = geralEmpresa.filter(r => {
+        const ano = String(r.ano || '').trim()
+        const mes = String(r.mes || '').trim().toUpperCase()
+        if (`${ano}-${mes}` !== mg.key) return false
+        return normalizarOrigemForecast(r.origemRaw || r.origem) === 'IB'
+      })
+      const pagosLegado = rowsLegado.filter(r => String(r.status || '').trim().toUpperCase() === 'PAGO')
+      const valorLegado = pagosLegado.reduce((s, r) => s + (Number(r.valor) || 0), 0)
+      return { realizadas: rowsLegado.length, pagos: pagosLegado.length, valor: valorLegado }
+    }
     const rows = geralEmpresa.filter(r => {
       const ano = String(r.ano || '').trim()
       const mes = String(r.mes || '').trim().toUpperCase()
-      if (anoFiltro !== 'todos' && ano !== anoFiltro) return false
       if (`${ano}-${mes}` !== mg.key) return false
       if (field === 'origem') return normalizarOrigemForecast(r.origemRaw || r.origem) === val
       return String(r[field] || '').trim() === val
@@ -3622,16 +3715,32 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     setCategoria(cat)
     setSubFiltro('todos')
     setMetricaGeral('realizadas')
-    const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : cat === 'calculadas' ? CALCULADAS : cat === 'forecast' ? FORECAST_METRICS : null
+    const lista = cat === 'comercial' ? COMERCIAL : cat === 'marketing' ? MARKETING : cat === 'calculadas' ? CALCULADAS : cat === 'forecast' ? FORECAST_METRICS : cat === 'meta' ? META_ATINGIDA : null
     if (lista) setMetrica(lista[0].key)
   }
 
-  function geralMetricVal(s, key) {
+  // Bloco B — denominador é o NMRR oficial da empresa no mês (meses[].nmrr, a mesma fonte
+  // usada em toda a categoria "Dados Comerciais" e no Painel Geral), casado por ano+mês com
+  // os meses agregados de GERAL (chaves diferentes: PERIODOS usa key tipo "AGO26", GERAL usa
+  // "2026-AGOSTO" — o cruzamento é feito aqui, uma vez, por ano+mesNome).
+  const nmrrTotalPorAnoMes = new Map(
+    mesesFiltrados.map((p, i) => [`${p.ano}-${String(p.mesNome || '').toUpperCase()}`, meses[i]?.nmrr])
+  )
+  function totalNmrrDoMes(mg) {
+    return nmrrTotalPorAnoMes.get(mg.key)
+  }
+
+  function geralMetricVal(s, key, totalNmrrMes) {
     if (key === 'realizadas') return s.realizadas
     if (key === 'pagos') return s.pagos
     if (key === 'valorPago') return s.valor
     if (key === 'taxaConversao') return s.realizadas > 0 ? (s.pagos / s.realizadas) * 100 : 0
-    if (key === 'tkm') return s.pagos > 0 ? s.valor / s.pagos : 0
+    // TKM sem contratos pagos é indefinido, não zero — null vira "-" no fmt (mesma regra do
+    // TKM IB do Bloco C, aplicada aqui a todas as origens/SDR/closer por consistência dentro
+    // da própria tabela/gráfico, em vez de deixar só o IB com esse tratamento especial).
+    if (key === 'tkm') return s.pagos > 0 ? s.valor / s.pagos : null
+    // Bloco B — % do Faturamento: null (não 0%) quando não há NMRR total válido no mês.
+    if (key === 'pctFaturamento') return totalNmrrMes > 0 ? (s.valor / totalNmrrMes) * 100 : null
     return 0
   }
 
@@ -3648,7 +3757,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
           const color = metrAtiva ? metrAtiva.color : colorArr[vi % colorArr.length]
           const chartData = mesesG.map(mg => {
             const s = geralStats(mg, field, val)
-            const valor = metrAtiva ? geralMetricVal(s, metrAtiva.key) : s.realizadas
+            const valor = metrAtiva ? geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg)) : s.realizadas
             return { mes: mg.mes, label: mg.label, valor, pagos: s.pagos, valorPago: s.valor }
           })
           const titulo = metrAtiva ? `${val} · ${metrAtiva.label} mês a mês` : `${val} · reuniões mês a mês`
@@ -3693,7 +3802,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
                   <td style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
                   {displayVals.map(v => {
                     const s = geralStats(mg, field, v)
-                    const val = geralMetricVal(s, metrAtiva.key)
+                    const val = geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg))
                     return <td key={v} className="is-numeric" style={{ color: metrAtiva.color, fontWeight: 500 }}>{metrAtiva.fmt(val)}</td>
                   })}
                 </tr>
@@ -3752,14 +3861,71 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
 
   const isGeral = ['origem', 'closer', 'sdr'].includes(categoria)
   const isForecast = categoria === 'forecast'
+  const isMeta = categoria === 'meta'
   const geralField = categoria === 'origem' ? 'origem' : categoria === 'closer' ? 'closer' : 'sdr'
   const geralColors = categoria === 'closer' ? CLOSER_COLORS : SDR_COLORS
 
   const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
 
-  const currentMetrics = categoria === 'comercial' ? COMERCIAL : categoria === 'marketing' ? MARKETING : categoria === 'calculadas' ? CALCULADAS : FORECAST_METRICS
+  const currentMetrics = categoria === 'comercial' ? COMERCIAL : categoria === 'marketing' ? MARKETING : categoria === 'calculadas' ? CALCULADAS : categoria === 'meta' ? META_ATINGIDA : FORECAST_METRICS
   const metricaAtiva = currentMetrics.find(m => m.key === metrica) || currentMetrics[0]
-  const currentMeses = isForecast ? mesesForecast : meses
+  const currentMeses = isForecast ? mesesForecast : isMeta ? mesesMeta : meses
+
+  // ── Bloco A — Média Total ──────────────────────────────────────────────
+  // Ignora meses com valor <= 0 no divisor (regra explícita do briefing); "—" quando não há
+  // nenhum mês válido. Para as categorias "geral" (origem/closer/sdr) só faz sentido quando
+  // um valor específico está selecionado no dropdown — com "Ver todos" há várias séries ao
+  // mesmo tempo e uma única média não teria um significado único, então a linha é omitida
+  // (não mostra "—", simplesmente não aparece, igual a "AI · 6 meses" hoje não existe fora
+  // desta view).
+  const mediaSemZero = (valores) => {
+    const validos = valores.filter(v => v != null && Number(v) > 0)
+    if (!validos.length) return null
+    return validos.reduce((s, v) => s + Number(v), 0) / validos.length
+  }
+  let mediaTotalDisplay = null
+  if (!isGeral) {
+    const media = mediaSemZero(currentMeses.map(mAtual => mAtual[metricaAtiva.key]))
+    mediaTotalDisplay = media == null ? '—' : metricaAtiva.fmt(media)
+  } else if (subFiltro !== 'todos') {
+    const metrAtivaGeral = METRICAS_GERAL.find(mg2 => mg2.key === metricaGeral) || METRICAS_GERAL[0]
+    const geralMesesAtual = geralMeses()
+    const media = mediaSemZero(geralMesesAtual.map(mg => geralMetricVal(geralStats(mg, geralField, subFiltro), metrAtivaGeral.key, totalNmrrDoMes(mg))))
+    mediaTotalDisplay = media == null ? '—' : metrAtivaGeral.fmt(media)
+  }
+
+  // ── Bloco D — Funil IB ─────────────────────────────────────────────────
+  // Usa periodoAtivo — o mês globalmente selecionado no dropdown "Mês…" do topo, a MESMA
+  // referência que Painel Geral/Dados Específicos/Metas por Origem/Forecast por Indicador já
+  // recebem (Dashboard já a calcula; só passamos como prop a mais aqui, nenhum estado novo).
+  // Esse dropdown fica visível e ativo mesmo com "Evolução Mensal" selecionada, então
+  // periodoAtivo reflete exatamente o mês que o usuário vê marcado ali — nunca um mês
+  // diferente escolhido silenciosamente por esta view.
+  //
+  // Deliberadamente INDEPENDENTE do filtro "Ano" desta própria view: esse filtro só afeta as
+  // séries de evolução (mês a mês) abaixo, que por natureza mostram vários meses ao mesmo
+  // tempo — não faz sentido "fatiar" um widget de um único mês (o Funil IB) por ele. Se
+  // periodoAtivo apontar para um ano diferente do que está selecionado em "Ano", o Funil IB
+  // mostra esse mês de qualquer forma (é a leitura mais direta de "o mês que o usuário está
+  // olhando" — geralStats() foi ajustado para não depender mais de anoFiltro).
+  const funilDadosMes = periodoAtivo ? getData(empresaSelecionada, periodoAtivo.key) : null
+  const funilLeadsIB = Number(funilDadosMes?.metricas?.leads) || 0
+  const funilKeyGeral = periodoAtivo ? `${periodoAtivo.ano}-${String(periodoAtivo.mesNome || '').toUpperCase()}` : null
+  const funilTemDadosGeral = funilKeyGeral
+    ? geralEmpresa.some(r => `${String(r.ano || '').trim()}-${String(r.mes || '').trim().toUpperCase()}` === funilKeyGeral)
+    : false
+  const funilIbStats = funilTemDadosGeral ? geralStats({ key: funilKeyGeral }, 'origem', 'IB') : null
+  const funilRealizadasIB = funilIbStats?.realizadas || 0
+  const funilPagosIB = funilIbStats?.pagos || 0
+  const funilNmrrIB = funilIbStats?.valor || 0
+  const funilConversaoIB = funilLeadsIB > 0 ? (funilPagosIB / funilLeadsIB) * 100 : null
+
+  const FunilStat = ({ label, value, color }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{label}</span>
+      <span style={{ fontSize: 18, fontWeight: 700, color }}>{value}</span>
+    </div>
+  )
 
   return (
     <div>
@@ -3810,8 +3976,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             </select>
           </div>
         )}
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)', alignSelf: 'flex-end', paddingBottom: 2 }}>
-          {empresaSelecionada} &nbsp;·&nbsp; {isGeral ? `${geralEmpresa.filter(r => anoFiltro === 'todos' || String(r.ano||'').trim() === anoFiltro).length} reuniões` : `${currentMeses.length} ${currentMeses.length === 1 ? 'mês' : 'meses'}`}
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, alignSelf: 'flex-end', paddingBottom: 2 }}>
+          {mediaTotalDisplay && (
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              MÉDIA TOTAL <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>→</span> {mediaTotalDisplay}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            {empresaSelecionada} &nbsp;·&nbsp; {isGeral ? `${geralEmpresa.filter(r => anoFiltro === 'todos' || String(r.ano||'').trim() === anoFiltro).length} reuniões` : `${currentMeses.length} ${currentMeses.length === 1 ? 'mês' : 'meses'}`}
+          </div>
         </div>
       </div>
       {/* Descrição da métrica selecionada — fora do flex row para não desalinhar os dropdowns */}
@@ -3821,6 +3994,25 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
       {!isGeral && metricaAtiva?.desc && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.4 }}>{metricaAtiva.desc}</div>
       )}
+
+      {/* ── Bloco D — Funil IB ── resumo do mês globalmente selecionado (dropdown "Mês…" do
+          topo); não substitui nenhum funil existente em outras views, é exclusivo desta aba. */}
+      <div className="chart-card" style={{ marginBottom: 32 }}>
+        <div className="chart-title">Funil IB{periodoAtivo ? ` — ${periodoAtivo.label}` : ''}</div>
+        {!periodoAtivo || !funilIbStats ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>
+            Sem dados de Funil IB para o período selecionado.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px 24px' }}>
+            <FunilStat label="Leads IB" value={fmt(funilLeadsIB)} color="#3b82f6" />
+            <FunilStat label="Realizadas IB" value={fmt(funilRealizadasIB)} color="#14b8a6" />
+            <FunilStat label="Contratos Pagos IB" value={fmt(funilPagosIB)} color="#10b981" />
+            <FunilStat label="NMRR IB" value={fmtR1(funilNmrrIB)} color="#f59e0b" />
+            <FunilStat label="Conversão IB" value={funilConversaoIB != null ? `${funilConversaoIB.toFixed(1)}%` : '—'} color="#8b5cf6" />
+          </div>
+        )}
+      </div>
 
       {/* Charts */}
       {!isGeral ? (
@@ -4180,7 +4372,7 @@ export default function Dashboard() {
               {periodo==='PAINEL' ? <PainelGeralView key={`painel-${empresa}-${periodoAtivo?.key}`} periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
                periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
+               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} periodoAtivo={periodoAtivo} /> :
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
