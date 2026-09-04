@@ -3726,6 +3726,18 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
     if (lista) setMetrica(lista[0].key)
   }
 
+  // "Taxa de Conversão IB" só faz sentido com Categoria=Origem e Origem=IB especificamente (a
+  // fórmula usa Leads Totais como denominador — Leads IB = Leads totais só quando o item
+  // selecionado É o IB). Trocar o valor do seletor Origem/SDR/Closer para outra coisa enquanto
+  // essa métrica está ativa não pode deixar o gráfico com uma métrica que não existe mais no
+  // dropdown — reseta para "Realizadas" nesse caso, mesma queda usada em changeCategoria acima.
+  function changeSubFiltro(v) {
+    setSubFiltro(v)
+    if (metricaGeral === 'taxaConversaoIb' && !(categoria === 'origem' && v === 'IB')) {
+      setMetricaGeral('realizadas')
+    }
+  }
+
   // Bloco B — denominador é o NMRR oficial da empresa no mês (meses[].nmrr, a mesma fonte
   // usada em toda a categoria "Dados Comerciais" e no Painel Geral), casado por ano+mês com
   // os meses agregados de GERAL (chaves diferentes: PERIODOS usa key tipo "AGO26", GERAL usa
@@ -3884,6 +3896,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
   const isForecast = categoria === 'forecast'
   const isMeta = categoria === 'meta'
   const geralField = categoria === 'origem' ? 'origem' : categoria === 'closer' ? 'closer' : 'sdr'
+  // "Taxa de Conversão IB" é exclusiva de Categoria=Origem + Origem=IB (ver changeSubFiltro
+  // acima) — some do dropdown de Métrica para qualquer outra origem, SDR, Closer ou "Ver todos".
+  const metricasGeralDisponiveis = METRICAS_GERAL.filter(m => m.key !== 'taxaConversaoIb' || (categoria === 'origem' && subFiltro === 'IB'))
   const geralColors = categoria === 'closer' ? CLOSER_COLORS : SDR_COLORS
 
   const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
@@ -3942,7 +3957,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
             <span className="field-label">
               {categoria === 'origem' ? 'Origem' : categoria === 'closer' ? 'Closer' : 'SDR'}
             </span>
-            <select className="field-input" value={subFiltro} onChange={e => setSubFiltro(e.target.value)}>
+            <select className="field-input" value={subFiltro} onChange={e => changeSubFiltro(e.target.value)}>
               <option value="todos">Ver todos</option>
               {geralVals.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
@@ -3952,7 +3967,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }
           <div>
             <span className="field-label">Métrica</span>
             <select className="field-input" value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
-              {METRICAS_GERAL.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+              {metricasGeralDisponiveis.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
           </div>
         )}
