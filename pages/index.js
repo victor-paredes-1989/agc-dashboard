@@ -2804,88 +2804,13 @@ function buildDsvIndicadorData({ registros, empresa, mes, ano, isMO }) {
   }
 }
 
-// ── Forecast SDR (Parte C) ──────────────────────────────────────────────────
-// Realizado: soma do Valor Pago/NMRR de cada SDR no mês, direto de REUNIOES_GERAL — mesma
-// regra oficial de NMRR já usada em todo o dashboard (processReunioes/lib/sheets.js): apenas
-// linhas com STATUS=PAGO, excluindo SERVIÇO=DSO/DSV (que são contabilizados à parte, não são
-// NMRR). NUNCA lido de SDR_FAT — essa aba contém somente a meta.
-// Meta: SDR_FAT (EMPRESA/ANO/MES/SDR/META FATURAMENTO).
-// Forecast: mesmo helper oficial de dias úteis do Forecast por Indicador (calcIndicatorStats,
-// dayMode:'working') — não duplica calendário/feriados.
-// SDR sem meta ou sem realizado continua aparecendo (união dos dois conjuntos de nomes).
-function calcSdrForecastRows({ registros, sdrFatData, empresa, anoStr, mesNome }) {
-  const empresaUp = String(empresa || '').toUpperCase()
-  const mesUp = String(mesNome || '').toUpperCase()
-  const metasDoMes = (sdrFatData || []).filter(r => r.empresa === empresaUp && r.ano === anoStr && r.mes === mesUp)
-  const registrosDoMes = (registros || []).filter(r =>
-    String(r.empresa || '').toUpperCase() === empresaUp &&
-    String(r.ano || '') === anoStr &&
-    String(r.mes || '').toUpperCase() === mesUp
-  )
-  const nomes = new Set([
-    ...metasDoMes.map(r => r.sdr.toUpperCase()),
-    ...registrosDoMes.map(r => String(r.sdr || '').trim().toUpperCase()).filter(Boolean),
-  ])
-  return [...nomes].sort().map(nomeUp => {
-    const metaRow = metasDoMes.find(r => r.sdr.toUpperCase() === nomeUp)
-    const nomeDisplay = metaRow?.sdr || registrosDoMes.find(r => String(r.sdr || '').trim().toUpperCase() === nomeUp)?.sdr || nomeUp
-    const realizado = registrosDoMes
-      .filter(r => String(r.sdr || '').trim().toUpperCase() === nomeUp)
-      .filter(r => String(r.status || '').toUpperCase() === 'PAGO')
-      .filter(r => !['DSO', 'DSV'].includes(String(r.servico || '').toUpperCase()))
-      .reduce((s, r) => s + (Number(r.valor) || 0), 0)
-    const meta = metaRow ? metaRow.metaFaturamento : null
-    const stats = calcIndicatorStats({ realizado, anoStr, mesNome, dayMode: 'working' })
-    const forecast = stats.projecao
-    const pctMeta = stats.estado === 'current' && forecast != null && meta > 0 ? (forecast / meta) * 100 : null
-    return { sdr: nomeDisplay, realizado, meta, forecast, pctMeta, estado: stats.estado }
-  })
-}
-
-function SdrForecastTable({ rows }) {
-  if (!rows.length) return (
-    <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 32, textAlign: 'center' }}>
-      Sem SDRs com meta (SDR_FAT) ou realizado (REUNIOES_GERAL) neste mês.
-    </div>
-  )
-  return (
-    <div className="table-shell" style={{ marginTop: 8 }}>
-      <table className="data-table zebra">
-        <thead>
-          <tr>
-            <th>SDR</th>
-            <th className="is-numeric">Realizado NMRR</th>
-            <th className="is-numeric">Meta Faturamento</th>
-            <th className="is-numeric">Forecast NMRR</th>
-            <th className="is-numeric">% da Meta</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => (
-            <tr key={r.sdr}>
-              <td style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{r.sdr}</td>
-              <td className="is-numeric">{fmtR1(r.realizado)}</td>
-              <td className="is-numeric">{r.meta != null ? fmtR1(r.meta) : '—'}</td>
-              <td className="is-numeric">{r.forecast != null ? fmtR1(r.forecast) : '—'}</td>
-              <td className="is-numeric" style={{ fontWeight: 700, color: r.pctMeta == null ? 'var(--text-muted)' : (r.pctMeta >= 100 ? 'var(--green)' : r.pctMeta >= 80 ? 'var(--amber)' : 'var(--red)') }}>
-                {r.pctMeta != null ? `${r.pctMeta.toFixed(1)}%` : '—'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 // ── Forecast por Indicador ────────────────────────────────────────────────────
 // Props:
 //   periodoAtivo  — objeto { mesNome, ano, key, label } do mês selecionado
 //   periodoData   — dados do mês: { metricas, reunioes }
 //   empresaSelecionada — 'AI' | 'MO'
 //   registros     — data.GERAL (REUNIOES_GERAL) para indicadores com série real
-//   sdrFatData    — data.SDR_FAT (Parte C — meta financeira por SDR)
-function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSelecionada, registros = [], sdrFatData = [] }) {
+function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSelecionada, registros = [] }) {
   const [filtro, setFiltro] = useState('Todos')
 
   if (!periodoAtivo || !periodoData) {
@@ -2939,39 +2864,20 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
   const sDsv         = calcIndicatorStats({ realizado: dsvVal,         anoStr, mesNome, dayMode: 'working' })
   const sInvest      = calcIndicatorStats({ realizado: investVal,      anoStr, mesNome, dayMode: 'calendar' })
 
-  // Metas mensais de Agendamentos/Reuniões/Contratos Pagos — mesma fonte já usada em
-  // EvolucaoMensalView (FORECAST_METRICS: fc_metaAgdDia/fc_metaRlzdDia/fc_metaContPagoDia),
-  // colunas M/N/O de FORECAST_AI/MO: meta DIÁRIA de dias úteis. Meta mensal = meta/dia útil
-  // × dias úteis do mês (mesmo diasTotais que calcIndicatorStats já calculou para o indicador
-  // correspondente, dayMode:'working'). Sem fonte de meta mensal direta para esses três — a
-  // aba só tem a taxa diária, então a meta mensal é sempre derivada, nunca lida pronta.
-  const metaAgendamentosMensal = (Number(fcEntry.metaAgdDia) || 0) * sAgend.diasTotais
-  const metaReunioesMensal     = (Number(fcEntry.metaRlzdDia) || 0) * sReunioes.diasTotais
-  const metaContratosMensal    = (Number(fcEntry.metaContPagoDia) || 0) * sContratos.diasTotais
-
   const INDICADORES = [
-    // Leads, Leads MQL, DSV/DSO e Investimento: nenhuma coluna de meta mensal ou diária foi
-    // encontrada em FORECAST_AI/MO, PERFORMANCE_ORIGEM ou qualquer outra aba para esses 4
-    // indicadores — "meta" fica undefined de propósito (IndicadorCard mostra "—" para
-    // % da Meta nesse caso, nunca inventa um valor). Ver auditoria completa na entrega final.
     { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmt,     fmtMedia: fmtNum1 },
     { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmt,     fmtMedia: fmtNum1 },
-    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmt,     fmtMedia: fmtNum1, meta: metaAgendamentosMensal },
-    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmt,     fmtMedia: fmtNum1, meta: metaReunioesMensal },
-    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmt,     fmtMedia: fmtNum1, meta: metaContratosMensal },
+    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmt,     fmtMedia: fmtNum1 },
+    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmt,     fmtMedia: fmtNum1 },
+    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmt,     fmtMedia: fmtNum1 },
     { id: 'NMRR',            label: 'NMRR',            stats: sNmrr,      fmt: fmtR1,   fmtMedia: fmtR,   meta: metaNmrr },
     { id: 'DSV/DSO',         label: dsvLabel,          stats: sDsv,       fmt: fmtR1,   fmtMedia: fmtR },
     { id: 'Investimento',    label: 'Investimento',    stats: sInvest,    fmt: fmtR1,   fmtMedia: fmtR },
   ]
 
-  const SDR_FILTRO_ID = 'SDR — Faturamento'
-  const opcoesDropdown = ['Todos', ...INDICADORES.map(i => i.id), SDR_FILTRO_ID]
-  const mostrarSdr = filtro === SDR_FILTRO_ID
+  const opcoesDropdown = ['Todos', ...INDICADORES.map(i => i.id)]
   const visiveis = filtro === 'Todos' ? INDICADORES : INDICADORES.filter(i => i.id === filtro)
   const estadoAtual = visiveis[0]?.stats.estado
-  // Parte C — meta financeira por SDR. Cálculo é barato (filtra registros de um único mês)
-  // e sempre roda para não depender de estado condicional dentro do JSX.
-  const sdrRows = calcSdrForecastRows({ registros, sdrFatData, empresa: empresaSelecionada, anoStr, mesNome })
 
   // ── Gráfico: somente quando um indicador específico está selecionado ──────
   const indicadorSelecionado = filtro !== 'Todos' && visiveis.length === 1 ? visiveis[0] : null
@@ -3040,96 +2946,80 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
         </select>
       </div>
 
-      {!mostrarSdr && (
-        <>
-          {/* Aviso contextual por tipo de mês */}
-          {estadoAtual === 'past' && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, fontStyle: 'italic' }}>
-              Mês encerrado — exibindo apenas o realizado.
-            </div>
-          )}
-          {estadoAtual === 'future' && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, fontStyle: 'italic' }}>
-              Mês futuro — sem dados disponíveis ainda.
-            </div>
-          )}
-
-          {/* Grid de cards — 4 colunas fixas no desktop, responsivo em telas menores */}
-          <style>{`
-            .ind-grid {
-              display: grid;
-              grid-template-columns: repeat(4, 1fr);
-              gap: 16px;
-              max-width: 900px;
-            }
-            @media (max-width: 900px) {
-              .ind-grid { grid-template-columns: repeat(2, 1fr); }
-            }
-            @media (max-width: 480px) {
-              .ind-grid { grid-template-columns: 1fr; }
-            }
-            .ind-card {
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              padding: 20px 20px 16px;
-              border-radius: 12px;
-              border: 1px solid var(--border-default);
-              background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
-              min-height: 172px;
-              box-shadow: var(--shadow-md), var(--card-highlight);
-              transition: box-shadow var(--duration-fast) var(--ease-standard),
-                          border-color var(--duration-fast) var(--ease-standard),
-                          transform 220ms var(--ease-standard);
-              animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
-            }
-            .ind-card:hover {
-              border-color: var(--border-strong);
-              box-shadow: var(--shadow-lg), var(--card-highlight-hover);
-              transform: translateY(-3px);
-            }
-          `}</style>
-          <div className="ind-grid stagger-children">
-            {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta }) => (
-              <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
-            ))}
-          </div>
-
-          {/* Gráfico detalhado — somente quando um indicador específico está selecionado */}
-          {chartDados && (
-            <div style={{ marginTop: 32 }}>
-              <div className="chart-card">
-                <div className="chart-title">
-                  {chartDados.singlePoint ? 'Forecast' : 'Evolução e Forecast'} — {indicadorSelecionado?.label}
-                </div>
-                <ForecastCurveChart dados={chartDados} unidade={chartUnidade} />
-                {chartDados.singlePoint && (
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
-                    Histórico diário não disponível. A projeção parte do resultado atual.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Nota de metodologia */}
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 18, lineHeight: 1.6 }}>
-            Leads, Leads MQL e Investimento usam dias corridos (calendário). Agendamentos, Reuniões, Contratos, NMRR e DSV/DSO usam dias úteis (Seg–Sex, excluindo feriados nacionais).
-          </div>
-        </>
-      )}
-
-      {/* Parte C — Meta Financeira por SDR: Realizado (REUNIOES_GERAL/PAGO), Meta (SDR_FAT),
-          Forecast (mesmo helper de dias úteis do Forecast por Indicador) e % da Meta. SDR sem
-          meta ou sem realizado continua aparecendo (união dos dois conjuntos de nomes). */}
-      {mostrarSdr && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.4 }}>
-            Realizado NMRR = soma do Valor Pago/NMRR dos PAGOS de cada SDR no mês (REUNIOES_GERAL). Meta Faturamento vem da aba SDR_FAT. Forecast NMRR usa a mesma regra de dias úteis do Forecast por Indicador.
-          </div>
-          <SdrForecastTable rows={sdrRows} />
+      {/* Aviso contextual por tipo de mês */}
+      {estadoAtual === 'past' && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, fontStyle: 'italic' }}>
+          Mês encerrado — exibindo apenas o realizado.
         </div>
       )}
+      {estadoAtual === 'future' && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, fontStyle: 'italic' }}>
+          Mês futuro — sem dados disponíveis ainda.
+        </div>
+      )}
+
+      {/* Grid de cards — 4 colunas fixas no desktop, responsivo em telas menores */}
+      <style>{`
+        .ind-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          max-width: 900px;
+        }
+        @media (max-width: 900px) {
+          .ind-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+          .ind-grid { grid-template-columns: 1fr; }
+        }
+        .ind-card {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 20px 20px 16px;
+          border-radius: 12px;
+          border: 1px solid var(--border-default);
+          background: linear-gradient(150deg, var(--surface-2) 0%, var(--surface-1) 65%);
+          min-height: 172px;
+          box-shadow: var(--shadow-md), var(--card-highlight);
+          transition: box-shadow var(--duration-fast) var(--ease-standard),
+                      border-color var(--duration-fast) var(--ease-standard),
+                      transform 220ms var(--ease-standard);
+          animation: fadeIn var(--duration-normal) var(--ease-entrance) both;
+        }
+        .ind-card:hover {
+          border-color: var(--border-strong);
+          box-shadow: var(--shadow-lg), var(--card-highlight-hover);
+          transform: translateY(-3px);
+        }
+      `}</style>
+      <div className="ind-grid stagger-children">
+        {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta }) => (
+          <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
+        ))}
+      </div>
+
+      {/* Gráfico detalhado — somente quando um indicador específico está selecionado */}
+      {chartDados && (
+        <div style={{ marginTop: 32 }}>
+          <div className="chart-card">
+            <div className="chart-title">
+              {chartDados.singlePoint ? 'Forecast' : 'Evolução e Forecast'} — {indicadorSelecionado?.label}
+            </div>
+            <ForecastCurveChart dados={chartDados} unidade={chartUnidade} />
+            {chartDados.singlePoint && (
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
+                Histórico diário não disponível. A projeção parte do resultado atual.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Nota de metodologia */}
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 18, lineHeight: 1.6 }}>
+        Leads, Leads MQL e Investimento usam dias corridos (calendário). Agendamentos, Reuniões, Contratos, NMRR e DSV/DSO usam dias úteis (Seg–Sex, excluindo feriados nacionais).
+      </div>
     </div>
   )
 }
@@ -3181,21 +3071,22 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
         )}
       </div>
 
-      {/* Rodapé: % da Meta (sempre visível — "—" quando meta zero/ausente ou sem forecast
-          disponível) + barra + dias. Antes só aparecia com isCurrent && metaVal>0, escondendo
-          o indicador inteiro quando não havia meta; agora o rótulo "% da Meta" permanece
-          visível sempre, só o número vira "—". */}
+      {/* Rodapé: meta + % + dias */}
       <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-            {isCurrent && metaVal > 0 ? `Meta ${fmtVal(metaVal)}` : '% da Meta'}
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta == null ? 'var(--text-muted)' : (pctMeta >= 100 ? 'var(--green)' : pctMeta >= 80 ? 'var(--amber)' : 'var(--red)') }}>
-            {pctMeta == null ? '—' : `${pctMeta}% DA META`}
-          </span>
-        </div>
-        {pctMeta !== null && (
-          <AnimatedBar pct={pctMeta} statusClass={pctMeta >= 100 ? 'positive' : pctMeta >= 80 ? 'warning' : 'negative'} small />
+        {isCurrent && metaVal > 0 && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Meta {fmtVal(metaVal)}</span>
+              {pctMeta !== null && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta >= 100 ? 'var(--green)' : pctMeta >= 80 ? 'var(--amber)' : 'var(--red)' }}>
+                  {pctMeta}%
+                </span>
+              )}
+            </div>
+            {pctMeta !== null && (
+              <AnimatedBar pct={pctMeta} statusClass={pctMeta >= 100 ? 'positive' : pctMeta >= 80 ? 'warning' : 'negative'} small />
+            )}
+          </>
         )}
         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
           {isCurrent ? `${diasDecorridos}/${diasTotais} ${diasLabel}` : ' '}
@@ -3516,7 +3407,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   )
 }
 
-function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, tcvData }) {
+function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }) {
   const CATEGORIAS = [
     { key: 'comercial',   label: 'Dados Comerciais' },
     { key: 'marketing',   label: 'Dados Marketing' },
@@ -3539,14 +3430,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     { key: 'taxaRealizadas',  label: 'Taxa de Comparecimento',  color: '#14b8a6', fmt: fmtPct, desc: 'Percentual de agendamentos que foram realizados.' },
     { key: 'taxaConversao',   label: 'Taxa de Conversão',       color: '#10b981', fmt: fmtPct, desc: 'Contratos Pagos ÷ Reuniões Realizadas × 100.' },
     { key: 'gap',             label: 'Gap',                     color: '#ef4444', fmt: fmtR1,  desc: 'Diferença em relação à meta do mês.' },
-    { key: 'tcv',             label: 'TCV',                      color: '#3b82f6', fmt: fmtR1,
-      desc: 'Total Contract Value — soma do TCV de todos os Closers da empresa no mês (aba TCV_MENSAL, já consolidado, não recalculado a partir do NMRR).' },
-    { key: 'metaTcv',         label: 'Meta TCV',                 color: '#6366f1', fmt: fmtR1,
-      desc: 'Soma das metas de TCV de todos os Closers da empresa no mês.' },
-    { key: 'pctMetaTcv',      label: '% Meta TCV',               color: '#10b981',
-      fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
-      desc: 'TCV Total ÷ Meta TCV Total × 100.' },
-    { key: 'gapTcv',          label: 'Gap TCV',                  color: '#ef4444', fmt: fmtR1,  desc: 'TCV Total − Meta TCV Total.' },
   ]
   const MARKETING = [
     { key: 'investimento', label: 'Investimento', color: '#f97316', fmt: fmtR1,  desc: 'Valor investido em mídia paga no mês.' },
@@ -3607,13 +3490,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     { key: 'tkm',           label: 'TKM',                 color: '#ec4899', fmt: v => v == null ? '-' : fmtR1(v), desc: 'Valor pago / contratos pagos.' },
     { key: 'pctFaturamento', label: '% do Faturamento',   color: '#8b5cf6', fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
       desc: 'NMRR desta origem/SDR/Closer ÷ NMRR total da empresa no mês × 100.' },
-    // TCV por Closer (Parte A) — exclusiva de Categoria=Closer (ver metricasGeralDisponiveis
-    // abaixo), fonte TCV_MENSAL (não REUNIOES_GERAL). Some do dropdown fora dessa categoria.
-    { key: 'tcv',            label: 'TCV',                 color: '#3b82f6', fmt: fmtR1,  desc: 'Total Contract Value deste Closer no mês (aba TCV_MENSAL).' },
-    { key: 'metaTcv',        label: 'Meta TCV',            color: '#6366f1', fmt: fmtR1,  desc: 'Meta de TCV deste Closer no mês.' },
-    { key: 'pctMetaTcv',     label: '% Meta TCV',          color: '#10b981', fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
-      desc: 'TCV ÷ Meta TCV deste Closer × 100.' },
-    { key: 'gapTcv',         label: 'Gap TCV',             color: '#ef4444', fmt: fmtR1,  desc: 'TCV − Meta TCV deste Closer.' },
   ]
 
   const [categoria, setCategoria] = useState('comercial')
@@ -3681,14 +3557,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     // % do Faturamento — Outras Origens: mesmo NMRR Outras Origens acima, como fração do NMRR
     // total oficial do mês. Denominador zero → indefinido (null), nunca 0%.
     const pctFaturamentoOutrasOrigens = nmrr > 0 ? (nmrrOutrasOrigens / nmrr) * 100 : null
-    // TCV (Parte A) — soma de todos os Closers da empresa no mês, casado por ano+mesNome
-    // (mesma chave usada pela aba TCV_MENSAL, comparável diretamente a p.ano/p.mesNome sem
-    // precisar da ponte de chaves usada para GERAL). Nunca recalculado a partir do NMRR.
-    const tcvRowsMes = tcvEmpresa.filter(r => r.ano === p.ano && r.mes === p.mesNome)
-    const tcv = tcvRowsMes.reduce((s, r) => s + r.tcv, 0)
-    const metaTcv = tcvRowsMes.reduce((s, r) => s + r.meta, 0)
-    const pctMetaTcv = metaTcv > 0 ? (tcv / metaTcv) * 100 : null
-    const gapTcv = tcv - metaTcv
     return {
       key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
       agendamentos: Number(m.agendamentos) || 0,
@@ -3714,10 +3582,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
       nmrrOutrasOrigens,
       roasIb,
       pctFaturamentoOutrasOrigens,
-      tcv,
-      metaTcv,
-      pctMetaTcv,
-      gapTcv,
     }
   })
 
@@ -3769,10 +3633,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     return emp === empresaSelecionada.toUpperCase().trim() || emp === ''
   })
 
-  // TCV_MENSAL (aba nova, granular por Closer) — mesmo padrão de filtro por empresa acima.
-  // TCV nunca é recalculado a partir do NMRR: usa o valor já consolidado manualmente na aba.
-  const tcvEmpresa = (tcvData || []).filter(r => String(r.empresa || '').toUpperCase().trim() === empresaSelecionada.toUpperCase().trim())
-
   const MES_ORDER = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO']
   const MES_ABBR  = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
 
@@ -3809,17 +3669,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
         ...FORECAST_ORIGEM_ORDER.filter(o => semIB.includes(o)),
         ...semIB.filter(o => !FORECAST_ORIGEM_ORDER.includes(o)),
       ]
-      return { mesesG, vals }
-    }
-    if (field === 'closer') {
-      // AJUSTE 1 (revisão) — TCV_MENSAL pode ter um Closer sem nenhum registro em
-      // REUNIOES_GERAL no recorte atual (ex.: Meta TCV cadastrada, realizado operacional
-      // zero naquele mês). Sem a união, esse Closer nunca apareceria no dropdown e sua Meta
-      // TCV ficaria inacessível. União deduplicada por nome exato (trim) — mesma comparação
-      // exata já usada em tcvStatsCloser/tcvMetricVal, sem fuzzy matching.
-      const closersReunioes = geralEmpresa.map(r => String(r.closer || '').trim()).filter(Boolean)
-      const closersTcv = tcvEmpresa.map(r => r.closer).filter(Boolean)
-      const vals = [...new Set([...closersReunioes, ...closersTcv])].sort()
       return { mesesG, vals }
     }
     const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))].sort()
@@ -3928,28 +3777,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     return 0
   }
 
-  // TCV por Closer (Parte A) — fonte TCV_MENSAL, nunca REUNIOES_GERAL. mg.key já está no
-  // mesmo formato "ANO-MESNOME" usado por geralMeses()/geralStats() acima, então casa direto
-  // sem precisar de ponte de chaves. Mantido totalmente separado de geralStats/geralMetricVal
-  // (que continuam intocados) para não alterar nenhuma métrica existente.
-  function tcvStatsCloser(mg, closerVal) {
-    const rows = tcvEmpresa.filter(r => `${r.ano}-${r.mes}` === mg.key && r.closer === closerVal)
-    return {
-      tcv: rows.reduce((s, r) => s + r.tcv, 0),
-      meta: rows.reduce((s, r) => s + r.meta, 0),
-    }
-  }
-  function tcvMetricVal(mg, closerVal, key) {
-    const { tcv, meta } = tcvStatsCloser(mg, closerVal)
-    if (key === 'tcv') return tcv
-    if (key === 'metaTcv') return meta
-    if (key === 'pctMetaTcv') return meta > 0 ? (tcv / meta) * 100 : null
-    if (key === 'gapTcv') return tcv - meta
-    return 0
-  }
-  const TCV_METRIC_KEYS = ['tcv', 'metaTcv', 'pctMetaTcv', 'gapTcv']
-  const isTcvMetric = (key) => TCV_METRIC_KEYS.includes(key)
-
   const renderGeralCharts = (field, colorArr, metricaKey = null) => {
     const { mesesG, vals } = buildGeralSeries(field)
     if (!mesesG.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>Sem dados em GERAL para filtros selecionados.</div>
@@ -3962,9 +3789,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
         {displayVals.map((val, vi) => {
           const color = metrAtiva ? metrAtiva.color : colorArr[vi % colorArr.length]
           const chartData = mesesG.map(mg => {
-            if (metrAtiva && isTcvMetric(metrAtiva.key)) {
-              return { mes: mg.mes, label: mg.label, valor: tcvMetricVal(mg, val, metrAtiva.key) }
-            }
             const s = geralStats(mg, field, val)
             const valor = metrAtiva ? geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg)) : s.realizadas
             return { mes: mg.mes, label: mg.label, valor, pagos: s.pagos, valorPago: s.valor }
@@ -4010,9 +3834,8 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
                 <tr key={mg.key}>
                   <td style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
                   {displayVals.map(v => {
-                    const val = isTcvMetric(metrAtiva.key)
-                      ? tcvMetricVal(mg, v, metrAtiva.key)
-                      : geralMetricVal(geralStats(mg, field, v), metrAtiva.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg))
+                    const s = geralStats(mg, field, v)
+                    const val = geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg))
                     return <td key={v} className="is-numeric" style={{ color: metrAtiva.color, fontWeight: 500 }}>{metrAtiva.fmt(val)}</td>
                   })}
                 </tr>
@@ -4075,13 +3898,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
   const geralField = categoria === 'origem' ? 'origem' : categoria === 'closer' ? 'closer' : 'sdr'
   // "Taxa de Conversão IB" é exclusiva de Categoria=Origem + Origem=IB (ver changeSubFiltro
   // acima) — some do dropdown de Métrica para qualquer outra origem, SDR, Closer ou "Ver todos".
-  // Métricas de TCV são exclusivas de Categoria=Closer (qualquer Closer, TCV_MENSAL não
-  // depende de qual Closer está selecionado para "existir" — diferente do IB acima).
-  const metricasGeralDisponiveis = METRICAS_GERAL.filter(m => {
-    if (m.key === 'taxaConversaoIb') return categoria === 'origem' && subFiltro === 'IB'
-    if (TCV_METRIC_KEYS.includes(m.key)) return categoria === 'closer'
-    return true
-  })
+  const metricasGeralDisponiveis = METRICAS_GERAL.filter(m => m.key !== 'taxaConversaoIb' || (categoria === 'origem' && subFiltro === 'IB'))
   const geralColors = categoria === 'closer' ? CLOSER_COLORS : SDR_COLORS
 
   const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
@@ -4109,9 +3926,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
   } else if (subFiltro !== 'todos') {
     const metrAtivaGeral = METRICAS_GERAL.find(mg2 => mg2.key === metricaGeral) || METRICAS_GERAL[0]
     const geralMesesAtual = geralMeses()
-    const media = mediaSemZero(geralMesesAtual.map(mg => isTcvMetric(metrAtivaGeral.key)
-      ? tcvMetricVal(mg, subFiltro, metrAtivaGeral.key)
-      : geralMetricVal(geralStats(mg, geralField, subFiltro), metrAtivaGeral.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg))))
+    const media = mediaSemZero(geralMesesAtual.map(mg => geralMetricVal(geralStats(mg, geralField, subFiltro), metrAtivaGeral.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg))))
     mediaTotalDisplay = media == null ? '—' : metrAtivaGeral.fmt(media)
   }
 
@@ -4541,11 +4356,11 @@ export default function Dashboard() {
               {periodo==='PAINEL' ? <PainelGeralView key={`painel-${empresa}-${periodoAtivo?.key}`} periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
                periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} tcvData={data?.TCV_MENSAL || []} /> :
+               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} registros={data?.GERAL} sdrFatData={data?.SDR_FAT} /> :
+               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} registros={data?.GERAL} /> :
                periodoData ? (
                  // key troca a cada empresa/mês — remonta este bloco (nenhum dos 4
                  // componentes abaixo guarda estado local próprio) só para retrigar o
