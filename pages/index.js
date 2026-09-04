@@ -3811,6 +3811,17 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
       ]
       return { mesesG, vals }
     }
+    if (field === 'closer') {
+      // AJUSTE 1 (revisão) — TCV_MENSAL pode ter um Closer sem nenhum registro em
+      // REUNIOES_GERAL no recorte atual (ex.: Meta TCV cadastrada, realizado operacional
+      // zero naquele mês). Sem a união, esse Closer nunca apareceria no dropdown e sua Meta
+      // TCV ficaria inacessível. União deduplicada por nome exato (trim) — mesma comparação
+      // exata já usada em tcvStatsCloser/tcvMetricVal, sem fuzzy matching.
+      const closersReunioes = geralEmpresa.map(r => String(r.closer || '').trim()).filter(Boolean)
+      const closersTcv = tcvEmpresa.map(r => r.closer).filter(Boolean)
+      const vals = [...new Set([...closersReunioes, ...closersTcv])].sort()
+      return { mesesG, vals }
+    }
     const vals = [...new Set(geralEmpresa.map(r => String(r[field] || '').trim()).filter(Boolean))].sort()
     return { mesesG, vals }
   }
