@@ -4319,13 +4319,423 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
   )
 }
 
+// ── Investimento em Equipe (área restrita ADMIN/SENIOR) ─────────────────────
+// Fonte: aba INVEST_EQUIPE (EMPRESA|ANO|MES|FUNCIONARIO|CARGO|NIVEL|FIXO|VARIAVEL 100%|
+// VARIAVEL ATINGIDO|VARAL|OUTROS BONUS|TOTAL RECEBIDO), buscada via /api/invest-equipe —
+// endpoint dedicado, protegido por requireSeniorOrAdmin (lib/auth-guard.js), NUNCA parte do
+// payload de /api/data.js (ver comentário de _investEquipeCache em lib/sheets.js para o
+// porquê). Este componente faz sua própria busca/estado — não recebe INVEST_EQUIPE via props
+// do Dashboard, diferente das demais views.
+//
+// MES na planilha pode vir como nome completo ("SETEMBRO") ou abreviado ("SET") — mesInvestNumero
+// abaixo reconhece as duas formas e devolve null (nunca "cai" em Janeiro por padrão) para
+// qualquer valor não reconhecido, para que uma linha com mês inválido/vazio simplesmente não
+// entre nos agrupamentos mensais, em vez de contaminar Janeiro silenciosamente.
+const MES_INVEST_MAP = {
+  JANEIRO: 1, JAN: 1, FEVEREIRO: 2, FEV: 2, MARCO: 3, MAR: 3, ABRIL: 4, ABR: 4, MAIO: 5, MAI: 5,
+  JUNHO: 6, JUN: 6, JULHO: 7, JUL: 7, AGOSTO: 8, AGO: 8, SETEMBRO: 9, SET: 9, OUTUBRO: 10, OUT: 10,
+  NOVEMBRO: 11, NOV: 11, DEZEMBRO: 12, DEZ: 12,
+}
+const MES_INVEST_ABBR = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
+const MES_INVEST_LABEL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+function mesInvestNumero(raw) {
+  const key = String(raw || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  return MES_INVEST_MAP[key] || null
+}
+
+function sumBy(rows, field) { return rows.reduce((s, r) => s + (Number(r[field]) || 0), 0) }
+
+function groupSumTotalRecebido(rows, field) {
+  const map = new Map()
+  rows.forEach(r => {
+    const key = r[field] || '(sem valor)'
+    map.set(key, (map.get(key) || 0) + (Number(r.totalRecebido) || 0))
+  })
+  return [...map.entries()].map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total)
+}
+
+// Constrói a série mensal (12 posições, Jan..Dez) para uma métrica do dropdown "Métrica".
+// % Variável Atingido NUNCA é a média dos percentuais individuais das linhas — soma os dois
+// lados (Atingido/100%) dentro do mês e só então divide, mesma regra da fórmula oficial.
+// "Equipe + Anúncios" soma o Total Recebido do mês (equipe) ao Investimento em Anúncios do
+// mês (fonte oficial já existente — metricas.investimento via getData/periodos), nunca lido
+// de INVEST_EQUIPE.
+function buildMonthlySeriesInvest(rows, ano, metricKey, empresaSelecionada, periodos, getData) {
+  const buckets = Array.from({ length: 12 }, () => ({ recebido: 0, fixo: 0, v100: 0, vAtingido: 0, varal: 0, outros: 0, hasData: false }))
+  rows.forEach(r => {
+    const n = mesInvestNumero(r.mes)
+    if (!n) return
+    const b = buckets[n - 1]
+    b.recebido += Number(r.totalRecebido) || 0
+    b.fixo += Number(r.fixo) || 0
+    b.v100 += Number(r.variavel100) || 0
+    b.vAtingido += Number(r.variavelAtingido) || 0
+    b.varal += Number(r.varal) || 0
+    b.outros += Number(r.outrosBonus) || 0
+    b.hasData = true
+  })
+  return buckets.map((b, i) => {
+    const mesNum = i + 1
+    let valor = null
+    if (metricKey === 'totalRecebido') valor = b.recebido
+    else if (metricKey === 'fixo') valor = b.fixo
+    else if (metricKey === 'variavel100') valor = b.v100
+    else if (metricKey === 'variavelAtingido') valor = b.vAtingido
+    else if (metricKey === 'pctVariavelAtingido') valor = b.v100 > 0 ? (b.vAtingido / b.v100) * 100 : null
+    else if (metricKey === 'varal') valor = b.varal
+    else if (metricKey === 'outrosBonus') valor = b.outros
+    else if (metricKey === 'equipeAnuncios') {
+      const key = (periodos || []).find(p => Number(p.ano) === Number(ano) && monthNumberFromName(p.mesNome) === mesNum)?.key
+      const ads = key ? (Number(getData(empresaSelecionada, key)?.metricas?.investimento) || 0) : 0
+      valor = b.recebido + ads
+    }
+    return {
+      mes: MES_INVEST_ABBR[i], label: `${MES_INVEST_LABEL[i]} ${ano}`,
+      valor: valor == null ? 0 : valor, valorReal: valor, hasData: b.hasData,
+    }
+  })
+}
+
+const INVEST_METRICAS = [
+  { key: 'totalRecebido',      label: 'Total Recebido',        fmt: fmtR1, color: '#3b82f6' },
+  { key: 'fixo',                label: 'Fixo',                   fmt: fmtR1, color: '#10b981' },
+  { key: 'variavel100',         label: 'Variável 100%',          fmt: fmtR1, color: '#8b5cf6' },
+  { key: 'variavelAtingido',    label: 'Variável Atingido',      fmt: fmtR1, color: '#f59e0b' },
+  { key: 'pctVariavelAtingido', label: '% Variável Atingido',    fmt: v => v == null ? '—' : fmtPct(v), color: '#14b8a6' },
+  { key: 'varal',                label: 'Varal',                  fmt: fmtR1, color: '#ec4899' },
+  { key: 'outrosBonus',         label: 'Outros Bônus',           fmt: fmtR1, color: '#f97316' },
+  { key: 'equipeAnuncios',      label: 'Equipe + Anúncios',      fmt: fmtR1, color: '#6366f1' },
+]
+
+function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
+  const [rows, setRows] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [anoSel, setAnoSel] = useState('')
+  const [funcionarioSel, setFuncionarioSel] = useState('Todos')
+  const [cargoSel, setCargoSel] = useState('Todos')
+  const [nivelSel, setNivelSel] = useState('Todos')
+  const [metricaSel, setMetricaSel] = useState('totalRecebido')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetch('/api/invest-equipe')
+      .then(res => {
+        if (!res.ok) throw new Error(res.status === 403 ? 'Acesso restrito a Admin/Sênior.' : `Erro ${res.status} ao carregar Investimento em Equipe.`)
+        return res.json()
+      })
+      .then(body => { if (!cancelled) setRows(body.INVEST_EQUIPE || []) })
+      .catch(err => { if (!cancelled) setError(err.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const rowsEmpresa = (rows || []).filter(r => r.empresa === String(empresaSelecionada || '').toUpperCase())
+
+  const anosDisp = [...new Set(rowsEmpresa.map(r => r.ano))].filter(Boolean).sort((a, b) => Number(b) - Number(a))
+  useEffect(() => {
+    if (!anosDisp.length) return
+    if (!anoSel || !anosDisp.includes(anoSel)) setAnoSel(anosDisp[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anosDisp.join(',')])
+
+  const rowsAno = rowsEmpresa.filter(r => r.ano === anoSel)
+
+  // Total por Operação (Equipe + Anúncios) e Evolução Mensal usam sempre a EQUIPE INTEIRA do
+  // ano (empresa+ano, sem filtro de Funcionário/Cargo/Nível) — somar o investimento em
+  // anúncios da empresa a um único funcionário/cargo filtrado não faria sentido conceitual
+  // ("Investimento Total da Operação" é sempre um número da operação inteira).
+  const funcionarios = [...new Set(rowsAno.map(r => r.funcionario))].filter(Boolean).sort((a, b) => a.localeCompare(b))
+  const cargos = [...new Set(rowsAno.map(r => r.cargo))].filter(Boolean).sort((a, b) => a.localeCompare(b))
+  const niveis = [...new Set(rowsAno.map(r => r.nivel))].filter(Boolean).sort((a, b) => a.localeCompare(b))
+
+  const rowsFiltradas = rowsAno.filter(r =>
+    (funcionarioSel === 'Todos' || r.funcionario === funcionarioSel) &&
+    (cargoSel === 'Todos' || r.cargo === cargoSel) &&
+    (nivelSel === 'Todos' || r.nivel === nivelSel)
+  )
+
+  // ── KPIs (respeitam os filtros de Funcionário/Cargo/Nível) ──
+  const totalEquipe = sumBy(rowsFiltradas, 'totalRecebido')
+  const fixoTotal = sumBy(rowsFiltradas, 'fixo')
+  const v100Total = sumBy(rowsFiltradas, 'variavel100')
+  const vAtingidoTotal = sumBy(rowsFiltradas, 'variavelAtingido')
+  const pctVAtingido = v100Total > 0 ? (vAtingidoTotal / v100Total) * 100 : null
+  const varalTotal = sumBy(rowsFiltradas, 'varal')
+  const outrosTotal = sumBy(rowsFiltradas, 'outrosBonus')
+
+  // ── Total por Funcionário / Cargo / Nível (respeitam os mesmos filtros — se um Cargo
+  // específico estiver selecionado, "Total por Funcionário" mostra só as pessoas daquele
+  // cargo, comportamento de cross-filter consistente com o resto do dashboard) ──
+  const porFuncionario = groupSumTotalRecebido(rowsFiltradas, 'funcionario')
+  const porCargo = groupSumTotalRecebido(rowsFiltradas, 'cargo')
+  const porNivel = groupSumTotalRecebido(rowsFiltradas, 'nivel')
+
+  // ── Investimento Total da Operação (SEMPRE equipe inteira do ano, ver comentário acima) ──
+  const totalEquipeAno = sumBy(rowsAno, 'totalRecebido')
+  const mesesComDadosAno = [...new Set(rowsAno.map(r => mesInvestNumero(r.mes)).filter(Boolean))]
+  const investAnunciosAno = mesesComDadosAno.reduce((s, mesNum) => {
+    const key = (periodos || []).find(p => Number(p.ano) === Number(anoSel) && monthNumberFromName(p.mesNome) === mesNum)?.key
+    return s + (key ? (Number(getData(empresaSelecionada, key)?.metricas?.investimento) || 0) : 0)
+  }, 0)
+  const totalOperacao = totalEquipeAno + investAnunciosAno
+
+  // ── Evolução Mensal (respeita os filtros — selecionar um Funcionário mostra a evolução
+  // mensal daquela pessoa, conforme pedido) ──
+  const metricaAtiva = INVEST_METRICAS.find(m => m.key === metricaSel) || INVEST_METRICAS[0]
+  const seriesMensal = buildMonthlySeriesInvest(rowsFiltradas, anoSel, metricaSel, empresaSelecionada, periodos, getData)
+  const mesesComValor = seriesMensal.filter(m => m.hasData || metricaSel === 'equipeAnuncios')
+
+  // Média mensal — só meses com valor > 0, mesma filosofia da Evolução Mensal comercial.
+  const valoresPositivos = seriesMensal.map(m => m.valorReal).filter(v => v != null && v > 0)
+  const mediaMensal = valoresPositivos.length ? valoresPositivos.reduce((s, v) => s + v, 0) / valoresPositivos.length : null
+
+  // Variação MoM — compara o último mês do ano com dado contra o mês calendário anterior
+  // (não "o mês anterior com dado", literalmente mês-1) — mês anterior ausente/zero => "—".
+  const idxUltimoComDado = [...seriesMensal].map((m, i) => ({ m, i })).reverse().find(x => x.m.valorReal != null && x.m.valorReal > 0)?.i
+  let variacaoMoM = null
+  if (idxUltimoComDado != null && idxUltimoComDado > 0) {
+    const atual = seriesMensal[idxUltimoComDado].valorReal
+    const anterior = seriesMensal[idxUltimoComDado - 1].valorReal
+    if (anterior != null && anterior > 0) variacaoMoM = ((atual - anterior) / anterior) * 100
+  }
+
+  // ── Composição da Remuneração — Fixo/Variável Atingido/Varal/Outros Bônus (NUNCA
+  // Variável 100%, que é potencial e não pago) sobre o Total Recebido filtrado ──
+  const composicao = [
+    { label: 'Fixo', valor: fixoTotal, color: '#10b981' },
+    { label: 'Variável Atingido', valor: vAtingidoTotal, color: '#f59e0b' },
+    { label: 'Varal', valor: varalTotal, color: '#ec4899' },
+    { label: 'Outros Bônus', valor: outrosTotal, color: '#f97316' },
+  ].map(c => ({ ...c, pct: totalEquipe > 0 ? (c.valor / totalEquipe) * 100 : null }))
+
+  // ── Auditoria TOTAL RECEBIDO vs. soma dos componentes — só para reportar divergência,
+  // nunca para substituir o valor oficial da planilha (ver parseInvestEquipe). ──
+  const divergentes = rowsFiltradas.filter(r => {
+    const soma = (Number(r.fixo)||0) + (Number(r.variavelAtingido)||0) + (Number(r.varal)||0) + (Number(r.outrosBonus)||0)
+    return Math.abs((Number(r.totalRecebido)||0) - soma) > 0.5
+  })
+
+  const KpiCard = ({ label, value, sub }) => (
+    <div className="ie-kpi-card">
+      <div className="ie-kpi-label">{label}</div>
+      <div className="ie-kpi-value">{value}</div>
+      {sub && <div className="ie-kpi-sub">{sub}</div>}
+    </div>
+  )
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 48, textAlign: 'center' }}>Carregando Investimento em Equipe…</div>
+  if (error) return <div style={{ color: 'var(--red)', fontSize: 13, padding: 48, textAlign: 'center' }}>{error}</div>
+  if (!rowsEmpresa.length) return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 48, textAlign: 'center' }}>Nenhum dado em INVEST_EQUIPE para {empresaSelecionada}.</div>
+
+  return (
+    <div>
+      <style>{`
+        .ie-kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 28px; }
+        @media (max-width: 1000px) { .ie-kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 560px) { .ie-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        .ie-kpi-card {
+          background: var(--surface-1); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+          padding: 14px 16px; box-shadow: var(--shadow-sm);
+        }
+        .ie-kpi-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+        .ie-kpi-value { font-size: 19px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+        .ie-kpi-sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+        .ie-op-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        @media (max-width: 560px) { .ie-op-grid { grid-template-columns: 1fr; } }
+      `}</style>
+
+      <div className="view-header">
+        <div className="view-header-title">Investimento em Equipe</div>
+        <div className="view-header-sub">{empresaSelecionada} · área restrita (Admin/Sênior)</div>
+      </div>
+
+      {/* Filtros */}
+      <div className="filter-bar" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', padding: '14px 20px', marginBottom: 20 }}>
+        <div>
+          <span className="field-label">Ano</span>
+          <select className="field-input" value={anoSel} onChange={e => setAnoSel(e.target.value)}>
+            {anosDisp.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div>
+          <span className="field-label">Funcionário</span>
+          <select className="field-input" value={funcionarioSel} onChange={e => setFuncionarioSel(e.target.value)}>
+            <option value="Todos">Todos</option>
+            {funcionarios.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+        <div>
+          <span className="field-label">Cargo</span>
+          <select className="field-input" value={cargoSel} onChange={e => setCargoSel(e.target.value)}>
+            <option value="Todos">Todos</option>
+            {cargos.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <span className="field-label">Nível</span>
+          <select className="field-input" value={nivelSel} onChange={e => setNivelSel(e.target.value)}>
+            <option value="Todos">Todos</option>
+            {niveis.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div>
+          <span className="field-label">Métrica (Evolução Mensal)</span>
+          <select className="field-input" value={metricaSel} onChange={e => setMetricaSel(e.target.value)}>
+            {INVEST_METRICAS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* KPIs de topo */}
+      <div className="ie-kpi-grid">
+        <KpiCard label="Total Equipe" value={fmtR1(totalEquipe)} />
+        <KpiCard label="Fixo" value={fmtR1(fixoTotal)} />
+        <KpiCard label="Variável Atingido" value={fmtR1(vAtingidoTotal)} />
+        <KpiCard label="Varal" value={fmtR1(varalTotal)} />
+        <KpiCard label="Outros Bônus" value={fmtR1(outrosTotal)} />
+        <KpiCard
+          label="% Variável Atingido"
+          value={pctVAtingido == null ? '—' : fmtPct(pctVAtingido)}
+          sub={pctVAtingido == null ? undefined : (pctVAtingido >= 100 ? 'Meta batida' : pctVAtingido >= 80 ? 'Perto da meta' : 'Abaixo da meta')}
+        />
+      </div>
+
+      {/* Investimento Total da Operação */}
+      <div className="chart-card" style={{ marginBottom: 28 }}>
+        <div className="chart-title">Investimento Total da Operação — {anoSel}</div>
+        <div className="ie-op-grid" style={{ marginTop: 12 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Equipe</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#3b82f6' }}>{fmtR1(totalEquipeAno)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Anúncios</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#f97316' }}>{fmtR1(investAnunciosAno)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Total</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>{fmtR1(totalOperacao)}</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
+          Equipe = soma de Total Recebido (INVEST_EQUIPE) de toda a empresa no ano. Anúncios = fonte oficial de Investimento já usada no restante do dashboard (nunca lida de INVEST_EQUIPE). Sempre a operação inteira — não reage aos filtros de Funcionário/Cargo/Nível acima.
+        </div>
+      </div>
+
+      {/* Evolução Mensal */}
+      <div className="chart-card" style={{ marginBottom: 28 }}>
+        <div className="chart-title">{metricaAtiva.label} — {empresaSelecionada} · mês a mês {anoSel}</div>
+        <VerticalBarChartMonths data={mesesComValor} color={metricaAtiva.color} formatVal={metricaAtiva.fmt} />
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <div>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Média Mensal</span>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{mediaMensal == null ? '—' : metricaAtiva.fmt(mediaMensal)}</div>
+          </div>
+          <div>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Variação MoM</span>
+            <div style={{ fontSize: 15, fontWeight: 700, color: variacaoMoM == null ? 'var(--text-muted)' : (variacaoMoM >= 0 ? 'var(--green)' : 'var(--red)') }}>
+              {variacaoMoM == null ? '—' : `${variacaoMoM >= 0 ? '+' : ''}${variacaoMoM.toFixed(1)}%`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Composição da Remuneração */}
+      <div className="chart-card" style={{ marginBottom: 28 }}>
+        <div className="chart-title">Composição da Remuneração {funcionarioSel !== 'Todos' ? `— ${funcionarioSel}` : ''}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+          {composicao.map(c => (
+            <div key={c.label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>{c.label}</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {fmtR1(c.valor)} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({c.pct == null ? '—' : `${c.pct.toFixed(1)}%`})</span>
+                </span>
+              </div>
+              <AnimatedBar pct={c.pct || 0} fillStyle={{ background: c.color }} small />
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 10 }}>% sobre o Total Recebido. Variável 100% não entra (é potencial, não pago).</div>
+      </div>
+
+      {/* Total por Funcionário / Cargo / Nível */}
+      <div className="ie-op-grid" style={{ marginBottom: 28 }}>
+        {[
+          { title: 'Total por Funcionário', data: porFuncionario },
+          { title: 'Total por Cargo', data: porCargo },
+          { title: 'Total por Nível', data: porNivel },
+        ].map(bloco => (
+          <div key={bloco.title} className="table-shell">
+            <table className="data-table zebra">
+              <thead><tr><th>{bloco.title}</th><th className="is-numeric">Total Recebido</th></tr></thead>
+              <tbody>
+                {bloco.data.length ? bloco.data.map(d => (
+                  <tr key={d.nome}><td>{d.nome}</td><td className="is-numeric">{fmtR1(d.total)}</td></tr>
+                )) : <tr><td colSpan={2} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Sem dados</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabela detalhada */}
+      <div className="table-shell">
+        <table className="data-table zebra">
+          <thead>
+            <tr>
+              <th>Funcionário</th><th>Cargo</th><th>Nível</th>
+              <th className="is-numeric">Fixo</th><th className="is-numeric">Variável 100%</th>
+              <th className="is-numeric">Variável Atingido</th><th className="is-numeric">% Variável</th>
+              <th className="is-numeric">Varal</th><th className="is-numeric">Outros Bônus</th>
+              <th className="is-numeric">Total Recebido</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rowsFiltradas.map(r => {
+              const pct = r.variavel100 > 0 ? (r.variavelAtingido / r.variavel100) * 100 : null
+              return (
+                <tr key={r.id}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{r.funcionario}</td>
+                  <td>{r.cargo || '—'}</td>
+                  <td>{r.nivel || '—'}</td>
+                  <td className="is-numeric">{fmtR1(r.fixo)}</td>
+                  <td className="is-numeric">{fmtR1(r.variavel100)}</td>
+                  <td className="is-numeric">{fmtR1(r.variavelAtingido)}</td>
+                  <td className="is-numeric" style={{ fontWeight: 700, color: pct == null ? 'var(--text-muted)' : (pct >= 100 ? 'var(--green)' : pct >= 80 ? 'var(--amber)' : 'var(--red)') }}>
+                    {pct == null ? '—' : `${pct.toFixed(1)}%`}
+                  </td>
+                  <td className="is-numeric">{fmtR1(r.varal)}</td>
+                  <td className="is-numeric">{fmtR1(r.outrosBonus)}</td>
+                  <td className="is-numeric" style={{ fontWeight: 700 }}>{fmtR1(r.totalRecebido)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {divergentes.length > 0 && (
+        <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 8 }}>
+          ⓘ TOTAL RECEBIDO diverge da soma dos componentes (Fixo+Variável Atingido+Varal+Outros Bônus) em {divergentes.length} linha(s) — TOTAL RECEBIDO da planilha continua sendo usado como fonte oficial, nada foi alterado.
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Dashboard ─────────────────────────────────────────────
 export default function Dashboard() {
-  // session.user.perfil existe só para UX (mostrar/ocultar este item de menu) — a proteção
-  // real de /admin/usuarios é feita no próprio getServerSideProps da página (consulta ao
-  // vivo a USUARIOS_ACESSO), nunca aqui.
+  // session.user.perfil existe só para UX (mostrar/ocultar itens de menu) — a proteção real
+  // de /admin/usuarios (ADMIN) e de Investimento em Equipe (ADMIN/SENIOR, via
+  // /api/invest-equipe -> requireSeniorOrAdmin) é feita sempre server-side, ao vivo em
+  // USUARIOS_ACESSO, nunca confiando neste valor de sessão.
   const { data: session } = useSession()
   const isAdmin = session?.user?.perfil === 'ADMIN'
+  const isSenior = session?.user?.perfil === 'SENIOR'
+  const canViewRestricted = isAdmin || isSenior
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -4458,12 +4868,20 @@ export default function Dashboard() {
     ['METAS_ORIGEM','Metas por Origem'],
     ['FORECAST_IND','Forecast por Indicador'],
   ]
+  // Grupo "Gestão" — só existe (no array e, portanto, na opção do dropdown) para quem pode
+  // ver áreas restritas. Para USUARIO, restrictedViews fica vazio: o item não aparece no
+  // menu (nem no isSpecialView abaixo), e mesmo que 'INVEST_EQUIPE' seja forçado via
+  // devtools no estado `periodo`, o switch de render mais abaixo exige canViewRestricted de
+  // novo antes de montar InvestimentoEquipeView — a proteção real, porém, é sempre
+  // server-side (requireSeniorOrAdmin em /api/invest-equipe), independente do que o cliente
+  // tente fazer.
+  const restrictedViews = canViewRestricted ? [['INVEST_EQUIPE', 'Investimento em Equipe']] : []
 
   // isSpecialView: true quando a aba ativa é uma análise especial (não a visão mensal padrão)
-  const isSpecialView = specialViews.some(([k]) => k === periodo)
+  const isSpecialView = specialViews.some(([k]) => k === periodo) || restrictedViews.some(([k]) => k === periodo)
   // activeMesKey: chave do mês para buscar dados — independe da aba ativa
   const activeMesKey = isSpecialView ? mesSelAtivo : periodo
-  const periodoData = currentData && activeMesKey && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO','FORECAST_IND'].includes(periodo)
+  const periodoData = currentData && activeMesKey && !['SEMANAS','FORECAST','DADOS','METAS_ORIGEM','COMPARATIVO','EVOLUCAO','FORECAST_IND','INVEST_EQUIPE'].includes(periodo)
     ? (currentData[activeMesKey] ?? null)
     : null
 
@@ -4568,6 +4986,13 @@ export default function Dashboard() {
                 {specialViews.map(([p, label]) => (
                   <option key={p} value={p}>{label}</option>
                 ))}
+                {restrictedViews.length > 0 && (
+                  <optgroup label="Gestão">
+                    {restrictedViews.map(([p, label]) => (
+                      <option key={p} value={p}>{label}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 
@@ -4638,6 +5063,11 @@ export default function Dashboard() {
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
                periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} empresaSelecionada={empresa} registros={data?.GERAL} sdrFatData={data?.SDR_FAT} metasForecastData={data?.METAS_FORECAST} /> :
+               periodo==='INVEST_EQUIPE' ? (
+                 canViewRestricted
+                   ? <InvestimentoEquipeView empresaSelecionada={empresa} periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} />
+                   : <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 48, textAlign: 'center' }}>Acesso restrito. Esta área é exclusiva para os perfis Admin e Sênior.</div>
+               ) :
                periodoData ? (
                  // key troca a cada empresa/mês — remonta este bloco (nenhum dos 4
                  // componentes abaixo guarda estado local próprio) só para retrigar o
