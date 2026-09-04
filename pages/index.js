@@ -3640,6 +3640,14 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
 
   const PIPELINE_STATUSES_CALC = ['PM','FECHOU','RECALL','R2','CONTRATO','ASSINADO']
 
+  // TCV_MENSAL (aba nova, granular por Closer) — mesmo padrão de filtro por empresa usado por
+  // geralEmpresa mais abaixo. Declarado ANTES de `meses`: o map() de `meses` já lê tcvEmpresa
+  // (TCV/Meta TCV/% Meta TCV/Gap TCV por período) e um `const` só existe a partir da própria
+  // linha de declaração — declará-lo depois de `meses` (como a versão anterior fazia) lança
+  // "Cannot access 'tcvEmpresa' before initialization" assim que a view monta, derrubando todo
+  // o componente. TCV nunca é recalculado a partir do NMRR: usa o valor já consolidado na aba.
+  const tcvEmpresa = (tcvData || []).filter(r => String(r.empresa || '').toUpperCase().trim() === empresaSelecionada.toUpperCase().trim())
+
   const meses = mesesFiltrados.map(p => {
     const d = getData(empresaSelecionada, p.key)
     const m = d?.metricas || {}, c = d?.reunioes?.cards || {}
@@ -3768,10 +3776,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     const emp = String(r.empresa || '').toUpperCase().trim()
     return emp === empresaSelecionada.toUpperCase().trim() || emp === ''
   })
-
-  // TCV_MENSAL (aba nova, granular por Closer) — mesmo padrão de filtro por empresa acima.
-  // TCV nunca é recalculado a partir do NMRR: usa o valor já consolidado manualmente na aba.
-  const tcvEmpresa = (tcvData || []).filter(r => String(r.empresa || '').toUpperCase().trim() === empresaSelecionada.toUpperCase().trim())
 
   const MES_ORDER = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO']
   const MES_ABBR  = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ']
