@@ -2565,7 +2565,7 @@ const FORECAST_ORIGEM_ORDER = ['MQL','FMQL','RECUPERAÇÃO','MÊS PAS','SS','IND
 
 // Indicadores SEM série diária real: produz ponto único no dia corrente + linha de forecast.
 // NÃO distribui o total pelos dias anteriores.
-function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoStr, mesNome, estado }) {
+function buildSinglePointForecastData({ realizado, projecao, meta, supermeta, dayMode, anoStr, mesNome, estado }) {
   const year = Number(anoStr)
   const month = monthNumberFromName(mesNome)
   const totalDias = new Date(year, month, 0).getDate()
@@ -2574,6 +2574,7 @@ function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoS
   const isCurrent = estado === 'current'
   const cutoffDia = isCurrent ? Math.min(brt.day, totalDias) : totalDias
   const metaNum = Number(meta) || 0
+  const superNum = Number(supermeta) || 0
   const val = Number(realizado) || 0
   const proj = (isCurrent && projecao !== null) ? Number(projecao) || 0 : val
 
@@ -2597,12 +2598,19 @@ function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoS
       })
     : [{ dia: cutoffDia, valor: val }]
 
-  // metaLine: linear proporcional ao dayMode
+  // metaLine/superLine: lineares proporcionais ao dayMode. superLine só é desenhada pelo
+  // ForecastCurveChart quando dados.supermeta > 0 — supermeta ausente/vazia (superNum === 0)
+  // nunca gera uma linha fictícia, mesmo com os pontos zerados abaixo.
   const metaTotais = dayMode === 'calendar' ? totalDias : countWorkingDays({ year, month, start: 1 })
   const metaLine = dias.map(d => {
     if (metaNum === 0) return { dia: d, valor: 0 }
     const ate = dayMode === 'calendar' ? d : countWorkingDays({ year, month, start: 1, end: d })
     return { dia: d, valor: metaTotais > 0 ? (metaNum / metaTotais) * ate : 0 }
+  })
+  const superLine = dias.map(d => {
+    if (superNum === 0) return { dia: d, valor: 0 }
+    const ate = dayMode === 'calendar' ? d : countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: metaTotais > 0 ? (superNum / metaTotais) * ate : 0 }
   })
 
   const diasDecorridos = isCurrent
@@ -2611,12 +2619,12 @@ function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoS
   const diasTotais = dayMode === 'calendar' ? totalDias : countWorkingDays({ year, month, start: 1 })
 
   return {
-    dias, totalDias, realizado: val, meta: metaNum, supermeta: 0,
+    dias, totalDias, realizado: val, meta: metaNum, supermeta: superNum,
     pctMeta: metaNum > 0 ? (val / metaNum) * 100 : 0,
     previsaoFinal: proj, mediaDia: 0, cutoffDia, ultimoDiaComDado: cutoffDia,
     diasOperacionaisMes: diasTotais, diasOperacionaisDecorridos: diasDecorridos,
     diasOperacionaisRestantes: opRestantes,
-    real, metaLine, superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    real, metaLine, superLine, previsaoLine,
     singlePoint: true,
   }
 }
@@ -2624,7 +2632,7 @@ function buildSinglePointForecastData({ realizado, projecao, meta, dayMode, anoS
 // NMRR: série diária real via REUNIOES_GERAL usando countWorkingDays (Mon–Sex + feriados nacionais).
 // NÃO usa buildDailyForecast — esse helper usa countOperationalDays (exclui só domingo).
 // Shape de retorno idêntico ao de buildDailyForecast para compatibilidade com ForecastCurveChart.
-function buildNmrrIndicadorData({ registros, empresa, mes, ano, meta }) {
+function buildNmrrIndicadorData({ registros, empresa, mes, ano, meta, supermeta }) {
   const empNorm = String(empresa).toUpperCase()
   const mesNorm = String(mes).toUpperCase()
   const anoNorm = String(ano)
@@ -2669,6 +2677,7 @@ function buildNmrrIndicadorData({ registros, empresa, mes, ano, meta }) {
   const diasRestWD = isCurrent ? countWorkingDays({ year, month, start: cutoffDia + 1, end: totalDias }) : 0
 
   const metaNum = Number(meta) || 0
+  const superNum = Number(supermeta) || 0
   const mediaDia = diasDecWD > 0 ? realizado / diasDecWD : 0
   // forecast = mesma fórmula que calcIndicatorStats usa: mediaDia * diasTotais
   const previsaoFinal = isCurrent && mediaDia > 0 ? mediaDia * diasTotaisWD : realizado
@@ -2686,19 +2695,26 @@ function buildNmrrIndicadorData({ registros, empresa, mes, ano, meta }) {
     const ate = countWorkingDays({ year, month, start: 1, end: d })
     return { dia: d, valor: diasTotaisWD > 0 ? (metaNum / diasTotaisWD) * ate : 0 }
   })
+  // superLine só vira linha real no ForecastCurveChart quando dados.supermeta > 0 abaixo —
+  // supermeta vazia/ausente (superNum === 0) nunca desenha nada, mesmo com pontos zerados.
+  const superLine = dias.map(d => {
+    if (superNum === 0) return { dia: d, valor: 0 }
+    const ate = countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: diasTotaisWD > 0 ? (superNum / diasTotaisWD) * ate : 0 }
+  })
 
   return {
-    dias, totalDias, realizado, meta: metaNum, supermeta: 0,
+    dias, totalDias, realizado, meta: metaNum, supermeta: superNum,
     pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
     previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
     diasOperacionaisMes: diasTotaisWD, diasOperacionaisDecorridos: diasDecWD, diasOperacionaisRestantes: diasRestWD,
-    real, metaLine, superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    real, metaLine, superLine, previsaoLine,
     singlePoint: false,
   }
 }
 
 // Reuniões: adapta evolucao [{data, qtd}] em curva acumulada para ForecastCurveChart.
-function buildReunioesIndicadorData({ evolucao, anoStr, mesNome, estado }) {
+function buildReunioesIndicadorData({ evolucao, anoStr, mesNome, estado, meta, supermeta }) {
   const year = Number(anoStr)
   const month = monthNumberFromName(mesNome)
   const totalDias = new Date(year, month, 0).getDate()
@@ -2735,18 +2751,31 @@ function buildReunioesIndicadorData({ evolucao, anoStr, mesNome, estado }) {
     return { dia: d, valor: realizado + (diasRestWD > 0 ? gapFuturo * op / diasRestWD : 0) }
   })
 
+  const metaNum = Number(meta) || 0
+  const superNum = Number(supermeta) || 0
+  const metaLine = dias.map(d => {
+    if (metaNum === 0) return { dia: d, valor: 0 }
+    const ate = countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: diasTotaisWD > 0 ? (metaNum / diasTotaisWD) * ate : 0 }
+  })
+  const superLine = dias.map(d => {
+    if (superNum === 0) return { dia: d, valor: 0 }
+    const ate = countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: diasTotaisWD > 0 ? (superNum / diasTotaisWD) * ate : 0 }
+  })
+
   return {
-    dias, totalDias, realizado, meta: 0, supermeta: 0, pctMeta: 0,
+    dias, totalDias, realizado, meta: metaNum, supermeta: superNum,
+    pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
     previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
     diasOperacionaisMes: diasTotaisWD, diasOperacionaisDecorridos: diasDecWD, diasOperacionaisRestantes: diasRestWD,
-    real, metaLine: dias.map(d => ({ dia: d, valor: 0 })),
-    superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    real, metaLine, superLine, previsaoLine,
     singlePoint: false,
   }
 }
 
 // DSV (AI) / DSO (MO): curva acumulada real via REUNIOES_GERAL filtrado por serviço.
-function buildDsvIndicadorData({ registros, empresa, mes, ano, isMO }) {
+function buildDsvIndicadorData({ registros, empresa, mes, ano, isMO, meta, supermeta }) {
   const servicoAlvo = isMO ? 'DSO' : 'DSV'
   const empNorm = String(empresa).toUpperCase()
   const mesNorm = String(mes).toUpperCase()
@@ -2794,12 +2823,25 @@ function buildDsvIndicadorData({ registros, empresa, mes, ano, isMO }) {
     return { dia: d, valor: realizado + (diasRestWD > 0 ? gapFuturo * op / diasRestWD : 0) }
   })
 
+  const metaNum = Number(meta) || 0
+  const superNum = Number(supermeta) || 0
+  const metaLine = dias.map(d => {
+    if (metaNum === 0) return { dia: d, valor: 0 }
+    const ate = countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: diasTotaisWD > 0 ? (metaNum / diasTotaisWD) * ate : 0 }
+  })
+  const superLine = dias.map(d => {
+    if (superNum === 0) return { dia: d, valor: 0 }
+    const ate = countWorkingDays({ year, month, start: 1, end: d })
+    return { dia: d, valor: diasTotaisWD > 0 ? (superNum / diasTotaisWD) * ate : 0 }
+  })
+
   return {
-    dias, totalDias, realizado, meta: 0, supermeta: 0, pctMeta: 0,
+    dias, totalDias, realizado, meta: metaNum, supermeta: superNum,
+    pctMeta: metaNum > 0 ? (realizado / metaNum) * 100 : 0,
     previsaoFinal, mediaDia, cutoffDia, ultimoDiaComDado,
     diasOperacionaisMes: diasTotaisWD, diasOperacionaisDecorridos: diasDecWD, diasOperacionaisRestantes: diasRestWD,
-    real, metaLine: dias.map(d => ({ dia: d, valor: 0 })),
-    superLine: dias.map(d => ({ dia: d, valor: 0 })), previsaoLine,
+    real, metaLine, superLine, previsaoLine,
     singlePoint: false,
   }
 }
@@ -2885,7 +2927,20 @@ function SdrForecastTable({ rows }) {
 //   empresaSelecionada — 'AI' | 'MO'
 //   registros     — data.GERAL (REUNIOES_GERAL) para indicadores com série real
 //   sdrFatData    — data.SDR_FAT (Parte C — meta financeira por SDR)
-function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSelecionada, registros = [], sdrFatData = [] }) {
+// Decisão oficial de negócio: METAS_FORECAST é a fonte ÚNICA e EXCLUSIVA de Meta/Supermeta
+// para os 8 indicadores do Forecast por Indicador — nunca usa FORECAST_AI/MO, metas por
+// origem, ou qualquer valor calculado como fallback. Sem linha em METAS_FORECAST para
+// empresa+ano+mês+indicador → meta/supermeta ficam null (renderiza "—", nunca inventa 0).
+function metaForecastMes(metasForecastData, empresa, anoStr, mesNome, indicador) {
+  const empresaUp = String(empresa || '').toUpperCase()
+  const mesUp = String(mesNome || '').toUpperCase()
+  const row = (metasForecastData || []).find(r =>
+    r.empresa === empresaUp && r.ano === anoStr && r.mes === mesUp && r.indicador === indicador
+  )
+  return row ? { meta: row.meta, supermeta: row.supermeta } : { meta: null, supermeta: null }
+}
+
+function ForecastIndicadorView({ periodoAtivo, periodoData, empresaSelecionada, registros = [], sdrFatData = [], metasForecastData = [] }) {
   const [filtro, setFiltro] = useState('Todos')
 
   if (!periodoAtivo || !periodoData) {
@@ -2898,12 +2953,18 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
   const anoStr  = String(periodoAtivo.ano)
   const isMO    = String(empresaSelecionada || '').toUpperCase() === 'MO'
 
-  // Meta mensal de NMRR — mesma fonte do Forecast atual (FORECAST_AI/MO col B).
-  // Busca pelo prefixo de 3 letras do mês, idêntico ao PainelGeralView.
-  const fcList = Array.isArray(forecast) ? forecast : []
-  const mesPfx = String(mesNome).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3)
-  const fcEntry = fcList.find(e => String(e.mes||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3) === mesPfx) || {}
-  const metaNmrr = Number(fcEntry.meta) || 0
+  // Meta/Supermeta dos 8 indicadores — EXCLUSIVAMENTE de METAS_FORECAST (decisão de negócio).
+  // FORECAST_AI/MO continua existindo e alimentando outras views (Painel Geral, Evolução
+  // Mensal, Forecast) — só paramos de lê-la para preencher Meta/Supermeta aqui.
+  const mfLeads       = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'LEADS')
+  const mfLeadsMql    = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'LEADS_MQL')
+  const mfAgendamentos = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'AGENDAMENTOS')
+  const mfReunioes    = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'REUNIOES')
+  const mfContratos   = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'CONTRATOS_PAGOS')
+  const mfNmrr        = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'NMRR')
+  const mfDsv         = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'DSV_DSO')
+  const mfInvest      = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'INVESTIMENTO')
+  const metaNmrr = mfNmrr.meta
 
   // Leads MQL — mesma lógica de EvolucaoMensalView:
   // MQL chega como fração (0.32) ou percentual (32) — normalizar para percentual.
@@ -2939,29 +3000,19 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
   const sDsv         = calcIndicatorStats({ realizado: dsvVal,         anoStr, mesNome, dayMode: 'working' })
   const sInvest      = calcIndicatorStats({ realizado: investVal,      anoStr, mesNome, dayMode: 'calendar' })
 
-  // Metas mensais de Agendamentos/Reuniões/Contratos Pagos — mesma fonte já usada em
-  // EvolucaoMensalView (FORECAST_METRICS: fc_metaAgdDia/fc_metaRlzdDia/fc_metaContPagoDia),
-  // colunas M/N/O de FORECAST_AI/MO: meta DIÁRIA de dias úteis. Meta mensal = meta/dia útil
-  // × dias úteis do mês (mesmo diasTotais que calcIndicatorStats já calculou para o indicador
-  // correspondente, dayMode:'working'). Sem fonte de meta mensal direta para esses três — a
-  // aba só tem a taxa diária, então a meta mensal é sempre derivada, nunca lida pronta.
-  const metaAgendamentosMensal = (Number(fcEntry.metaAgdDia) || 0) * sAgend.diasTotais
-  const metaReunioesMensal     = (Number(fcEntry.metaRlzdDia) || 0) * sReunioes.diasTotais
-  const metaContratosMensal    = (Number(fcEntry.metaContPagoDia) || 0) * sContratos.diasTotais
-
   const INDICADORES = [
-    // Leads, Leads MQL, DSV/DSO e Investimento: nenhuma coluna de meta mensal ou diária foi
-    // encontrada em FORECAST_AI/MO, PERFORMANCE_ORIGEM ou qualquer outra aba para esses 4
-    // indicadores — "meta" fica undefined de propósito (IndicadorCard mostra "—" para
-    // % da Meta nesse caso, nunca inventa um valor). Ver auditoria completa na entrega final.
-    { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmt,     fmtMedia: fmtNum1 },
-    { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmt,     fmtMedia: fmtNum1 },
-    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmt,     fmtMedia: fmtNum1, meta: metaAgendamentosMensal },
-    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmt,     fmtMedia: fmtNum1, meta: metaReunioesMensal },
-    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmt,     fmtMedia: fmtNum1, meta: metaContratosMensal },
-    { id: 'NMRR',            label: 'NMRR',            stats: sNmrr,      fmt: fmtR1,   fmtMedia: fmtR,   meta: metaNmrr },
-    { id: 'DSV/DSO',         label: dsvLabel,          stats: sDsv,       fmt: fmtR1,   fmtMedia: fmtR },
-    { id: 'Investimento',    label: 'Investimento',    stats: sInvest,    fmt: fmtR1,   fmtMedia: fmtR },
+    // Meta/Supermeta dos 8 — todas de METAS_FORECAST (mfXxx.meta/mfXxx.supermeta acima), nunca
+    // de FORECAST_AI/MO. null quando não há linha cadastrada → IndicadorCard mostra "—", nunca
+    // inventa um valor. Investimento marca isBudget: a meta é orçamento planejado, não uma
+    // meta de performance — IndicadorCard usa nomenclatura e cor diferentes para ela.
+    { id: 'Leads',           label: 'Leads',           stats: sLeads,     fmt: fmt,     fmtMedia: fmtNum1, meta: mfLeads.meta,       supermeta: mfLeads.supermeta },
+    { id: 'Leads MQL',       label: 'Leads MQL',       stats: sLeadsMql,  fmt: fmt,     fmtMedia: fmtNum1, meta: mfLeadsMql.meta,    supermeta: mfLeadsMql.supermeta },
+    { id: 'Agendamentos',    label: 'Agendamentos',    stats: sAgend,     fmt: fmt,     fmtMedia: fmtNum1, meta: mfAgendamentos.meta, supermeta: mfAgendamentos.supermeta },
+    { id: 'Reuniões',        label: 'Reuniões',        stats: sReunioes,  fmt: fmt,     fmtMedia: fmtNum1, meta: mfReunioes.meta,    supermeta: mfReunioes.supermeta },
+    { id: 'Contratos Pagos', label: 'Contratos Pagos', stats: sContratos, fmt: fmt,     fmtMedia: fmtNum1, meta: mfContratos.meta,   supermeta: mfContratos.supermeta },
+    { id: 'NMRR',            label: 'NMRR',            stats: sNmrr,      fmt: fmtR1,   fmtMedia: fmtR,    meta: mfNmrr.meta,        supermeta: mfNmrr.supermeta },
+    { id: 'DSV/DSO',         label: dsvLabel,          stats: sDsv,       fmt: fmtR1,   fmtMedia: fmtR,    meta: mfDsv.meta,         supermeta: mfDsv.supermeta },
+    { id: 'Investimento',    label: 'Investimento',    stats: sInvest,    fmt: fmtR1,   fmtMedia: fmtR,    meta: mfInvest.meta,      supermeta: mfInvest.supermeta, isBudget: true },
   ]
 
   const SDR_FILTRO_ID = 'SDR — Faturamento'
@@ -2989,7 +3040,8 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
         empresa: String(empresaSelecionada).toUpperCase(),
         mes: mesUpper,
         ano: anoStr,
-        meta: metaNmrr,
+        meta: mfNmrr.meta,
+        supermeta: mfNmrr.supermeta,
       })
       chartUnidade = 'money'
 
@@ -2997,6 +3049,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
       chartDados = buildReunioesIndicadorData({
         evolucao: periodoData.reunioes?.graficos?.evolucao || [],
         anoStr, mesNome, estado: stats.estado,
+        meta: mfReunioes.meta, supermeta: mfReunioes.supermeta,
       })
       chartUnidade = 'qty'
 
@@ -3004,6 +3057,7 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
       chartDados = buildDsvIndicadorData({
         registros, empresa: String(empresaSelecionada).toUpperCase(),
         mes: mesUpper, ano: anoStr, isMO,
+        meta: mfDsv.meta, supermeta: mfDsv.supermeta,
       })
       chartUnidade = 'money'
 
@@ -3012,7 +3066,8 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
       chartDados = buildSinglePointForecastData({
         realizado: stats.realizado,
         projecao: stats.projecao,
-        meta: indicadorSelecionado.meta || 0,
+        meta: indicadorSelecionado.meta,
+        supermeta: indicadorSelecionado.supermeta,
         dayMode: stats.dayMode,
         anoStr, mesNome, estado: stats.estado,
       })
@@ -3090,8 +3145,8 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
             }
           `}</style>
           <div className="ind-grid stagger-children">
-            {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta }) => (
-              <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} />
+            {visiveis.map(({ id, label, stats, fmt: fmtVal, fmtMedia, meta, supermeta, isBudget }) => (
+              <IndicadorCard key={id} label={label} stats={stats} fmtVal={fmtVal} fmtMedia={fmtMedia} meta={meta} supermeta={supermeta} isBudget={isBudget} />
             ))}
           </div>
 
@@ -3136,14 +3191,27 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, forecast, empresaSel
 
 // Card individual de indicador.
 // meta: meta mensal real (opcional) — exibida apenas no mês atual.
-function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
+function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta, supermeta, isBudget }) {
   const { realizado, mediaDia, projecao, diasDecorridos, diasTotais, estado, dayMode } = stats
   const isCurrent = estado === 'current'
+  // meta/supermeta chegam como null quando METAS_FORECAST não tem linha para este indicador
+  // neste mês — Number(null) === 0, então metaVal/superVal tratam ausência e zero explícito
+  // da mesma forma (ambos viram "—"/sem linha), consistente com o resto do dashboard.
   const metaVal   = Number(meta) || 0
+  const superVal  = Number(supermeta) || 0
   const pctMeta   = isCurrent && projecao !== null && metaVal > 0
     ? Math.round((projecao / metaVal) * 100)
     : null
   const diasLabel = dayMode === 'calendar' ? 'dias' : 'dias úteis'
+  // Investimento (isBudget): a "meta" é orçamento planejado, não uma meta de performance a
+  // superar — nunca aplica o verde de sucesso por estourar 100% (projeção de estouro de
+  // orçamento não é uma vitória). Usa nomenclatura e cor neutra (info/azul) sempre, em vez do
+  // semáforo verde/âmbar/vermelho usado pelos 7 indicadores de performance.
+  const pctColor = pctMeta == null ? 'var(--text-muted)' : (isBudget ? 'var(--info)' : (pctMeta >= 100 ? 'var(--green)' : pctMeta >= 80 ? 'var(--amber)' : 'var(--red)'))
+  const barStatusClass = isBudget ? 'info' : (pctMeta >= 100 ? 'positive' : pctMeta >= 80 ? 'warning' : 'negative')
+  const metaHeaderWord = isBudget ? 'Orçamento' : 'Meta'
+  const pctHeaderLabel = isBudget ? '% do Orçamento Projetado' : '% da Meta'
+  const pctSuffix = isBudget ? '% DO ORÇAMENTO' : '% DA META'
 
   return (
     <div className="ind-card">
@@ -3181,21 +3249,23 @@ function IndicadorCard({ label, stats, fmtVal, fmtMedia, meta }) {
         )}
       </div>
 
-      {/* Rodapé: % da Meta (sempre visível — "—" quando meta zero/ausente ou sem forecast
-          disponível) + barra + dias. Antes só aparecia com isCurrent && metaVal>0, escondendo
-          o indicador inteiro quando não havia meta; agora o rótulo "% da Meta" permanece
-          visível sempre, só o número vira "—". */}
+      {/* Rodapé: % da Meta/Orçamento (sempre visível — "—" quando meta zero/ausente ou sem
+          forecast disponível) + barra + Supermeta (só quando METAS_FORECAST tem valor > 0,
+          nunca uma linha fictícia) + dias. */}
       <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-            {isCurrent && metaVal > 0 ? `Meta ${fmtVal(metaVal)}` : '% da Meta'}
+            {isCurrent && metaVal > 0 ? `${metaHeaderWord} ${fmtVal(metaVal)}` : pctHeaderLabel}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: pctMeta == null ? 'var(--text-muted)' : (pctMeta >= 100 ? 'var(--green)' : pctMeta >= 80 ? 'var(--amber)' : 'var(--red)') }}>
-            {pctMeta == null ? '—' : `${pctMeta}% DA META`}
+          <span style={{ fontSize: 12, fontWeight: 700, color: pctColor }}>
+            {pctMeta == null ? '—' : `${pctMeta}${pctSuffix}`}
           </span>
         </div>
         {pctMeta !== null && (
-          <AnimatedBar pct={pctMeta} statusClass={pctMeta >= 100 ? 'positive' : pctMeta >= 80 ? 'warning' : 'negative'} small />
+          <AnimatedBar pct={pctMeta} statusClass={barStatusClass} small />
+        )}
+        {superVal > 0 && (
+          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Supermeta {fmtVal(superVal)}</div>
         )}
         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
           {isCurrent ? `${diasDecorridos}/${diasTotais} ${diasLabel}` : ' '}
@@ -3516,7 +3586,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   )
 }
 
-function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, tcvData }) {
+function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, tcvData, metasForecastData }) {
   const CATEGORIAS = [
     { key: 'comercial',   label: 'Dados Comerciais' },
     { key: 'marketing',   label: 'Dados Marketing' },
@@ -3541,12 +3611,15 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     { key: 'gap',             label: 'Gap',                     color: '#ef4444', fmt: fmtR1,  desc: 'Diferença em relação à meta do mês.' },
     { key: 'tcv',             label: 'TCV',                      color: '#3b82f6', fmt: fmtR1,
       desc: 'Total Contract Value — soma do TCV de todos os Closers da empresa no mês (aba TCV_MENSAL, já consolidado, não recalculado a partir do NMRR).' },
-    { key: 'metaTcv',         label: 'Meta TCV',                 color: '#6366f1', fmt: fmtR1,
-      desc: 'Soma das metas de TCV de todos os Closers da empresa no mês.' },
+    { key: 'metaTcv',         label: 'Meta TCV',                 color: '#6366f1',
+      fmt: v => v == null ? '-' : fmtR1(v),
+      desc: 'Meta de TCV total da empresa no mês (aba METAS_FORECAST, indicador TCV — fonte única, não soma mais TCV_MENSAL).' },
     { key: 'pctMetaTcv',      label: '% Meta TCV',               color: '#10b981',
       fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
       desc: 'TCV Total ÷ Meta TCV Total × 100.' },
-    { key: 'gapTcv',          label: 'Gap TCV',                  color: '#ef4444', fmt: fmtR1,  desc: 'TCV Total − Meta TCV Total.' },
+    { key: 'gapTcv',          label: 'Gap TCV',                  color: '#ef4444',
+      fmt: v => v == null ? '-' : fmtR1(v),
+      desc: 'TCV Total − Meta TCV Total.' },
   ]
   const MARKETING = [
     { key: 'investimento', label: 'Investimento', color: '#f97316', fmt: fmtR1,  desc: 'Valor investido em mídia paga no mês.' },
@@ -3648,6 +3721,19 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
   // o componente. TCV nunca é recalculado a partir do NMRR: usa o valor já consolidado na aba.
   const tcvEmpresa = (tcvData || []).filter(r => String(r.empresa || '').toUpperCase().trim() === empresaSelecionada.toUpperCase().trim())
 
+  // METAS_FORECAST — fonte ÚNICA e EXCLUSIVA da Meta TCV total da empresa (decisão de
+  // negócio); TCV_MENSAL.META deixa de ser usada aqui, mas continua existindo intocada na
+  // planilha. Mesma cautela de posicionamento acima: declarado ANTES de `meses`, que já lê
+  // esta variável dentro do próprio .map() (TDZ — ver nota de tcvEmpresa acima).
+  const metasForecastEmpresa = (metasForecastData || []).filter(r => String(r.empresa || '').toUpperCase().trim() === empresaSelecionada.toUpperCase().trim())
+  // Meta TCV granular por Closer NÃO existe em METAS_FORECAST (só tem o total mensal da
+  // empresa) — nunca dividida/inventada a partir do total. TCV por Closer (Categoria=Closer)
+  // continua usando TCV_MENSAL.META, sem alteração nesta tarefa. Ver relatório da PR.
+  function metaTcvTotalDoMes(ano, mesNomeUp) {
+    const row = metasForecastEmpresa.find(r => r.ano === ano && r.mes === mesNomeUp && r.indicador === 'TCV')
+    return row ? row.meta : null
+  }
+
   const meses = mesesFiltrados.map(p => {
     const d = getData(empresaSelecionada, p.key)
     const m = d?.metricas || {}, c = d?.reunioes?.cards || {}
@@ -3689,14 +3775,16 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     // % do Faturamento — Outras Origens: mesmo NMRR Outras Origens acima, como fração do NMRR
     // total oficial do mês. Denominador zero → indefinido (null), nunca 0%.
     const pctFaturamentoOutrasOrigens = nmrr > 0 ? (nmrrOutrasOrigens / nmrr) * 100 : null
-    // TCV (Parte A) — soma de todos os Closers da empresa no mês, casado por ano+mesNome
-    // (mesma chave usada pela aba TCV_MENSAL, comparável diretamente a p.ano/p.mesNome sem
-    // precisar da ponte de chaves usada para GERAL). Nunca recalculado a partir do NMRR.
+    // TCV (Parte A) — REALIZADO: soma de todos os Closers da empresa no mês, casado por
+    // ano+mesNome (mesma chave usada pela aba TCV_MENSAL, comparável diretamente a
+    // p.ano/p.mesNome sem precisar da ponte de chaves usada para GERAL). Nunca recalculado a
+    // partir do NMRR. META: METAS_FORECAST (decisão de negócio) — não soma mais
+    // TCV_MENSAL.META; null quando não há linha cadastrada, nunca 0 inventado.
     const tcvRowsMes = tcvEmpresa.filter(r => r.ano === p.ano && r.mes === p.mesNome)
     const tcv = tcvRowsMes.reduce((s, r) => s + r.tcv, 0)
-    const metaTcv = tcvRowsMes.reduce((s, r) => s + r.meta, 0)
+    const metaTcv = metaTcvTotalDoMes(p.ano, p.mesNome)
     const pctMetaTcv = metaTcv > 0 ? (tcv / metaTcv) * 100 : null
-    const gapTcv = tcv - metaTcv
+    const gapTcv = metaTcv != null ? tcv - metaTcv : null
     return {
       key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
       agendamentos: Number(m.agendamentos) || 0,
@@ -4545,11 +4633,11 @@ export default function Dashboard() {
               {periodo==='PAINEL' ? <PainelGeralView key={`painel-${empresa}-${periodoAtivo?.key}`} periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
                periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} tcvData={data?.TCV_MENSAL || []} /> :
+               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} tcvData={data?.TCV_MENSAL || []} metasForecastData={data?.METAS_FORECAST || []} /> :
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} forecast={currentData?.FORECAST} empresaSelecionada={empresa} registros={data?.GERAL} sdrFatData={data?.SDR_FAT} /> :
+               periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} empresaSelecionada={empresa} registros={data?.GERAL} sdrFatData={data?.SDR_FAT} metasForecastData={data?.METAS_FORECAST} /> :
                periodoData ? (
                  // key troca a cada empresa/mês — remonta este bloco (nenhum dos 4
                  // componentes abaixo guarda estado local próprio) só para retrigar o
