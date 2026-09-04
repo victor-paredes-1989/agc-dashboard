@@ -2966,8 +2966,23 @@ function ForecastIndicadorView({ periodoAtivo, periodoData, empresaSelecionada, 
   const mfInvest      = metaForecastMes(metasForecastData, empresaSelecionada, anoStr, mesNome, 'INVESTIMENTO')
   const metaNmrr = mfNmrr.meta
 
-  // Leads MQL — mesma lógica de EvolucaoMensalView:
-  // MQL chega como fração (0.32) ou percentual (32) — normalizar para percentual.
+  // Leads MQL — regra oficial: Leads MQL = Math.round(Leads Totais × % MQL), NUNCA
+  // reuniões/origem MQL nem REUNIOES_GERAL. `m.leads` e `m.mql` vêm exclusivamente de
+  // metricas (parseDashRow da aba "DASH <EMPRESA> <MES> <ANO>" em lib/sheets.js) —
+  // mesma fonte usada por Painel Geral e Evolução Mensal, nunca de reuniões.
+  // `m.mql` já chega deste parser passado por parsePercentMeta (lib/sheets.js), que
+  // normaliza fração→percentual (ex.: 0,32 → 32) sem duplicar valores já em percentual
+  // (ex.: 32 permanece 32). O recálculo abaixo é apenas a mesma checagem de fração/
+  // percentual aplicada de novo sobre o valor já normalizado — idempotente para
+  // qualquer % MQL real (≥ 1%), que é o caso de praticamente todos os meses.
+  // Ausência de dado (célula vazia) sempre resulta em 0 (nunca em 100%) — nunca mascara
+  // a ausência transformando Leads MQL em Leads Totais.
+  // Investigação (bug report "AI mostra Leads MQL = Leads Totais"): se Leads MQL bater
+  // exatamente com Leads Totais, isso é matematicamente equivalente a % MQL = 100% —
+  // ou seja, a célula MQL da aba "DASH <EMPRESA> <MES> <ANO>" contém "1" (fração) ou
+  // "100" (percentual), ambos interpretados como 100% por este mesmo parser. Confirmado
+  // via reprodução isolada: não há bug de código nesta cadeia — se 100% não for o dado
+  // real, a correção é na planilha (célula MQL daquele mês/empresa), não aqui.
   const leadsVal  = Number(m.leads)  || 0
   const mqlN      = Number(m.mql) || 0
   const mqlRaw    = mqlN && Math.abs(mqlN) <= 1 ? mqlN * 100 : mqlN
