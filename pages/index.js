@@ -4443,10 +4443,11 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
 
   const rowsAno = rowsEmpresa.filter(r => r.ano === anoSel)
 
-  // Total por Operação (Equipe + Anúncios) e Evolução Mensal usam sempre a EQUIPE INTEIRA do
+  // Investimento Total da Operação (bloco dedicado abaixo) usa sempre a EQUIPE INTEIRA do
   // ano (empresa+ano, sem filtro de Funcionário/Cargo/Nível) — somar o investimento em
   // anúncios da empresa a um único funcionário/cargo filtrado não faria sentido conceitual
-  // ("Investimento Total da Operação" é sempre um número da operação inteira).
+  // ("Investimento Total da Operação" é sempre um número da operação inteira). A métrica
+  // "Equipe + Anúncios" da Evolução Mensal segue a mesma regra — ver isConsolidado abaixo.
   const funcionarios = [...new Set(rowsAno.map(r => r.funcionario))].filter(Boolean).sort((a, b) => a.localeCompare(b))
   const cargos = [...new Set(rowsAno.map(r => r.cargo))].filter(Boolean).sort((a, b) => a.localeCompare(b))
   const niveis = [...new Set(rowsAno.map(r => r.nivel))].filter(Boolean).sort((a, b) => a.localeCompare(b))
@@ -4456,6 +4457,19 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
     (cargoSel === 'Todos' || r.cargo === cargoSel) &&
     (nivelSel === 'Todos' || r.nivel === nivelSel)
   )
+
+  // "Equipe + Anúncios" só existe na visão CONSOLIDADA da empresa (Funcionário/Cargo/Nível
+  // = Todos). Não existe regra oficial de rateio de Investimento em Anúncios por pessoa/
+  // cargo/nível — somar o Total Recebido de UMA pessoa filtrada ao investimento em anúncios
+  // da empresa INTEIRA produziria um número sem significado (não é "o custo total da
+  // operação do Rui"). Por isso a opção é removida do dropdown de Métrica sempre que houver
+  // qualquer filtro granular ativo (ver useEffect abaixo, que também reseta a métrica
+  // selecionada se o usuário estava em "Equipe + Anúncios" e depois aplicou um filtro).
+  const isConsolidado = funcionarioSel === 'Todos' && cargoSel === 'Todos' && nivelSel === 'Todos'
+  useEffect(() => {
+    if (!isConsolidado && metricaSel === 'equipeAnuncios') setMetricaSel('totalRecebido')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConsolidado])
 
   // ── KPIs (respeitam os filtros de Funcionário/Cargo/Nível) ──
   const totalEquipe = sumBy(rowsFiltradas, 'totalRecebido')
@@ -4483,10 +4497,14 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
   const totalOperacao = totalEquipeAno + investAnunciosAno
 
   // ── Evolução Mensal (respeita os filtros — selecionar um Funcionário mostra a evolução
-  // mensal daquela pessoa, conforme pedido) ──
-  const metricaAtiva = INVEST_METRICAS.find(m => m.key === metricaSel) || INVEST_METRICAS[0]
-  const seriesMensal = buildMonthlySeriesInvest(rowsFiltradas, anoSel, metricaSel, empresaSelecionada, periodos, getData)
-  const mesesComValor = seriesMensal.filter(m => m.hasData || metricaSel === 'equipeAnuncios')
+  // mensal daquela pessoa, conforme pedido). "Equipe + Anúncios" fica de fora da lista
+  // enquanto houver filtro granular (isConsolidado=false) — sem essa métrica no ar, não há
+  // como o dropdown ficar com metricaSel apontando para uma opção inexistente (o useEffect
+  // acima garante que metricaSel já volta para 'totalRecebido' antes deste ponto). ──
+  const metricasDisponiveis = isConsolidado ? INVEST_METRICAS : INVEST_METRICAS.filter(m => m.key !== 'equipeAnuncios')
+  const metricaAtiva = metricasDisponiveis.find(m => m.key === metricaSel) || metricasDisponiveis[0]
+  const seriesMensal = buildMonthlySeriesInvest(rowsFiltradas, anoSel, metricaAtiva.key, empresaSelecionada, periodos, getData)
+  const mesesComValor = seriesMensal.filter(m => m.hasData || metricaAtiva.key === 'equipeAnuncios')
 
   // Média mensal — só meses com valor > 0, mesma filosofia da Evolução Mensal comercial.
   const valoresPositivos = seriesMensal.map(m => m.valorReal).filter(v => v != null && v > 0)
@@ -4583,9 +4601,14 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
         </div>
         <div>
           <span className="field-label">Métrica (Evolução Mensal)</span>
-          <select className="field-input" value={metricaSel} onChange={e => setMetricaSel(e.target.value)}>
-            {INVEST_METRICAS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+          <select className="field-input" value={metricaAtiva.key} onChange={e => setMetricaSel(e.target.value)}>
+            {metricasDisponiveis.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
           </select>
+          {!isConsolidado && (
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, maxWidth: 220 }}>
+              "Equipe + Anúncios" disponível apenas na visão consolidada da empresa (Funcionário/Cargo/Nível = Todos) — não há regra de rateio de anúncios por pessoa/cargo/nível.
+            </div>
+          )}
         </div>
       </div>
 
