@@ -3407,7 +3407,7 @@ function VerticalBarChartMonthsGeral({ data, color = '#3b82f6', formatVal = fmt,
   )
 }
 
-function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, periodoAtivo }) {
+function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData }) {
   const CATEGORIAS = [
     { key: 'comercial',   label: 'Dados Comerciais' },
     { key: 'marketing',   label: 'Dados Marketing' },
@@ -3461,6 +3461,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     { key: 'valorPipeline', label: 'Valor Pipeline',   color: '#8b5cf6', fmt: fmtR1,  desc: 'Soma dos valores em status de pipeline: PM, FECHOU, RECALL, R2, CONTRATO e ASSINADO.' },
     { key: 'nmrrOutrasOrigens', label: 'NMRR — Outras Origens', color: '#f97316', fmt: fmtR1,
       desc: 'Soma do NMRR de todas as origens que não são Inbound — exclui MQL, FMQL e também o rótulo histórico "IB" de meses anteriores à separação (IB é Inbound, nunca "outra origem").' },
+    { key: 'pctFaturamentoOutrasOrigens', label: '% do Faturamento — Outras Origens', color: '#fb923c',
+      fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
+      desc: 'NMRR — Outras Origens ÷ NMRR total da empresa no mês × 100.' },
     { key: 'roasIb',        label: 'ROAS IB',          color: '#10b981',
       fmt: v => v == null ? '-' : `${fmtNum1(v)}x · ${(v * 100).toFixed(0)}%`,
       desc: 'NMRR IB (Inbound consolidado) ÷ Investimento em anúncios do mês. Mostrado como múltiplo e como percentual.' },
@@ -3478,6 +3481,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     { key: 'pagos',         label: 'Contratos pagos',     color: '#10b981', fmt: fmt,    desc: 'Total de reuniões com status PAGO.' },
     { key: 'valorPago',     label: 'Valor pago',          color: '#f59e0b', fmt: fmtR1,  desc: 'Soma dos valores das reuniões com status PAGO.' },
     { key: 'taxaConversao', label: 'Taxa de conversão',   color: '#3b82f6', fmt: fmtPct, desc: 'Contratos pagos / reuniões realizadas.' },
+    { key: 'taxaConversaoIb', label: 'Taxa de Conversão IB', color: '#0ea5e9',
+      fmt: v => v == null ? '-' : `${v.toFixed(1)}%`,
+      desc: 'Contratos pagos desta origem/SDR/Closer ÷ Leads totais da empresa no mês × 100. Diferente da "Taxa de conversão" (que usa reuniões realizadas como base) — todo lead do dashboard é Inbound, então Leads IB = Leads totais.' },
     // fmt tratado como null-aware (não fmtR1 direto): TKM sem contratos pagos é indefinido,
     // não zero — mesma regra usada para IB (ver geralMetricVal) e para as demais métricas
     // calculadas desta view quando o denominador é zero.
@@ -3548,6 +3554,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     // ROAS IB — nunca infinito: sem investimento no mês, o múltiplo fica indefinido (null),
     // renderizado como "-" pelo fmt do CALCULADAS.roasIb.
     const roasIb = investimento > 0 ? (nmrrIB / investimento) : null
+    // % do Faturamento — Outras Origens: mesmo NMRR Outras Origens acima, como fração do NMRR
+    // total oficial do mês. Denominador zero → indefinido (null), nunca 0%.
+    const pctFaturamentoOutrasOrigens = nmrr > 0 ? (nmrrOutrasOrigens / nmrr) * 100 : null
     return {
       key: p.key, mes: `${p.mesAbbr}/${p.ano.slice(-2)}`, label: p.label, ano: p.ano,
       agendamentos: Number(m.agendamentos) || 0,
@@ -3572,6 +3581,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
       valorPipeline,
       nmrrOutrasOrigens,
       roasIb,
+      pctFaturamentoOutrasOrigens,
     }
   })
 
@@ -3668,10 +3678,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
   // Nota sobre anoFiltro: removido do filtro de linhas abaixo (existia aqui antes) porque era
   // redundante quando `mg` vem de geralMeses() — geralMeses() já só enumera meses cujo ano
   // passa no anoFiltro, então nenhuma linha de um ano fora do filtro poderia bater com
-  // `mg.key` de qualquer forma. Remover essa checagem também é o que permite o Funil IB
-  // (Bloco D) consultar um mês específico do seletor global "Mês…" independente do que o
-  // dropdown "Ano" desta view estiver mostrando — sem essa mudança, um "Ano" diferente do mês
-  // ativo global faria geralStats devolver zero silenciosamente para o Funil IB.
+  // `mg.key` de qualquer forma.
   function geralStats(mg, field, val) {
     if (field === 'origem' && val === 'IB') {
       // Bloco C (ajuste de revisão) — IB é FALLBACK, nunca uma terceira parcela. Se o mês já
@@ -3719,6 +3726,18 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     if (lista) setMetrica(lista[0].key)
   }
 
+  // "Taxa de Conversão IB" só faz sentido com Categoria=Origem e Origem=IB especificamente (a
+  // fórmula usa Leads Totais como denominador — Leads IB = Leads totais só quando o item
+  // selecionado É o IB). Trocar o valor do seletor Origem/SDR/Closer para outra coisa enquanto
+  // essa métrica está ativa não pode deixar o gráfico com uma métrica que não existe mais no
+  // dropdown — reseta para "Realizadas" nesse caso, mesma queda usada em changeCategoria acima.
+  function changeSubFiltro(v) {
+    setSubFiltro(v)
+    if (metricaGeral === 'taxaConversaoIb' && !(categoria === 'origem' && v === 'IB')) {
+      setMetricaGeral('realizadas')
+    }
+  }
+
   // Bloco B — denominador é o NMRR oficial da empresa no mês (meses[].nmrr, a mesma fonte
   // usada em toda a categoria "Dados Comerciais" e no Painel Geral), casado por ano+mês com
   // os meses agregados de GERAL (chaves diferentes: PERIODOS usa key tipo "AGO26", GERAL usa
@@ -3730,7 +3749,17 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     return nmrrTotalPorAnoMes.get(mg.key)
   }
 
-  function geralMetricVal(s, key, totalNmrrMes) {
+  // Taxa de Conversão IB — denominador é o total de leads da empresa no mês (meses[].leads),
+  // casado por ano+mês do mesmo jeito que o NMRR total acima. Regra de negócio: todo lead do
+  // dashboard é Inbound, então Leads IB = Leads totais da empresa no mês.
+  const leadsTotalPorAnoMes = new Map(
+    mesesFiltrados.map((p, i) => [`${p.ano}-${String(p.mesNome || '').toUpperCase()}`, meses[i]?.leads])
+  )
+  function totalLeadsDoMes(mg) {
+    return leadsTotalPorAnoMes.get(mg.key)
+  }
+
+  function geralMetricVal(s, key, totalNmrrMes, totalLeadsMes) {
     if (key === 'realizadas') return s.realizadas
     if (key === 'pagos') return s.pagos
     if (key === 'valorPago') return s.valor
@@ -3741,6 +3770,10 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
     if (key === 'tkm') return s.pagos > 0 ? s.valor / s.pagos : null
     // Bloco B — % do Faturamento: null (não 0%) quando não há NMRR total válido no mês.
     if (key === 'pctFaturamento') return totalNmrrMes > 0 ? (s.valor / totalNmrrMes) * 100 : null
+    // Taxa de Conversão IB: contratos pagos ÷ leads totais do mês × 100 — diferente da "Taxa
+    // de conversão" acima (que usa realizadas como denominador). Denominador zero/ausente →
+    // null (não 0%), mesma convenção das demais métricas calculadas desta view.
+    if (key === 'taxaConversaoIb') return totalLeadsMes > 0 ? (s.pagos / totalLeadsMes) * 100 : null
     return 0
   }
 
@@ -3757,7 +3790,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
           const color = metrAtiva ? metrAtiva.color : colorArr[vi % colorArr.length]
           const chartData = mesesG.map(mg => {
             const s = geralStats(mg, field, val)
-            const valor = metrAtiva ? geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg)) : s.realizadas
+            const valor = metrAtiva ? geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg)) : s.realizadas
             return { mes: mg.mes, label: mg.label, valor, pagos: s.pagos, valorPago: s.valor }
           })
           const titulo = metrAtiva ? `${val} · ${metrAtiva.label} mês a mês` : `${val} · reuniões mês a mês`
@@ -3802,7 +3835,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
                   <td style={{ color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{mg.label}</td>
                   {displayVals.map(v => {
                     const s = geralStats(mg, field, v)
-                    const val = geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg))
+                    const val = geralMetricVal(s, metrAtiva.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg))
                     return <td key={v} className="is-numeric" style={{ color: metrAtiva.color, fontWeight: 500 }}>{metrAtiva.fmt(val)}</td>
                   })}
                 </tr>
@@ -3863,6 +3896,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
   const isForecast = categoria === 'forecast'
   const isMeta = categoria === 'meta'
   const geralField = categoria === 'origem' ? 'origem' : categoria === 'closer' ? 'closer' : 'sdr'
+  // "Taxa de Conversão IB" é exclusiva de Categoria=Origem + Origem=IB (ver changeSubFiltro
+  // acima) — some do dropdown de Métrica para qualquer outra origem, SDR, Closer ou "Ver todos".
+  const metricasGeralDisponiveis = METRICAS_GERAL.filter(m => m.key !== 'taxaConversaoIb' || (categoria === 'origem' && subFiltro === 'IB'))
   const geralColors = categoria === 'closer' ? CLOSER_COLORS : SDR_COLORS
 
   const { vals: geralVals } = isGeral ? buildGeralSeries(geralField) : { vals: [] }
@@ -3890,42 +3926,9 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
   } else if (subFiltro !== 'todos') {
     const metrAtivaGeral = METRICAS_GERAL.find(mg2 => mg2.key === metricaGeral) || METRICAS_GERAL[0]
     const geralMesesAtual = geralMeses()
-    const media = mediaSemZero(geralMesesAtual.map(mg => geralMetricVal(geralStats(mg, geralField, subFiltro), metrAtivaGeral.key, totalNmrrDoMes(mg))))
+    const media = mediaSemZero(geralMesesAtual.map(mg => geralMetricVal(geralStats(mg, geralField, subFiltro), metrAtivaGeral.key, totalNmrrDoMes(mg), totalLeadsDoMes(mg))))
     mediaTotalDisplay = media == null ? '—' : metrAtivaGeral.fmt(media)
   }
-
-  // ── Bloco D — Funil IB ─────────────────────────────────────────────────
-  // Usa periodoAtivo — o mês globalmente selecionado no dropdown "Mês…" do topo, a MESMA
-  // referência que Painel Geral/Dados Específicos/Metas por Origem/Forecast por Indicador já
-  // recebem (Dashboard já a calcula; só passamos como prop a mais aqui, nenhum estado novo).
-  // Esse dropdown fica visível e ativo mesmo com "Evolução Mensal" selecionada, então
-  // periodoAtivo reflete exatamente o mês que o usuário vê marcado ali — nunca um mês
-  // diferente escolhido silenciosamente por esta view.
-  //
-  // Deliberadamente INDEPENDENTE do filtro "Ano" desta própria view: esse filtro só afeta as
-  // séries de evolução (mês a mês) abaixo, que por natureza mostram vários meses ao mesmo
-  // tempo — não faz sentido "fatiar" um widget de um único mês (o Funil IB) por ele. Se
-  // periodoAtivo apontar para um ano diferente do que está selecionado em "Ano", o Funil IB
-  // mostra esse mês de qualquer forma (é a leitura mais direta de "o mês que o usuário está
-  // olhando" — geralStats() foi ajustado para não depender mais de anoFiltro).
-  const funilDadosMes = periodoAtivo ? getData(empresaSelecionada, periodoAtivo.key) : null
-  const funilLeadsIB = Number(funilDadosMes?.metricas?.leads) || 0
-  const funilKeyGeral = periodoAtivo ? `${periodoAtivo.ano}-${String(periodoAtivo.mesNome || '').toUpperCase()}` : null
-  const funilTemDadosGeral = funilKeyGeral
-    ? geralEmpresa.some(r => `${String(r.ano || '').trim()}-${String(r.mes || '').trim().toUpperCase()}` === funilKeyGeral)
-    : false
-  const funilIbStats = funilTemDadosGeral ? geralStats({ key: funilKeyGeral }, 'origem', 'IB') : null
-  const funilRealizadasIB = funilIbStats?.realizadas || 0
-  const funilPagosIB = funilIbStats?.pagos || 0
-  const funilNmrrIB = funilIbStats?.valor || 0
-  const funilConversaoIB = funilLeadsIB > 0 ? (funilPagosIB / funilLeadsIB) * 100 : null
-
-  const FunilStat = ({ label, value, color }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ fontSize: 18, fontWeight: 700, color }}>{value}</span>
-    </div>
-  )
 
   return (
     <div>
@@ -3954,7 +3957,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
             <span className="field-label">
               {categoria === 'origem' ? 'Origem' : categoria === 'closer' ? 'Closer' : 'SDR'}
             </span>
-            <select className="field-input" value={subFiltro} onChange={e => setSubFiltro(e.target.value)}>
+            <select className="field-input" value={subFiltro} onChange={e => changeSubFiltro(e.target.value)}>
               <option value="todos">Ver todos</option>
               {geralVals.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
@@ -3964,7 +3967,7 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
           <div>
             <span className="field-label">Métrica</span>
             <select className="field-input" value={metricaGeral} onChange={e => setMetricaGeral(e.target.value)}>
-              {METRICAS_GERAL.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+              {metricasGeralDisponiveis.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
           </div>
         )}
@@ -3994,25 +3997,6 @@ function EvolucaoMensalView({ periodos, getData, empresaSelecionada, geralData, 
       {!isGeral && metricaAtiva?.desc && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.4 }}>{metricaAtiva.desc}</div>
       )}
-
-      {/* ── Bloco D — Funil IB ── resumo do mês globalmente selecionado (dropdown "Mês…" do
-          topo); não substitui nenhum funil existente em outras views, é exclusivo desta aba. */}
-      <div className="chart-card" style={{ marginBottom: 32 }}>
-        <div className="chart-title">Funil IB{periodoAtivo ? ` — ${periodoAtivo.label}` : ''}</div>
-        {!periodoAtivo || !funilIbStats ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>
-            Sem dados de Funil IB para o período selecionado.
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px 24px' }}>
-            <FunilStat label="Leads IB" value={fmt(funilLeadsIB)} color="#3b82f6" />
-            <FunilStat label="Realizadas IB" value={fmt(funilRealizadasIB)} color="#14b8a6" />
-            <FunilStat label="Contratos Pagos IB" value={fmt(funilPagosIB)} color="#10b981" />
-            <FunilStat label="NMRR IB" value={fmtR1(funilNmrrIB)} color="#f59e0b" />
-            <FunilStat label="Conversão IB" value={funilConversaoIB != null ? `${funilConversaoIB.toFixed(1)}%` : '—'} color="#8b5cf6" />
-          </div>
-        )}
-      </div>
 
       {/* Charts */}
       {!isGeral ? (
@@ -4372,7 +4356,7 @@ export default function Dashboard() {
               {periodo==='PAINEL' ? <PainelGeralView key={`painel-${empresa}-${periodoAtivo?.key}`} periodoData={periodoData} periodoAtivo={periodoAtivo} nomeEmpresa={nomeEmpresa} forecast={currentData?.FORECAST} /> :
                periodo==='SEMANAS' ? <SemanasComparativo semanas={currentData?.SEMANAS} /> :
                periodo==='FORECAST' ? <ForecastView forecast={currentData?.FORECAST} forecastEquipe={data?.FORECAST_EQUIPE} registros={data?.GERAL} empresaSelecionada={empresa} /> :
-               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} periodoAtivo={periodoAtivo} /> :
+               periodo==='EVOLUCAO' ? <EvolucaoMensalView periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} empresaSelecionada={empresa} geralData={data?.GERAL || []} /> :
                periodo==='DADOS' ? <DadosEspecificosView registros={data?.GERAL} empresaAtiva={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='METAS_ORIGEM' ? <MetasOrigemView performance={data?.PERFORMANCE_ORIGEM} empresaSelecionada={empresa} periodoAtivo={periodoAtivo} /> :
                periodo==='COMPARATIVO' ? <ComparativoMensalDashboard registros={data?.GERAL} empresaSelecionada={empresa} /> :
