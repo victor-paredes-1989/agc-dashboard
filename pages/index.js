@@ -4354,13 +4354,31 @@ function groupSumTotalRecebido(rows, field) {
   return [...map.entries()].map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total)
 }
 
+// Lê um campo de metricas (DASH, via periodos/getData) para um mês específico do ano —
+// mesma fonte oficial usada em todo o dashboard (nunca recalculado de REUNIOES_GERAL/
+// TCV_MENSAL para os agregados da empresa). Ausência de período/dado -> 0 (nunca quebra).
+function getMetricaMes(periodos, getData, empresaSelecionada, ano, mesNum, campo) {
+  const key = (periodos || []).find(p => Number(p.ano) === Number(ano) && monthNumberFromName(p.mesNome) === mesNum)?.key
+  return key ? (Number(getData(empresaSelecionada, key)?.metricas?.[campo]) || 0) : 0
+}
+// TCV Realizado do mês — SEMPRE de TCV_MENSAL (nunca Meta TCV, nunca INVEST_EQUIPE), soma de
+// todos os Closers da empresa naquele ano+mês. Mesmo padrão de EvolucaoMensalView.
+function sumTcvMes(tcvData, empresaSelecionada, ano, mesNum) {
+  const empresaUp = String(empresaSelecionada || '').toUpperCase()
+  const mesNomeUp = MES_INVEST_LABEL[mesNum - 1].toUpperCase()
+  return (tcvData || [])
+    .filter(r => r.empresa === empresaUp && r.ano === String(ano) && r.mes === mesNomeUp)
+    .reduce((s, r) => s + (Number(r.tcv) || 0), 0)
+}
+
 // Constrói a série mensal (12 posições, Jan..Dez) para uma métrica do dropdown "Métrica".
 // % Variável Atingido NUNCA é a média dos percentuais individuais das linhas — soma os dois
 // lados (Atingido/100%) dentro do mês e só então divide, mesma regra da fórmula oficial.
-// "Equipe + Anúncios" soma o Total Recebido do mês (equipe) ao Investimento em Anúncios do
-// mês (fonte oficial já existente — metricas.investimento via getData/periodos), nunca lido
-// de INVEST_EQUIPE.
-function buildMonthlySeriesInvest(rows, ano, metricKey, empresaSelecionada, periodos, getData) {
+// "Equipe + Anúncios" e as 8 métricas de eficiência somam/dividem sempre dados do PRÓPRIO
+// mês da barra (NMRR/Contratos/Reuniões/Anúncios via metricas do DASH daquele mês, TCV via
+// TCV_MENSAL daquele mês) — nunca reaproveita o mês atualmente selecionado no dashboard para
+// as demais barras históricas.
+function buildMonthlySeriesInvest(rows, ano, metricKey, empresaSelecionada, periodos, getData, tcvData) {
   const buckets = Array.from({ length: 12 }, () => ({ recebido: 0, fixo: 0, v100: 0, vAtingido: 0, varal: 0, outros: 0, hasData: false }))
   rows.forEach(r => {
     const n = mesInvestNumero(r.mes)
@@ -4376,6 +4394,7 @@ function buildMonthlySeriesInvest(rows, ano, metricKey, empresaSelecionada, peri
   })
   return buckets.map((b, i) => {
     const mesNum = i + 1
+    const m = (campo) => getMetricaMes(periodos, getData, empresaSelecionada, ano, mesNum, campo)
     let valor = null
     if (metricKey === 'totalRecebido') valor = b.recebido
     else if (metricKey === 'fixo') valor = b.fixo
@@ -4384,11 +4403,15 @@ function buildMonthlySeriesInvest(rows, ano, metricKey, empresaSelecionada, peri
     else if (metricKey === 'pctVariavelAtingido') valor = b.v100 > 0 ? (b.vAtingido / b.v100) * 100 : null
     else if (metricKey === 'varal') valor = b.varal
     else if (metricKey === 'outrosBonus') valor = b.outros
-    else if (metricKey === 'equipeAnuncios') {
-      const key = (periodos || []).find(p => Number(p.ano) === Number(ano) && monthNumberFromName(p.mesNome) === mesNum)?.key
-      const ads = key ? (Number(getData(empresaSelecionada, key)?.metricas?.investimento) || 0) : 0
-      valor = b.recebido + ads
-    }
+    else if (metricKey === 'equipeAnuncios') valor = b.recebido + m('investimento')
+    else if (metricKey === 'nmrrCustoEquipe') valor = b.recebido > 0 ? m('nmrr') / b.recebido : null
+    else if (metricKey === 'tcvCustoEquipe') { const tcv = sumTcvMes(tcvData, empresaSelecionada, ano, mesNum); valor = b.recebido > 0 ? tcv / b.recebido : null }
+    else if (metricKey === 'custoEquipeContrato') { const c = m('contratosPagos'); valor = c > 0 ? b.recebido / c : null }
+    else if (metricKey === 'custoEquipeReuniao') { const r2 = m('realizadas'); valor = r2 > 0 ? b.recebido / r2 : null }
+    else if (metricKey === 'nmrrCustoTotal') { const custoTotal = b.recebido + m('investimento'); valor = custoTotal > 0 ? m('nmrr') / custoTotal : null }
+    else if (metricKey === 'tcvCustoTotal') { const custoTotal = b.recebido + m('investimento'); const tcv = sumTcvMes(tcvData, empresaSelecionada, ano, mesNum); valor = custoTotal > 0 ? tcv / custoTotal : null }
+    else if (metricKey === 'custoTotalContrato') { const custoTotal = b.recebido + m('investimento'); const c = m('contratosPagos'); valor = c > 0 ? custoTotal / c : null }
+    else if (metricKey === 'custoTotalReuniao') { const custoTotal = b.recebido + m('investimento'); const r2 = m('realizadas'); valor = r2 > 0 ? custoTotal / r2 : null }
     return {
       mes: MES_INVEST_ABBR[i], label: `${MES_INVEST_LABEL[i]} ${ano}`,
       valor: valor == null ? 0 : valor, valorReal: valor, hasData: b.hasData,
@@ -4396,18 +4419,33 @@ function buildMonthlySeriesInvest(rows, ano, metricKey, empresaSelecionada, peri
   })
 }
 
+const fmtX = v => v == null ? '—' : `${v.toFixed(2)}x`
+
+// Métricas "de operação" — só existem na visão consolidada (Funcionário/Cargo/Nível =
+// Todos), pois dependem de Investimento em Anúncios/NMRR/TCV/Contratos/Reuniões, nenhum dos
+// quais tem regra oficial de rateio por pessoa/cargo/nível.
+const INVEST_METRICAS_OPERACAO_KEYS = ['equipeAnuncios', 'nmrrCustoEquipe', 'tcvCustoEquipe', 'custoEquipeContrato', 'custoEquipeReuniao', 'nmrrCustoTotal', 'tcvCustoTotal', 'custoTotalContrato', 'custoTotalReuniao']
+
 const INVEST_METRICAS = [
-  { key: 'totalRecebido',      label: 'Total Recebido',        fmt: fmtR1, color: '#3b82f6' },
-  { key: 'fixo',                label: 'Fixo',                   fmt: fmtR1, color: '#10b981' },
-  { key: 'variavel100',         label: 'Variável 100%',          fmt: fmtR1, color: '#8b5cf6' },
-  { key: 'variavelAtingido',    label: 'Variável Atingido',      fmt: fmtR1, color: '#f59e0b' },
-  { key: 'pctVariavelAtingido', label: '% Variável Atingido',    fmt: v => v == null ? '—' : fmtPct(v), color: '#14b8a6' },
-  { key: 'varal',                label: 'Varal',                  fmt: fmtR1, color: '#ec4899' },
-  { key: 'outrosBonus',         label: 'Outros Bônus',           fmt: fmtR1, color: '#f97316' },
-  { key: 'equipeAnuncios',      label: 'Equipe + Anúncios',      fmt: fmtR1, color: '#6366f1' },
+  { key: 'totalRecebido',      label: 'Total Recebido',        fmt: fmtR1, color: '#3b82f6', grupo: 'Remuneração' },
+  { key: 'fixo',                label: 'Fixo',                   fmt: fmtR1, color: '#10b981', grupo: 'Remuneração' },
+  { key: 'variavel100',         label: 'Variável 100%',          fmt: fmtR1, color: '#8b5cf6', grupo: 'Remuneração' },
+  { key: 'variavelAtingido',    label: 'Variável Atingido',      fmt: fmtR1, color: '#f59e0b', grupo: 'Remuneração' },
+  { key: 'pctVariavelAtingido', label: '% Variável Atingido',    fmt: v => v == null ? '—' : fmtPct(v), color: '#14b8a6', grupo: 'Remuneração' },
+  { key: 'varal',                label: 'Varal',                  fmt: fmtR1, color: '#ec4899', grupo: 'Remuneração' },
+  { key: 'outrosBonus',         label: 'Outros Bônus',           fmt: fmtR1, color: '#f97316', grupo: 'Remuneração' },
+  { key: 'equipeAnuncios',      label: 'Equipe + Anúncios',      fmt: fmtR1, color: '#6366f1', grupo: 'Eficiência da Operação' },
+  { key: 'nmrrCustoEquipe',     label: 'NMRR / Custo da Equipe', fmt: fmtX,  color: '#10b981', grupo: 'Eficiência da Operação' },
+  { key: 'tcvCustoEquipe',      label: 'TCV / Custo da Equipe',  fmt: fmtX,  color: '#3b82f6', grupo: 'Eficiência da Operação' },
+  { key: 'custoEquipeContrato', label: 'Custo Equipe / Contrato', fmt: fmtR1, color: '#f59e0b', grupo: 'Eficiência da Operação' },
+  { key: 'custoEquipeReuniao',  label: 'Custo Equipe / Reunião', fmt: fmtR1, color: '#ec4899', grupo: 'Eficiência da Operação' },
+  { key: 'nmrrCustoTotal',      label: 'NMRR / Custo Total',     fmt: fmtX,  color: '#14b8a6', grupo: 'Eficiência da Operação' },
+  { key: 'tcvCustoTotal',       label: 'TCV / Custo Total',      fmt: fmtX,  color: '#6366f1', grupo: 'Eficiência da Operação' },
+  { key: 'custoTotalContrato',  label: 'Custo Total / Contrato', fmt: fmtR1, color: '#f97316', grupo: 'Eficiência da Operação' },
+  { key: 'custoTotalReuniao',   label: 'Custo Total / Reunião',  fmt: fmtR1, color: '#8b5cf6', grupo: 'Eficiência da Operação' },
 ]
 
-function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
+function InvestimentoEquipeView({ empresaSelecionada, periodos, getData, registros = [], tcvData = [] }) {
   const [rows, setRows] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -4467,7 +4505,7 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
   // selecionada se o usuário estava em "Equipe + Anúncios" e depois aplicou um filtro).
   const isConsolidado = funcionarioSel === 'Todos' && cargoSel === 'Todos' && nivelSel === 'Todos'
   useEffect(() => {
-    if (!isConsolidado && metricaSel === 'equipeAnuncios') setMetricaSel('totalRecebido')
+    if (!isConsolidado && INVEST_METRICAS_OPERACAO_KEYS.includes(metricaSel)) setMetricaSel('totalRecebido')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConsolidado])
 
@@ -4496,15 +4534,83 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
   }, 0)
   const totalOperacao = totalEquipeAno + investAnunciosAno
 
+  // ── Eficiência da Operação (BLOCO 1+2, só na visão consolidada) ── NMRR/TCV/Contratos/
+  // Reuniões são sempre a fonte oficial já usada no resto do dashboard (metricas do DASH via
+  // getData/periodos para NMRR/Contratos/Reuniões; TCV_MENSAL para TCV — nunca Meta TCV,
+  // nunca recalculado). Somados sobre os MESMOS meses em que há custo de equipe registrado
+  // (mesesComDadosAno) — comparar resultado comercial de um mês sem nenhum custo de equipe
+  // lançado distorceria a eficiência para mais, sem reduzir o denominador correspondente.
+  const nmrrAno = mesesComDadosAno.reduce((s, mesNum) => s + getMetricaMes(periodos, getData, empresaSelecionada, anoSel, mesNum, 'nmrr'), 0)
+  const contratosAno = mesesComDadosAno.reduce((s, mesNum) => s + getMetricaMes(periodos, getData, empresaSelecionada, anoSel, mesNum, 'contratosPagos'), 0)
+  const realizadasAno = mesesComDadosAno.reduce((s, mesNum) => s + getMetricaMes(periodos, getData, empresaSelecionada, anoSel, mesNum, 'realizadas'), 0)
+  const tcvAno = mesesComDadosAno.reduce((s, mesNum) => s + sumTcvMes(tcvData, empresaSelecionada, anoSel, mesNum), 0)
+  const nmrrCustoEquipe = totalEquipeAno > 0 ? nmrrAno / totalEquipeAno : null
+  const tcvCustoEquipe = totalEquipeAno > 0 ? tcvAno / totalEquipeAno : null
+  const custoEquipeContrato = contratosAno > 0 ? totalEquipeAno / contratosAno : null
+  const custoEquipeReuniao = realizadasAno > 0 ? totalEquipeAno / realizadasAno : null
+  const nmrrCustoTotal = totalOperacao > 0 ? nmrrAno / totalOperacao : null
+  const tcvCustoTotal = totalOperacao > 0 ? tcvAno / totalOperacao : null
+  const custoTotalContrato = contratosAno > 0 ? totalOperacao / contratosAno : null
+  const custoTotalReuniao = realizadasAno > 0 ? totalOperacao / realizadasAno : null
+
+  // ── Eficiência Individual (BLOCO 3, só quando um Funcionário específico está selecionado)
+  // NUNCA usa mídia/Ads — base de custo é sempre TOTAL RECEBIDO do próprio funcionário no
+  // ano. Resultado comercial depende do CARGO: SDR e CLOSER têm fontes inequívocas via
+  // REUNIOES_GERAL (campos sdr/closer já atribuídos por linha, nunca um rateio inventado);
+  // outros cargos não têm métrica comercial individual atribuível (ver relatório da PR). ──
+  const cargoIndividual = funcionarioSel !== 'Todos' ? (rowsAno.find(r => r.funcionario === funcionarioSel)?.cargo || '').trim().toUpperCase() : ''
+  const registrosDoAno = (registros || []).filter(r =>
+    String(r.empresa || '').toUpperCase() === String(empresaSelecionada || '').toUpperCase() &&
+    String(r.ano || '') === anoSel
+  )
+  let individualStats = null
+  if (funcionarioSel !== 'Todos' && cargoIndividual === 'SDR') {
+    const registrosSdr = registrosDoAno.filter(r => String(r.sdr || '').trim().toUpperCase() === funcionarioSel.trim().toUpperCase())
+    // NMRR do SDR — mesma regra já auditada/oficial de calcSdrForecastRows (Forecast SDR):
+    // PAGO, excluindo DSV/DSO (que não contam como NMRR, mesmo sendo PAGO).
+    const nmrrSdr = registrosSdr
+      .filter(r => String(r.status || '').toUpperCase() === 'PAGO')
+      .filter(r => !['DSO', 'DSV'].includes(String(r.servico || '').toUpperCase()))
+      .reduce((s, r) => s + (Number(r.valor) || 0), 0)
+    const contratosPagosSdr = registrosSdr.filter(r => String(r.status || '').toUpperCase() === 'PAGO').length
+    const reunioesSdr = registrosSdr.length
+    individualStats = {
+      cargo: 'SDR',
+      nmrrCusto: totalEquipe > 0 ? nmrrSdr / totalEquipe : null,
+      custoContrato: contratosPagosSdr > 0 ? totalEquipe / contratosPagosSdr : null,
+      custoReuniao: reunioesSdr > 0 ? totalEquipe / reunioesSdr : null,
+    }
+  } else if (funcionarioSel !== 'Todos' && cargoIndividual === 'CLOSER') {
+    const registrosCloser = registrosDoAno.filter(r => String(r.closer || '').trim().toUpperCase() === funcionarioSel.trim().toUpperCase())
+    const nmrrCloser = registrosCloser
+      .filter(r => String(r.status || '').toUpperCase() === 'PAGO')
+      .filter(r => !['DSO', 'DSV'].includes(String(r.servico || '').toUpperCase()))
+      .reduce((s, r) => s + (Number(r.valor) || 0), 0)
+    const contratosPagosCloser = registrosCloser.filter(r => String(r.status || '').toUpperCase() === 'PAGO').length
+    const reunioesCloser = registrosCloser.length
+    const tcvCloser = (tcvData || [])
+      .filter(r => r.empresa === String(empresaSelecionada || '').toUpperCase() && r.ano === anoSel && String(r.closer || '').trim().toUpperCase() === funcionarioSel.trim().toUpperCase())
+      .reduce((s, r) => s + (Number(r.tcv) || 0), 0)
+    individualStats = {
+      cargo: 'CLOSER',
+      tcvCusto: totalEquipe > 0 ? tcvCloser / totalEquipe : null,
+      nmrrCusto: totalEquipe > 0 ? nmrrCloser / totalEquipe : null,
+      custoContrato: contratosPagosCloser > 0 ? totalEquipe / contratosPagosCloser : null,
+      custoReuniao: reunioesCloser > 0 ? totalEquipe / reunioesCloser : null,
+    }
+  } else if (funcionarioSel !== 'Todos') {
+    individualStats = { cargo: cargoIndividual || null, semMetrica: true }
+  }
+
   // ── Evolução Mensal (respeita os filtros — selecionar um Funcionário mostra a evolução
   // mensal daquela pessoa, conforme pedido). "Equipe + Anúncios" fica de fora da lista
   // enquanto houver filtro granular (isConsolidado=false) — sem essa métrica no ar, não há
   // como o dropdown ficar com metricaSel apontando para uma opção inexistente (o useEffect
   // acima garante que metricaSel já volta para 'totalRecebido' antes deste ponto). ──
-  const metricasDisponiveis = isConsolidado ? INVEST_METRICAS : INVEST_METRICAS.filter(m => m.key !== 'equipeAnuncios')
+  const metricasDisponiveis = isConsolidado ? INVEST_METRICAS : INVEST_METRICAS.filter(m => !INVEST_METRICAS_OPERACAO_KEYS.includes(m.key))
   const metricaAtiva = metricasDisponiveis.find(m => m.key === metricaSel) || metricasDisponiveis[0]
-  const seriesMensal = buildMonthlySeriesInvest(rowsFiltradas, anoSel, metricaAtiva.key, empresaSelecionada, periodos, getData)
-  const mesesComValor = seriesMensal.filter(m => m.hasData || metricaAtiva.key === 'equipeAnuncios')
+  const seriesMensal = buildMonthlySeriesInvest(rowsFiltradas, anoSel, metricaAtiva.key, empresaSelecionada, periodos, getData, tcvData)
+  const mesesComValor = seriesMensal.filter(m => m.hasData || INVEST_METRICAS_OPERACAO_KEYS.includes(metricaAtiva.key))
 
   // Média mensal — só meses com valor > 0, mesma filosofia da Evolução Mensal comercial.
   const valoresPositivos = seriesMensal.map(m => m.valorReal).filter(v => v != null && v > 0)
@@ -4602,11 +4708,18 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
         <div>
           <span className="field-label">Métrica (Evolução Mensal)</span>
           <select className="field-input" value={metricaAtiva.key} onChange={e => setMetricaSel(e.target.value)}>
-            {metricasDisponiveis.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+            <optgroup label="Remuneração">
+              {metricasDisponiveis.filter(m => m.grupo === 'Remuneração').map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </optgroup>
+            {isConsolidado && (
+              <optgroup label="Eficiência da Operação">
+                {metricasDisponiveis.filter(m => m.grupo === 'Eficiência da Operação').map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+              </optgroup>
+            )}
           </select>
           {!isConsolidado && (
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, maxWidth: 220 }}>
-              "Equipe + Anúncios" disponível apenas na visão consolidada da empresa (Funcionário/Cargo/Nível = Todos) — não há regra de rateio de anúncios por pessoa/cargo/nível.
+              Métricas de Eficiência da Operação (Equipe + Anúncios, NMRR/TCV/Custo etc.) disponíveis apenas na visão consolidada da empresa (Funcionário/Cargo/Nível = Todos) — não há regra de rateio de anúncios/NMRR/TCV por pessoa/cargo/nível.
             </div>
           )}
         </div>
@@ -4647,6 +4760,69 @@ function InvestimentoEquipeView({ empresaSelecionada, periodos, getData }) {
           Equipe = soma de Total Recebido (INVEST_EQUIPE) de toda a empresa no ano. Anúncios = fonte oficial de Investimento já usada no restante do dashboard (nunca lida de INVEST_EQUIPE). Sempre a operação inteira — não reage aos filtros de Funcionário/Cargo/Nível acima.
         </div>
       </div>
+
+      {/* Eficiência da Operação — só na visão consolidada (Funcionário/Cargo/Nível = Todos):
+          nenhuma dessas métricas tem regra oficial de rateio de Anúncios/NMRR/TCV por
+          pessoa/cargo/nível, então nunca são calculadas fora da consolidação. */}
+      {isConsolidado && (
+        <div className="chart-card" style={{ marginBottom: 28 }}>
+          <div className="chart-title">Eficiência da Operação — {anoSel}</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: 14, marginBottom: 8 }}>
+            Sobre o Custo da Equipe
+          </div>
+          <div className="ie-kpi-grid" style={{ marginBottom: 20 }}>
+            <KpiCard label="NMRR / Custo da Equipe" value={fmtX(nmrrCustoEquipe)} />
+            <KpiCard label="TCV / Custo da Equipe" value={fmtX(tcvCustoEquipe)} />
+            <KpiCard label="Custo Equipe / Contrato" value={custoEquipeContrato == null ? '—' : fmtR1(custoEquipeContrato)} />
+            <KpiCard label="Custo Equipe / Reunião" value={custoEquipeReuniao == null ? '—' : fmtR1(custoEquipeReuniao)} />
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
+            Sobre o Custo Total da Operação (Equipe + Anúncios)
+          </div>
+          <div className="ie-kpi-grid" style={{ marginBottom: 0 }}>
+            <KpiCard label="NMRR / Custo Total" value={fmtX(nmrrCustoTotal)} />
+            <KpiCard label="TCV / Custo Total" value={fmtX(tcvCustoTotal)} />
+            <KpiCard label="Custo Total / Contrato" value={custoTotalContrato == null ? '—' : fmtR1(custoTotalContrato)} />
+            <KpiCard label="Custo Total / Reunião" value={custoTotalReuniao == null ? '—' : fmtR1(custoTotalReuniao)} />
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
+            NMRR e Contratos Pagos e Reuniões Realizadas: fonte oficial já usada no resto do dashboard (metricas do DASH). TCV: TCV_MENSAL (realizado, nunca Meta TCV). Somados sobre os meses em que há custo de equipe lançado. Denominador zero ou ausente → "—".
+          </div>
+        </div>
+      )}
+
+      {/* Eficiência Individual — só quando um Funcionário específico está selecionado.
+          NUNCA usa mídia/Ads. Depende do CARGO: SDR e CLOSER têm fonte inequívoca via
+          REUNIOES_GERAL/TCV_MENSAL; outros cargos mostram aviso de limitação. */}
+      {individualStats && (
+        <div className="chart-card" style={{ marginBottom: 28 }}>
+          <div className="chart-title">Eficiência Individual — {funcionarioSel}{individualStats.cargo ? ` (${individualStats.cargo})` : ''}</div>
+          {individualStats.semMetrica ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12, padding: '16px 0', textAlign: 'center' }}>
+              Sem métrica comercial individual atribuível.
+            </div>
+          ) : (
+            <>
+              <div className="ie-kpi-grid" style={{ marginTop: 14 }}>
+                {individualStats.cargo === 'SDR' && (
+                  <KpiCard label="NMRR / Custo do SDR" value={fmtX(individualStats.nmrrCusto)} />
+                )}
+                {individualStats.cargo === 'CLOSER' && (
+                  <>
+                    <KpiCard label="TCV / Custo do Closer" value={fmtX(individualStats.tcvCusto)} />
+                    <KpiCard label="NMRR / Custo do Closer" value={fmtX(individualStats.nmrrCusto)} />
+                  </>
+                )}
+                <KpiCard label={`Custo ${individualStats.cargo === 'SDR' ? 'SDR' : 'Closer'} / Contrato Pago`} value={individualStats.custoContrato == null ? '—' : fmtR1(individualStats.custoContrato)} />
+                <KpiCard label={`Custo ${individualStats.cargo === 'SDR' ? 'SDR' : 'Closer'} / Reunião`} value={individualStats.custoReuniao == null ? '—' : fmtR1(individualStats.custoReuniao)} />
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
+                Base de custo: Total Recebido do próprio funcionário (INVEST_EQUIPE), nunca mídia/Ads. Resultado comercial: linhas de REUNIOES_GERAL{individualStats.cargo === 'CLOSER' ? '/TCV_MENSAL' : ''} atribuídas a este {individualStats.cargo === 'SDR' ? 'SDR' : 'Closer'} pelo campo oficial (nunca um rateio). Denominador zero/ausente → "—".
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Evolução Mensal */}
       <div className="chart-card" style={{ marginBottom: 28 }}>
@@ -5088,7 +5264,7 @@ export default function Dashboard() {
                periodo==='FORECAST_IND' ? <ForecastIndicadorView periodoAtivo={periodoAtivo} periodoData={currentData?.[activeMesKey]} empresaSelecionada={empresa} registros={data?.GERAL} sdrFatData={data?.SDR_FAT} metasForecastData={data?.METAS_FORECAST} /> :
                periodo==='INVEST_EQUIPE' ? (
                  canViewRestricted
-                   ? <InvestimentoEquipeView empresaSelecionada={empresa} periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} />
+                   ? <InvestimentoEquipeView empresaSelecionada={empresa} periodos={periodosDinamicos} getData={(emp, key) => data?.[emp]?.[key]} registros={data?.GERAL} tcvData={data?.TCV_MENSAL} />
                    : <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 48, textAlign: 'center' }}>Acesso restrito. Esta área é exclusiva para os perfis Admin e Sênior.</div>
                ) :
                periodoData ? (
