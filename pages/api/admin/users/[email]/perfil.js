@@ -3,7 +3,7 @@ import { updateUserPerfil } from '../../../../../lib/sheets-write'
 import { sendHelperError, isSameOriginPost, rejectCrossOrigin } from '../../../../../lib/admin-api'
 
 const MAX_EMAIL_LEN = 320
-const VALID_PERFIS = ['ADMIN', 'USUARIO']
+const VALID_PERFIS = ['ADMIN', 'SENIOR', 'USUARIO']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

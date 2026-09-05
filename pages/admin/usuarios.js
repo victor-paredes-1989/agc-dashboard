@@ -184,10 +184,18 @@ export default function AdminUsuarios() {
       return 0
     })
 
+  // Ranking explícito (não apenas "ADMIN primeiro"): com 3 perfis, um comparador binário
+  // (a.perfil === 'ADMIN' ? -1 : 1) deixa de ser simétrico entre SENIOR/USUARIO — para
+  // qualquer par sem ADMIN, tanto comparator(a,b) quanto comparator(b,a) retornavam 1,
+  // violando o contrato de comparação (ordem instável/indefinida). Um mapa de rank
+  // resolve isso para qualquer número de perfis.
+  const PERFIL_RANK = { ADMIN: 0, SENIOR: 1, USUARIO: 2 }
   const todos = list
     .slice()
     .sort((a, b) => {
-      if (a.perfil !== b.perfil) return a.perfil === 'ADMIN' ? -1 : 1
+      const ra = PERFIL_RANK[a.perfil] ?? 3
+      const rb = PERFIL_RANK[b.perfil] ?? 3
+      if (ra !== rb) return ra - rb
       const an = (a.nome || a.email || '').toLowerCase()
       const bn = (b.nome || b.email || '').toLowerCase()
       return an.localeCompare(bn)
@@ -377,6 +385,7 @@ export default function AdminUsuarios() {
                                 onChange={(e) => handlePerfilChange(u.email, e.target.value)}
                               >
                                 <option value="USUARIO">Usuário</option>
+                                <option value="SENIOR">Sênior</option>
                                 <option value="ADMIN">Admin</option>
                               </select>
                             </td>
